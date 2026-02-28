@@ -1,12 +1,12 @@
 /**
  * StudentPortal — Student-facing dashboard.
  * Tabs: Attendance (check-in/out), Logs, Notices, LMS, Results.
- * Uses face recognition + geolocation for attendance marking.
+ * Uses geolocation for attendance marking.
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getStudentPortalData, markStudentAttendance, registerFaceData } from '../../services/api';
+import { getStudentPortalData, markStudentAttendance } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
@@ -49,19 +49,13 @@ export default function StudentPortal() {
     };
     const attStatus = getAttStatus();
 
-    // Handle attendance marking (simplified — face recognition requires HTTPS)
+    // Handle attendance marking (geolocation only, no face detection)
     const handleAttendance = async (type) => {
-        if (!profile.hasFace) {
-            alert('You must register your face ID first.');
-            return;
-        }
         if (!geo.lat || !geo.lng) {
-            alert('GPS location not available.');
+            alert('GPS location not available. Please allow location access.');
             return;
         }
         showToast(`Processing ${type}...`);
-        // NOTE: Face descriptor would come from face-api.js camera scan
-        // For now, we pass an empty array — full face flow requires HTTPS
         const result = await markStudentAttendance(user?.studentId || user?.userId, type, geo.lat, geo.lng, []);
         if (result?.success) {
             showToast(`${type} Successful!`);
@@ -69,11 +63,6 @@ export default function StudentPortal() {
         } else {
             alert(result?.error || 'Failed');
         }
-    };
-
-    // Face registration placeholder
-    const handleFaceReg = () => {
-        alert('Face registration requires HTTPS and camera access. This feature works on deployed environments.');
     };
 
     return (
@@ -85,8 +74,8 @@ export default function StudentPortal() {
             tabs={TABS}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            hasFace={profile.hasFace}
-            onFaceReg={handleFaceReg}
+            hasFace={true}
+            onFaceReg={() => { }}
             onLogout={logout}
         >
             {/* === Attendance Tab === */}

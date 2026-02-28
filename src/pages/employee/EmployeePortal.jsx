@@ -53,14 +53,10 @@ export default function EmployeePortal() {
     };
     const attState = getAttButtons();
 
-    // Handle attendance
+    // Handle attendance (geolocation only, no face detection)
     const handleAttendance = async (type) => {
-        if (!profile.hasFace) {
-            alert('You must register your face ID first.');
-            return;
-        }
         if (!geo.lat || !geo.lng) {
-            alert('GPS location not available.');
+            alert('GPS location not available. Please allow location access.');
             return;
         }
         showToast(`Processing ${type}...`);
@@ -93,9 +89,7 @@ export default function EmployeePortal() {
         setSavingLeave(false);
     };
 
-    const handleFaceReg = () => {
-        alert('Face registration requires HTTPS and camera access. This feature works on deployed environments.');
-    };
+    // Face detection removed — no registration needed
 
     return (
         <PortalLayout
@@ -105,8 +99,8 @@ export default function EmployeePortal() {
             tabs={TABS}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            hasFace={profile.hasFace}
-            onFaceReg={handleFaceReg}
+            hasFace={true}
+            onFaceReg={() => { }}
             onLogout={logout}
         >
             {/* === Attendance Tab === */}
