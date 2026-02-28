@@ -2,15 +2,27 @@
 @import "tailwindcss";
 
 /* ============================================
-   Student Management System - Global Styles
+   Student Management System — Premium Theme
+   Gradient sidebar, glassmorphism, modern UI
    ============================================ */
+
+:root {
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --accent: #8b5cf6;
+  --sidebar-from: #1e1b4b;
+  --sidebar-to: #312e81;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.3);
+}
 
 body {
   font-family: 'Inter', sans-serif;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 50%, #f5f0ff 100%);
   color: #1e293b;
   margin: 0;
   padding: 0;
+  min-height: 100vh;
 }
 
 /* --- Top Loading Bar --- */
@@ -25,7 +37,7 @@ body {
 }
 
 .loading-bar .bar {
-  background: #2563eb;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
   width: 0;
   height: 100%;
   transition: width 0.2s ease;
@@ -34,20 +46,22 @@ body {
 /* --- Toast Notification --- */
 .toast {
   visibility: hidden;
-  min-width: 250px;
-  background-color: #333;
+  min-width: 280px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   text-align: center;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px 20px;
   position: fixed;
   z-index: 100;
   left: 50%;
   bottom: 30px;
   transform: translateX(-50%);
   font-size: 14px;
+  font-weight: 500;
   opacity: 0;
-  transition: opacity 0.5s;
+  transition: opacity 0.4s;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
 }
 
 .toast.show {
@@ -55,16 +69,19 @@ body {
   opacity: 1;
 }
 
-/* --- Sidebar Navigation --- */
+/* ============================================
+   SIDEBAR NAVIGATION — Gradient Dark
+   ============================================ */
 .sidebar {
-  background: #ffffff;
+  background: linear-gradient(180deg, var(--sidebar-from) 0%, var(--sidebar-to) 100%);
   width: 260px;
   height: 100vh;
   position: fixed;
-  border-right: 1px solid #e2e8f0;
+  border-right: none;
   z-index: 20;
   display: flex;
   flex-direction: column;
+  box-shadow: 4px 0 24px rgba(30, 27, 75, 0.15);
 }
 
 .main-content {
@@ -79,159 +96,221 @@ body {
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  color: #64748b;
+  color: rgba(199, 210, 254, 0.7);
   font-weight: 500;
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.25s ease;
   border-right: 3px solid transparent;
+  border-radius: 0;
+  margin: 2px 8px;
+  border-radius: 8px;
 }
 
 .nav-item:hover {
-  background: #f8fafc;
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e7ff;
 }
 
 .nav-item.active {
-  background: #eff6ff;
-  color: #2563eb;
-  border-right-color: #2563eb;
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  border-right-color: #818cf8;
+  box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.1);
 }
 
-/* --- Cards --- */
+/* ============================================
+   CARDS — Glassmorphism
+   ============================================ */
 .card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--glass-border);
   padding: 24px;
   margin-bottom: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* --- Stat Cards with gradient accent --- */
 .stat-card {
-  background: white;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
   padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-/* --- Tables --- */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
 .t-head {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc, #f0f4ff);
   font-size: 12px;
-  font-weight: 600;
-  color: #475569;
+  font-weight: 700;
+  color: #6366f1;
   text-transform: uppercase;
-  border-bottom: 1px solid #e2e8f0;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e0e7ff;
 }
 
 .t-head th {
-  padding: 12px 16px;
+  padding: 14px 16px;
   text-align: left;
 }
 
 .t-row td {
-  padding: 12px 16px;
+  padding: 14px 16px;
   font-size: 14px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
 
 .t-row:hover {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc, #faf5ff);
 }
 
-/* --- Badges --- */
+/* ============================================
+   BADGES — Vibrant Colors
+   ============================================ */
 .badge {
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 5px 10px;
+  border-radius: 20px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .b-green {
-  background: #dcfce7;
-  color: #166534;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
 }
 
 .b-blue {
-  background: #dbeafe;
-  color: #1e40af;
+  background: linear-gradient(135deg, #dbeafe, #c7d2fe);
+  color: #3730a3;
 }
 
 .b-yellow {
-  background: #fef9c3;
-  color: #854d0e;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
 }
 
 .b-red {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   color: #991b1b;
 }
 
-/* --- Form Inputs --- */
+/* ============================================
+   FORM INPUTS
+   ============================================ */
 .inp {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  padding: 11px 14px;
+  border: 1.5px solid #e0e7ff;
+  border-radius: 10px;
   margin-bottom: 10px;
   font-size: 14px;
   outline: none;
   box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.8);
+  transition: all 0.25s ease;
 }
 
 .inp:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px #eff6ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: #fff;
 }
 
-/* --- Buttons --- */
+/* ============================================
+   BUTTONS — Gradient
+   ============================================ */
 .btn {
-  padding: 10px 20px;
-  background: #2563eb;
+  padding: 11px 22px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
-  border-radius: 6px;
+  border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: 0.2s;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
 }
 
 .btn:hover {
-  background: #1d4ed8;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
 }
 
 .btn:disabled {
   background: #94a3b8;
+  box-shadow: none;
+  transform: none;
   cursor: not-allowed;
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #48bb78, #38a169);
-  color: white;
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #059669, #047857);
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, #f56565, #e53e3e);
-  color: white;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
 }
 
-/* --- Modal Backdrop --- */
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
 
-/* --- Student/Employee Portal --- */
+/* ============================================
+   STUDENT / EMPLOYEE PORTAL
+   ============================================ */
 .sp-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -239,14 +318,28 @@ body {
 }
 
 .sp-header {
-  background: white;
-  border-radius: 15px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
   padding: 25px;
   margin-bottom: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.08);
   display: flex;
   align-items: center;
   gap: 20px;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
 }
 
 .sp-header img {
@@ -254,7 +347,8 @@ body {
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #667eea;
+  border: 3px solid #818cf8;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
 }
 
 .sp-tabs {
@@ -266,61 +360,75 @@ body {
 
 .sp-tab {
   padding: 10px 20px;
-  background: white;
-  border: none;
-  border-radius: 10px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
   cursor: pointer;
   font-weight: 600;
-  color: #718096;
+  color: #64748b;
   transition: all 0.3s ease;
 }
 
-.sp-tab.active {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+.sp-tab:hover {
+  color: #6366f1;
+  border-color: #c7d2fe;
 }
 
-/* --- Attendance Status --- */
+.sp-tab.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 5px 20px rgba(99, 102, 241, 0.3);
+}
+
+/* ============================================
+   ATTENDANCE STATUS
+   ============================================ */
 .status-indicator {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 15px;
-  border-radius: 20px;
+  padding: 8px 16px;
+  border-radius: 24px;
   font-size: 14px;
   font-weight: 600;
 }
 
 .status-checkin {
-  background: #c6f6d5;
-  color: #22543d;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
 }
 
 .status-checkout {
-  background: #fed7d7;
-  color: #742a2a;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
 }
 
 .status-none {
-  background: #e2e8f0;
-  color: #4a5568;
+  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  color: #475569;
 }
 
 /* --- Log Items --- */
 .log-item {
-  padding: 12px;
-  background: #f7fafc;
-  border-radius: 8px;
+  padding: 14px;
+  background: linear-gradient(135deg, #faf5ff, #f0f4ff);
+  border-radius: 12px;
   margin-bottom: 10px;
-  border-left: 3px solid #667eea;
+  border-left: 4px solid #8b5cf6;
+  transition: transform 0.15s ease;
+}
+
+.log-item:hover {
+  transform: translateX(4px);
 }
 
 /* --- Progress Bar --- */
 .progress-bar {
   width: 100%;
   height: 10px;
-  background: #e2e8f0;
+  background: #e0e7ff;
   border-radius: 10px;
   overflow: hidden;
   margin-top: 10px;
@@ -328,21 +436,24 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  transition: width 0.5s ease;
+  border-radius: 10px;
 }
 
 /* --- Location Info --- */
 .location-info {
-  background: #edf2f7;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #f0f4ff, #e8eeff);
+  border-radius: 10px;
   padding: 10px;
   font-size: 13px;
   margin-bottom: 15px;
   text-align: center;
 }
 
-/* --- Responsive --- */
+/* ============================================
+   RESPONSIVE
+   ============================================ */
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -360,10 +471,7 @@ body {
 
 /* ============================================
    DARK MODE
-   Activated by adding 'dark' class to <html>
    ============================================ */
-
-/* Smooth transition for all theme changes */
 body,
 .sidebar,
 .card,
@@ -379,54 +487,58 @@ body,
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* --- Body --- */
 .dark body {
-  background: #0f172a;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
   color: #e2e8f0;
 }
 
-/* --- Sidebar --- */
 .dark .sidebar {
-  background: #1e293b;
-  border-right-color: #334155;
+  background: linear-gradient(180deg, #0c0a1e 0%, #1a1744 100%);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
 }
 
 .dark .nav-item {
-  color: #94a3b8;
+  color: rgba(199, 210, 254, 0.5);
 }
 
 .dark .nav-item:hover {
-  background: #334155;
-  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.05);
+  color: #c7d2fe;
 }
 
 .dark .nav-item.active {
-  background: #1e3a5f;
-  color: #60a5fa;
-  border-right-color: #60a5fa;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border-right-color: #818cf8;
 }
 
-/* --- Main Content --- */
 .dark .main-content {
-  background: #0f172a;
+  background: transparent;
 }
 
-/* --- Cards --- */
 .dark .card {
-  background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border-color: rgba(71, 85, 105, 0.4);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.dark .card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .dark .stat-card {
-  background: #1e293b;
-  border-color: #334155;
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(71, 85, 105, 0.4);
 }
 
-/* --- Tables --- */
+.dark .stat-card::before {
+  background: linear-gradient(90deg, #818cf8, #a78bfa);
+}
+
 .dark .t-head {
-  background: #1e293b;
-  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.9);
+  color: #a5b4fc;
   border-bottom-color: #334155;
 }
 
@@ -436,131 +548,126 @@ body,
 }
 
 .dark .t-row:hover {
-  background: #334155;
+  background: rgba(51, 65, 85, 0.5);
 }
 
-/* --- Form Inputs --- */
 .dark .inp {
-  background: #0f172a;
+  background: rgba(15, 23, 42, 0.8);
   border-color: #475569;
   color: #e2e8f0;
 }
 
 .dark .inp:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
 }
 
 .dark select.inp {
-  background: #0f172a;
+  background: rgba(15, 23, 42, 0.8);
   color: #e2e8f0;
 }
 
-/* --- Buttons --- */
 .dark .btn {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
 
 .dark .btn:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
 }
 
 .dark .btn:disabled {
   background: #475569;
+  box-shadow: none;
 }
 
-/* --- Modal --- */
 .dark .modal-backdrop {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 .dark .modal-backdrop>div {
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid #334155;
   color: #e2e8f0;
 }
 
-/* --- Portal Styles --- */
 .dark .sp-header {
-  background: #1e293b;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border-color: rgba(71, 85, 105, 0.4);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
 .dark .sp-tab {
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(71, 85, 105, 0.4);
   color: #94a3b8;
 }
 
-.dark .sp-tab.active {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
+.dark .sp-tab:hover {
+  color: #a5b4fc;
+  border-color: #6366f1;
 }
 
-/* --- Badges (keep colored in dark mode) --- */
+.dark .sp-tab.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border-color: transparent;
+}
+
 .dark .b-green {
-  background: #064e3b;
+  background: linear-gradient(135deg, #064e3b, #065f46);
   color: #6ee7b7;
 }
 
 .dark .b-blue {
-  background: #1e3a5f;
-  color: #93c5fd;
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  color: #a5b4fc;
 }
 
 .dark .b-yellow {
-  background: #713f12;
+  background: linear-gradient(135deg, #713f12, #92400e);
   color: #fde68a;
 }
 
 .dark .b-red {
-  background: #7f1d1d;
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
   color: #fca5a5;
 }
 
-/* --- Attendance Status Indicators --- */
 .dark .status-checkin {
-  background: #064e3b;
+  background: linear-gradient(135deg, #064e3b, #065f46);
   color: #6ee7b7;
 }
 
 .dark .status-checkout {
-  background: #7f1d1d;
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
   color: #fca5a5;
 }
 
 .dark .status-none {
-  background: #334155;
+  background: linear-gradient(135deg, #334155, #475569);
   color: #94a3b8;
 }
 
-/* --- Log Items --- */
 .dark .log-item {
-  background: #1e293b;
-  border-left-color: #667eea;
+  background: rgba(30, 41, 59, 0.7);
+  border-left-color: #818cf8;
 }
 
-/* --- Progress Bar --- */
 .dark .progress-bar {
   background: #334155;
 }
 
-/* --- Location Info --- */
 .dark .location-info {
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.7);
   color: #cbd5e1;
 }
 
-/* --- Toast --- */
 .dark .toast {
-  background-color: #f1f5f9;
-  color: #1e293b;
+  background: linear-gradient(135deg, #818cf8, #a78bfa);
+  color: #0f172a;
 }
 
-/* --- Login Page Dark --- */
-.dark .login-container {
-  background: #0f172a;
-}
-
-/* --- Misc text overrides --- */
 .dark h1,
 .dark h2,
 .dark h3 {

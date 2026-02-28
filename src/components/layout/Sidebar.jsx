@@ -1,12 +1,11 @@
 /**
- * Sidebar — Admin panel left navigation.
- * Renders nav items, dark mode toggle, user info, and logout button.
+ * Sidebar — Admin panel left navigation with gradient dark theme.
+ * Shows nav items, dark mode toggle, user info, and logout.
  */
 
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
-// Navigation items configuration
 const NAV_ITEMS = [
     { id: 'dash', icon: 'fas fa-home', label: 'Dashboard' },
     { id: 'att', icon: 'fas fa-calendar-check', label: 'Attendance' },
@@ -16,10 +15,10 @@ const NAV_ITEMS = [
     { id: 'adm', icon: 'fas fa-user-graduate', label: 'Admissions' },
     { id: 'fee', icon: 'fas fa-wallet', label: 'Fee Collection' },
     { id: 'rec', icon: 'fas fa-receipt', label: 'Receipts' },
-    { id: 'hr', icon: 'fas fa-users-cog', label: 'HR & Payroll', color: 'text-orange-600' },
+    { id: 'hr', icon: 'fas fa-users-cog', label: 'HR & Payroll' },
     { id: 'divider' },
-    { id: 'lms', icon: 'fas fa-cloud-upload-alt', label: 'LMS Upload', color: 'text-purple-700' },
-    { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results', color: 'text-purple-700' },
+    { id: 'lms', icon: 'fas fa-cloud-upload-alt', label: 'LMS Upload' },
+    { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results' },
 ];
 
 export default function Sidebar({ activeTab, onTabChange }) {
@@ -29,42 +28,51 @@ export default function Sidebar({ activeTab, onTabChange }) {
     return (
         <aside className="sidebar">
             {/* Brand */}
-            <div className="p-6 border-b border-current/10 text-xl font-bold text-blue-600 flex items-center gap-2">
-                <i className="fas fa-layer-group" /> EduManager
+            <div className="p-6" style={{ borderBottom: '1px solid rgba(199,210,254,0.1)' }}>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg"
+                        style={{ background: 'linear-gradient(135deg, #818cf8, #a78bfa)' }}>
+                        <i className="fas fa-graduation-cap" />
+                    </div>
+                    <div>
+                        <div className="font-bold text-white text-lg">EduManager</div>
+                        <div className="text-xs" style={{ color: 'rgba(199,210,254,0.5)' }}>Institute Portal</div>
+                    </div>
+                </div>
             </div>
 
             {/* User Info */}
-            <div className="p-4 border-b border-current/10" style={{ background: isDark ? '#1e293b' : '#f9fafb' }}>
-                <p className="text-xs font-bold opacity-50">LOGGED IN AS</p>
-                <p className="font-bold text-sm">{user?.username || 'User'}</p>
-                <p className="text-xs text-blue-600">{user?.branch || 'Branch'}</p>
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(199,210,254,0.08)', background: 'rgba(0,0,0,0.1)' }}>
+                <p className="text-[10px] font-bold tracking-wider" style={{ color: 'rgba(199,210,254,0.35)' }}>LOGGED IN AS</p>
+                <p className="font-bold text-sm text-white mt-1">{user?.username || 'User'}</p>
+                <p className="text-xs" style={{ color: '#818cf8' }}>{user?.branch || 'Branch'}</p>
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 overflow-y-auto py-3 px-2">
                 {NAV_ITEMS.map((item) => {
                     if (item.id === 'divider') {
-                        return <div key="divider" className="border-t border-current/10 my-2" />;
+                        return <div key="divider" className="my-3 mx-3" style={{ borderTop: '1px solid rgba(199,210,254,0.08)' }} />;
                     }
                     return (
                         <div
                             key={item.id}
-                            className={`nav-item ${item.color || ''} ${activeTab === item.id ? 'active' : ''}`}
+                            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
                             onClick={() => onTabChange(item.id)}
                         >
-                            <i className={item.icon} /> {item.label}
+                            <i className={`${item.icon} w-5 text-center`} /> {item.label}
                         </div>
                     );
                 })}
             </div>
 
             {/* Dark Mode Toggle + Logout */}
-            <div className="p-4 border-t border-current/10">
+            <div className="p-4" style={{ borderTop: '1px solid rgba(199,210,254,0.08)' }}>
                 <button
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg font-semibold text-sm transition-all mb-2"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-all mb-2"
                     style={{
-                        background: isDark ? '#334155' : '#f1f5f9',
-                        color: isDark ? '#fbbf24' : '#64748b',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: isDark ? '#fbbf24' : '#c7d2fe',
                     }}
                     onClick={toggleTheme}
                 >
@@ -75,10 +83,11 @@ export default function Sidebar({ activeTab, onTabChange }) {
                     )}
                 </button>
                 <button
-                    className="w-full text-red-500 font-bold text-sm hover:bg-red-50 py-2 rounded"
+                    className="w-full py-2.5 rounded-lg font-bold text-sm transition-all"
+                    style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5' }}
                     onClick={logout}
                 >
-                    Logout
+                    <i className="fas fa-sign-out-alt mr-1" /> Logout
                 </button>
             </div>
         </aside>

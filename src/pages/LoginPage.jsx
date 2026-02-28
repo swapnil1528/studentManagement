@@ -1,6 +1,5 @@
 /**
- * LoginPage — Authentication screen.
- * Handles form submission, validation, and role-based redirect.
+ * LoginPage — Premium authentication screen with gradient background.
  */
 
 import { useState } from 'react';
@@ -38,14 +37,27 @@ export default function LoginPage() {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{ background: isDark ? '#0f172a' : '#f8fafc' }}
+            style={{
+                background: isDark
+                    ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)'
+                    : 'linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #e0e7ff 100%)',
+            }}
         >
+            {/* Decorative circles */}
+            <div className="absolute top-10 left-10 w-72 h-72 rounded-full opacity-20"
+                style={{ background: 'radial-gradient(circle, #818cf8, transparent)', filter: 'blur(60px)' }}
+            />
+            <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full opacity-15"
+                style={{ background: 'radial-gradient(circle, #a78bfa, transparent)', filter: 'blur(80px)' }}
+            />
+
             {/* Dark mode toggle */}
             <button
-                className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all"
+                className="absolute top-5 right-5 w-11 h-11 rounded-xl flex items-center justify-center text-lg transition-all shadow-lg"
                 style={{
-                    background: isDark ? '#334155' : '#e2e8f0',
-                    color: isDark ? '#fbbf24' : '#64748b',
+                    background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.7)',
+                    color: isDark ? '#fbbf24' : '#6366f1',
+                    backdropFilter: 'blur(8px)',
                 }}
                 onClick={toggleTheme}
                 title={isDark ? 'Light Mode' : 'Dark Mode'}
@@ -53,19 +65,31 @@ export default function LoginPage() {
                 <i className={isDark ? 'fas fa-sun' : 'fas fa-moon'} />
             </button>
 
-            <div className="p-8 rounded-2xl shadow-xl w-96 border"
+            <div className="p-8 rounded-2xl shadow-2xl w-96 relative"
                 style={{
-                    background: isDark ? '#1e293b' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#f1f5f9',
+                    background: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(16px)',
+                    border: `1px solid ${isDark ? 'rgba(71,85,105,0.4)' : 'rgba(255,255,255,0.5)'}`,
                 }}
             >
+                {/* Top gradient line */}
+                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
+                    style={{ background: 'linear-gradient(90deg, #6366f1, #a855f7, #ec4899)' }}
+                />
+
                 {/* Logo */}
-                <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600 text-2xl mb-2">
+                <div className="text-center mb-6 mt-2">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto text-white text-2xl mb-3 shadow-lg"
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                    >
                         <i className="fas fa-graduation-cap" />
                     </div>
-                    <h1 className="text-2xl font-bold text-blue-600">Institute Portal</h1>
-                    <p className="text-sm" style={{ color: isDark ? '#94a3b8' : '#9ca3af' }}>Admin, Employee & Student Login</p>
+                    <h1 className="text-2xl font-bold" style={{ color: isDark ? '#c7d2fe' : '#4338ca' }}>
+                        Institute Portal
+                    </h1>
+                    <p className="text-sm mt-1" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                        Admin, Employee & Student Login
+                    </p>
                 </div>
 
                 {/* Form */}
@@ -95,7 +119,7 @@ export default function LoginPage() {
 
                 {/* Error message */}
                 {error && (
-                    <p className="text-red-500 text-sm text-center mt-4">{error}</p>
+                    <p className="text-red-400 text-sm text-center mt-4 font-medium">{error}</p>
                 )}
             </div>
         </div>

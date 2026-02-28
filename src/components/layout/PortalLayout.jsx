@@ -1,6 +1,6 @@
 /**
- * PortalLayout — Wrapper for Student & Employee portal pages.
- * Provides a consistent header, tab navigation, dark mode toggle, and content area.
+ * PortalLayout — Premium wrapper for Student & Employee portals.
+ * Glassmorphism header with gradient accent, tab nav, dark mode toggle.
  */
 
 import { useTheme } from '../../context/ThemeContext';
@@ -12,7 +12,13 @@ export default function PortalLayout({
     const { isDark, toggleTheme } = useTheme();
 
     return (
-        <div className="min-h-screen" style={{ background: isDark ? '#0f172a' : '#f8fafc' }}>
+        <div className="min-h-screen"
+            style={{
+                background: isDark
+                    ? 'linear-gradient(135deg, #0f172a, #1e1b4b, #0f172a)'
+                    : 'linear-gradient(135deg, #f0f4ff, #e8eeff, #f5f0ff)',
+            }}
+        >
             <div className="sp-container">
                 {/* Header */}
                 <div className="sp-header">
@@ -23,27 +29,23 @@ export default function PortalLayout({
                         />
                     )}
                     <div className="flex-1">
-                        <h1 className="text-2xl font-bold">{name || 'Loading...'}</h1>
-                        <p className="opacity-60">{id || '---'}</p>
+                        <h1 className="text-2xl font-bold" style={{ color: isDark ? '#e0e7ff' : '#1e293b' }}>
+                            {name || 'Loading...'}
+                        </h1>
+                        <p style={{ color: isDark ? '#94a3b8' : '#64748b' }}>{id || '---'}</p>
                         <div className="flex gap-2 items-center mt-2">
                             <span className="badge b-blue">{role || '---'}</span>
-                            {hasFace && (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded font-bold border border-green-200">
-                                    ✅ Face ID Active
-                                </span>
-                            )}
                         </div>
                     </div>
                     <div className="flex gap-2 items-center">
-                        {/* Dark Mode Toggle */}
                         <button
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all"
                             style={{
-                                background: isDark ? '#334155' : '#f1f5f9',
-                                color: isDark ? '#fbbf24' : '#64748b',
+                                background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.08)',
+                                color: isDark ? '#fbbf24' : '#6366f1',
                             }}
                             onClick={toggleTheme}
-                            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                            title={isDark ? 'Light Mode' : 'Dark Mode'}
                         >
                             <i className={isDark ? 'fas fa-sun' : 'fas fa-moon'} />
                         </button>
