@@ -9,7 +9,6 @@ import { getEmployeePortalData, markEmployeeAttendance, saveLeaveRequest } from 
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
-import { useGeolocation } from '../../hooks/useGeolocation';
 import Badge from '../../components/ui/Badge';
 
 const TABS = [
@@ -23,7 +22,7 @@ export default function EmployeePortal() {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
-    const geo = useGeolocation();
+
 
     // Leave form state
     const [leaveForm, setLeaveForm] = useState({
@@ -53,14 +52,10 @@ export default function EmployeePortal() {
     };
     const attState = getAttButtons();
 
-    // Handle attendance (geolocation only, no face detection)
+    // Handle attendance (simple — no face or location check)
     const handleAttendance = async (type) => {
-        if (!geo.lat || !geo.lng) {
-            alert('GPS location not available. Please allow location access.');
-            return;
-        }
         showToast(`Processing ${type}...`);
-        const result = await markEmployeeAttendance(user?.userId, type, geo.lat, geo.lng, []);
+        const result = await markEmployeeAttendance(user?.userId, type, 0, 0, []);
         if (result?.success) {
             showToast(`${type} Successful!`);
             loadData();
@@ -108,12 +103,6 @@ export default function EmployeePortal() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="card text-center">
                         <h3 className="font-bold text-lg mb-4">Mark Attendance</h3>
-                        <div className={`text-center text-xs font-bold p-2 mb-4 rounded ${geo.inRange ? 'bg-green-100 text-green-700' : geo.error ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>
-                            {geo.loading ? '📡 Locating...' :
-                                geo.error ? `❌ ${geo.error}` :
-                                    geo.inRange ? `✅ In office range (${geo.distance}m)` : `❌ Too far (${geo.distance}m)`
-                            }
-                        </div>
                         <div className={attState.iconClass}><i className={attState.icon} /></div>
                         <p className="text-sm text-gray-400 mb-6">{attState.lastText}</p>
                         <div className="grid grid-cols-2 gap-4">

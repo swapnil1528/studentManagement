@@ -10,7 +10,6 @@ import { getStudentPortalData, markStudentAttendance } from '../../services/api'
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
-import { useGeolocation } from '../../hooks/useGeolocation';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -24,7 +23,7 @@ export default function StudentPortal() {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
-    const geo = useGeolocation();
+
 
     // Load student data on mount
     useEffect(() => {
@@ -49,14 +48,10 @@ export default function StudentPortal() {
     };
     const attStatus = getAttStatus();
 
-    // Handle attendance marking (geolocation only, no face detection)
+    // Handle attendance marking (simple — no face or location check)
     const handleAttendance = async (type) => {
-        if (!geo.lat || !geo.lng) {
-            alert('GPS location not available. Please allow location access.');
-            return;
-        }
         showToast(`Processing ${type}...`);
-        const result = await markStudentAttendance(user?.studentId || user?.userId, type, geo.lat, geo.lng, []);
+        const result = await markStudentAttendance(user?.studentId || user?.userId, type, 0, 0, []);
         if (result?.success) {
             showToast(`${type} Successful!`);
             loadData();
@@ -84,12 +79,6 @@ export default function StudentPortal() {
                     {/* Mark Attendance Card */}
                     <div className="card text-center">
                         <h3 className="font-bold text-lg mb-4">Mark Attendance</h3>
-                        <div className="location-info">
-                            {geo.loading ? '📡 Getting location...' :
-                                geo.error ? `❌ ${geo.error}` :
-                                    geo.inRange ? `✅ In range (${geo.distance}m)` : `❌ Too far (${geo.distance}m)`
-                            }
-                        </div>
                         <div className="mb-4">
                             <div className={`status-indicator ${attStatus.class}`}>
                                 <span>{attStatus.label}</span>
