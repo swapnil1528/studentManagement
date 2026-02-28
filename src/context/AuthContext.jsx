@@ -54,9 +54,11 @@ export function AuthProvider({ children }) {
 
         if (result && result.success) {
             // Handle different field name conventions from backend
+            // Normalize role to lowercase (sheet may have 'Admin', 'Student', etc.)
+            const rawRole = (result.role || 'admin').toLowerCase();
             const userData = {
                 username: result.username || result.user || username,
-                role: result.role || 'admin',
+                role: rawRole,
                 branch: result.branch || 'All',
                 userId: result.userId || result.id || '',
                 studentId: result.studentId || result.studId || '',
