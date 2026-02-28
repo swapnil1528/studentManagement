@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment variables (SENSITIVE - never commit)
+.env
+.env.local
+.env.production
+
+# Editor & OS
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

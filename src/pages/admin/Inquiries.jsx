@@ -1,0 +1,134 @@
+/**
+ * Inquiries — Admin inquiry management page.
+ * Lists all inquiries with status and provides a modal to add new ones.
+ */
+
+import { useState } from 'react';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
+import Modal from '../../components/ui/Modal';
+import { saveInquiry } from '../../services/api';
+import { showToast } from '../../components/ui/Toast';
+
+const COLUMNS = [
+    { key: 'name', label: 'Name' },
+    { key: 'mobile', label: 'Mobile' },
+    { key: 'course', label: 'Course' },
+    { key: 'status', label: 'Status' },
+    { key: 'action', label: 'Action' },
+];
+
+export default function Inquiries({ adminData, onReload }) {
+    const [showModal, setShowModal] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const inquiries = adminData?.inquiries || [];
+    const dropdowns = adminData?.dropdowns || {};
+
+    // Form state
+    const [form, setForm] = useState({
+        name: '', mobile: '', branch: '', course: '', village: '',
+        edu: '', gender: 'Male', medium: 'English', board: 'State',
+        stream: 'Arts', remark: '',
+    });
+
+    const handleChange = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleSave = async () => {
+        if (!form.name || !form.mobile) {
+            alert('Please fill required fields');
+            return;
+        }
+        setSaving(true);
+        const result = await saveInquiry(form);
+        if (result?.success) {
+            showToast('Inquiry Saved');
+            setShowModal(false);
+            setForm({ name: '', mobile: '', branch: '', course: '', village: '', edu: '', gender: 'Male', medium: 'English', board: 'State', stream: 'Arts', remark: '' });
+            onReload?.();
+        }
+        setSaving(false);
+    };
+
+    // Callback for opening registration (passed via parent in future)
+    const openReg = (inquiryId) => {
+        // This will be handled by the parent or a shared state
+        alert(`Register inquiry ID: ${inquiryId} — navigate to Registrations tab`);
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between mb-4">
+                <h1 className="text-2xl font-bold">Inquiries</h1>
+                <button className="btn" onClick={() => setShowModal(true)}>New Inquiry</button>
+            </div>
+
+            <DataTable
+                columns={COLUMNS}
+                data={inquiries}
+                renderRow={(r, i) => (
+                    <tr key={i} className="t-row">
+                        <td><div className="font-bold text-gray-700">{r[3]}</div></td>
+                        <td>{r[4]}</td>
+                        <td>{r[6]}</td>
+                        <td><Badge text={r[7]} variant={r[7] === 'Confirmed' ? 'green' : 'yellow'} /></td>
+                        <td>
+                            {r[7] === 'Confirmed' ? (
+                                <Badge text="Confirmed" variant="green" />
+                            ) : (
+                                <button
+                                    onClick={() => openReg(r[0])}
+                                    className="text-blue-600 font-bold text-xs underline"
+                                >
+                                    Register
+                                </button>
+                            )}
+                        </td>
+                    </tr>
+                )}
+            />
+
+            {/* New Inquiry Modal */}
+            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Inquiry" width="w-[600px]">
+                <div className="grid grid-cols-2 gap-4">
+                    <input className="inp" placeholder="Student Name" value={form.name} onChange={(e) => handleChange('name', e.target.value)} />
+                    <input className="inp" placeholder="Mobile" value={form.mobile} onChange={(e) => handleChange('mobile', e.target.value)} />
+                    <select className="inp" value={form.branch} onChange={(e) => handleChange('branch', e.target.value)}>
+                        <option value="">Select Branch</option>
+                        {(dropdowns.branches || []).map((b) => <option key={b}>{b}</option>)}
+                    </select>
+                    <select className="inp" value={form.course} onChange={(e) => handleChange('course', e.target.value)}>
+                        <option value="">Select Course</option>
+                        {(dropdowns.courses || []).map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                    <select className="inp" value={form.village} onChange={(e) => handleChange('village', e.target.value)}>
+                        <option value="">Select Village</option>
+                        {(dropdowns.villages || []).map((v) => <option key={v}>{v}</option>)}
+                    </select>
+                    <select className="inp" value={form.edu} onChange={(e) => handleChange('edu', e.target.value)}>
+                        <option value="">Select Education</option>
+                        {(dropdowns.education || []).map((e) => <option key={e}>{e}</option>)}
+                    </select>
+                    <select className="inp" value={form.gender} onChange={(e) => handleChange('gender', e.target.value)}>
+                        <option>Male</option><option>Female</option>
+                    </select>
+                    <select className="inp" value={form.medium} onChange={(e) => handleChange('medium', e.target.value)}>
+                        <option>English</option><option>Marathi</option><option>Hindi</option>
+                    </select>
+                    <select className="inp" value={form.board} onChange={(e) => handleChange('board', e.target.value)}>
+                        <option>State</option><option>CBSE</option>
+                    </select>
+                    <select className="inp" value={form.stream} onChange={(e) => handleChange('stream', e.target.value)}>
+                        <option>Arts</option><option>Commerce</option><option>Science</option>
+                    </select>
+                    <textarea className="inp col-span-2" placeholder="Remarks" value={form.remark} onChange={(e) => handleChange('remark', e.target.value)} />
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                    <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowModal(false)}>Cancel</button>
+                    <button className="btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+                </div>
+            </Modal>
+        </div>
+    );
+}
