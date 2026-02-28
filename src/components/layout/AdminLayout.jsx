@@ -38,11 +38,19 @@ export default function AdminLayout({ adminData, onReload }) {
     // Get the active component, fallback to Dashboard
     const ActiveComponent = TAB_COMPONENTS[activeTab] || Dashboard;
 
+    // Safety check — render empty state if adminData is somehow null
+    const safeData = adminData || {
+        inquiries: [], registrations: [], admissions: [], fees: [],
+        activeStudents: [], employees: [], leaves: [], payroll: [],
+        dropdowns: { branches: [], courses: [], villages: [], employees: [], education: [] },
+        stats: { todayPresent: 0, todayAbsent: 0 },
+    };
+
     return (
         <div>
             <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
             <main className="main-content">
-                <ActiveComponent adminData={adminData} onReload={onReload} />
+                <ActiveComponent adminData={safeData} onReload={onReload} />
             </main>
         </div>
     );

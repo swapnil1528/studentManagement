@@ -50,19 +50,23 @@ export function AuthProvider({ children }) {
      */
     const login = async (username, password) => {
         const result = await loginUser(username, password);
+        console.log('[Auth] Login response:', result);
+
         if (result && result.success) {
+            // Handle different field name conventions from backend
             const userData = {
-                username: result.username,
-                role: result.role,
-                branch: result.branch,
-                userId: result.userId,
-                studentId: result.studentId,
+                username: result.username || result.user || username,
+                role: result.role || 'admin',
+                branch: result.branch || 'All',
+                userId: result.userId || result.id || '',
+                studentId: result.studentId || result.studId || '',
             };
+            console.log('[Auth] Stored user:', userData);
             setUser(userData);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
             return { success: true };
         }
-        return { success: false, error: 'Invalid credentials' };
+        return { success: false, error: result?.error || 'Invalid credentials' };
     };
 
     // ─── Logout ──────────────────────────────────────────────

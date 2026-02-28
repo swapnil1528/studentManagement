@@ -22,9 +22,23 @@ export async function apiCall(action, data = {}) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
+            redirect: 'follow',
+            headers: {
+                'Content-Type': 'text/plain',
+            },
             body: JSON.stringify({ action, ...data }),
         });
-        const result = await response.json();
+
+        // Google Apps Script may return a redirect — check if we got HTML
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (parseErr) {
+            console.error(`[API Parse Error] ${action}: Response is not JSON`, text.substring(0, 200));
+            return null;
+        }
+
         if (result.error) {
             console.error(`[API Error] ${action}:`, result.error);
         }
