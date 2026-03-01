@@ -118,7 +118,7 @@ export default function App() {
 
           {/* Protected — Admin */}
           <Route
-            path="/admin"
+            path="/admin/*"
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminPage />

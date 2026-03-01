@@ -1,10 +1,12 @@
 /**
  * Sidebar — Admin panel left navigation with gradient dark theme.
- * Shows nav items, dark mode toggle, user info, and logout.
+ * Uses URL-based navigation (react-router) — each page has its own URL.
  */
 
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { TAB_TO_SLUG } from './AdminLayout';
 
 const NAV_ITEMS = [
     { id: 'dash', icon: 'fas fa-home', label: 'Dashboard' },
@@ -21,9 +23,15 @@ const NAV_ITEMS = [
     { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results' },
 ];
 
-export default function Sidebar({ activeTab, onTabChange }) {
+export default function Sidebar({ activeTab }) {
     const { user, logout } = useAuth();
     const { isDark, toggleTheme } = useTheme();
+    const navigate = useNavigate();
+
+    const handleNavClick = (tabId) => {
+        const slug = TAB_TO_SLUG[tabId] || 'dashboard';
+        navigate(`/admin/${slug}`);
+    };
 
     return (
         <aside className="sidebar">
@@ -58,7 +66,7 @@ export default function Sidebar({ activeTab, onTabChange }) {
                         <div
                             key={item.id}
                             className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                            onClick={() => onTabChange(item.id)}
+                            onClick={() => handleNavClick(item.id)}
                         >
                             <i className={`${item.icon} w-5 text-center`} /> {item.label}
                         </div>

@@ -1,9 +1,10 @@
 /**
  * AdminLayout — Wraps admin pages with sidebar + main content area.
- * Manages the active tab state and renders the corresponding admin page.
+ * Uses URL-based routing via useLocation for page navigation.
+ * Each admin sub-page has its own URL: /admin/attendance, /admin/notices, etc.
  */
 
-import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Dashboard from '../../pages/admin/Dashboard';
 import Inquiries from '../../pages/admin/Inquiries';
@@ -17,38 +18,65 @@ import HRManagement from '../../pages/admin/HRManagement';
 import LMSUpload from '../../pages/admin/LMSUpload';
 import ExamResults from '../../pages/admin/ExamResults';
 
-// Map tab IDs to components
-const TAB_COMPONENTS = {
-    dash: Dashboard,
-    att: Attendance,
-    notices: Notices,
-    inq: Inquiries,
-    reg: Registrations,
-    adm: Admissions,
-    fee: FeeCollection,
-    rec: Receipts,
-    hr: HRManagement,
-    lms: LMSUpload,
-    exam: ExamResults,
+// Map URL paths to components
+const PAGE_MAP = {
+    'dashboard': Dashboard,
+    'attendance': Attendance,
+    'notices': Notices,
+    'inquiries': Inquiries,
+    'registrations': Registrations,
+    'admissions': Admissions,
+    'fees': FeeCollection,
+    'receipts': Receipts,
+    'hr': HRManagement,
+    'lms': LMSUpload,
+    'exams': ExamResults,
 };
 
+// Map old tab IDs to new URL slugs (for Sidebar compatibility)
+export const TAB_TO_SLUG = {
+    dash: 'dashboard',
+    att: 'attendance',
+    notices: 'notices',
+    inq: 'inquiries',
+    reg: 'registrations',
+    adm: 'admissions',
+    fee: 'fees',
+    rec: 'receipts',
+    hr: 'hr',
+    lms: 'lms',
+    exam: 'exams',
+};
+
+export const SLUG_TO_TAB = Object.fromEntries(
+    Object.entries(TAB_TO_SLUG).map(([k, v]) => [v, k])
+);
+
 export default function AdminLayout({ adminData, onReload }) {
-    const [activeTab, setActiveTab] = useState('dash');
+    const location = useLocation();
 
-    // Get the active component, fallback to Dashboard
-    const ActiveComponent = TAB_COMPONENTS[activeTab] || Dashboard;
+    // Extract page slug from URL: /admin/attendance → "attendance"
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    const currentSlug = pathParts.length > 1 ? pathParts[1] : 'dashboard';
 
-    // Safety check — render empty state if adminData is somehow null
+    // Get the active component based on URL
+    const ActiveComponent = PAGE_MAP[currentSlug] || Dashboard;
+
+    // Current "tab" ID for sidebar highlight
+    const activeTab = SLUG_TO_TAB[currentSlug] || 'dash';
+
+    // Safety check
     const safeData = adminData || {
         inquiries: [], registrations: [], admissions: [], fees: [],
         activeStudents: [], employees: [], leaves: [], payroll: [],
         dropdowns: { branches: [], courses: [], villages: [], employees: [], education: [] },
         stats: { todayPresent: 0, todayAbsent: 0 },
+        _rawAttendance: [],
     };
 
     return (
         <div>
-            <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+            <Sidebar activeTab={activeTab} />
             <main className="main-content">
                 <ActiveComponent adminData={safeData} onReload={onReload} />
             </main>
