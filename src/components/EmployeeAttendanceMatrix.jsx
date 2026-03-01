@@ -191,6 +191,7 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">Total Backend Logs: {logs?.length || 0}</span>
                     <select
                         className="inp m-0"
                         value={selectedMonth}
