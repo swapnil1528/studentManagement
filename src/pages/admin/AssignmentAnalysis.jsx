@@ -8,9 +8,6 @@ import { useState, useEffect } from 'react';
 import { apiCall } from '../../services/api';
 import { setLoading } from '../../components/ui/LoadingBar';
 
-// Normalize strings for comparison
-const norm = (s) => String(s || '').trim().toLowerCase();
-
 export default function AssignmentAnalysis({ adminData }) {
     const [assignments, setAssignments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -19,10 +16,14 @@ export default function AssignmentAnalysis({ adminData }) {
     const [filterCourse, setFilterCourse] = useState('');
     const [filterBatch, setFilterBatch] = useState('');
 
+    // Filtered results stored as state
+    const [rows, setRows] = useState([]);
+    const [topics, setTopics] = useState([]);
+
     // Get active students from adminData
     const allStudents = adminData?.activeStudents || [];
-    const batches = [...new Set(allStudents.map(s => s.batch).filter(Boolean))];
-    const courses = [...new Set(allStudents.map(s => s.course).filter(Boolean))];
+    const batches = [...new Set(allStudents.map(s => String(s.batch || '').trim()).filter(Boolean))];
+    const courses = [...new Set(allStudents.map(s => String(s.course || '').trim()).filter(Boolean))];
 
     // Load all assignments on mount
     useEffect(() => { loadAllAssignments(); }, []);
@@ -36,48 +37,59 @@ export default function AssignmentAnalysis({ adminData }) {
         setIsLoading(false);
     };
 
-    // ── Compute filtered data directly (no useMemo) ──
-    const fc = filterCourse ? norm(filterCourse) : '';
-    const fb = filterBatch ? norm(filterBatch) : '';
+    // ── Re-compute filtered data whenever filters, students, or assignments change ──
+    useEffect(() => {
+        const fc = filterCourse ? String(filterCourse).trim().toLowerCase() : '';
+        const fb = filterBatch ? String(filterBatch).trim().toLowerCase() : '';
 
-    // 1. Filter students
-    let filteredStudents = allStudents;
-    if (fc) filteredStudents = filteredStudents.filter(s => norm(s.course) === fc);
-    if (fb) filteredStudents = filteredStudents.filter(s => norm(s.batch) === fb);
+        console.log('[AssignmentAnalysis] Filter:', { fc, fb, totalStudents: allStudents.length, totalAssignments: assignments.length });
 
-    // 2. Get relevant topics (only from selected course if filtered)
-    const relevantAssignments = fc
-        ? assignments.filter(a => norm(a.course) === fc)
-        : assignments;
-    const allTopics = [...new Set(relevantAssignments.map(a => a.topic).filter(Boolean))].sort();
-
-    // 3. Build rows with assignment counts
-    const rows = filteredStudents.map(student => {
-        let studentAsn = assignments.filter(a => String(a.studentId) === String(student.id));
-        if (fc) studentAsn = studentAsn.filter(a => norm(a.course) === fc);
-
-        const topicCounts = {};
-        allTopics.forEach(t => { topicCounts[t] = 0; });
-        studentAsn.forEach(a => {
-            if (a.topic && topicCounts.hasOwnProperty(a.topic)) topicCounts[a.topic]++;
+        // 1. Filter students
+        let filtered = allStudents.filter(s => {
+            const sCourse = String(s.course || '').trim().toLowerCase();
+            const sBatch = String(s.batch || '').trim().toLowerCase();
+            if (fc && sCourse !== fc) return false;
+            if (fb && sBatch !== fb) return false;
+            return true;
         });
 
-        return {
-            id: student.id + '-' + student.course, // unique key per student-course
-            studentId: student.id,
-            name: student.name,
-            course: student.course,
-            batch: student.batch,
-            total: studentAsn.length,
-            topicCounts
-        };
-    });
+        console.log('[AssignmentAnalysis] Filtered students:', filtered.length, 'sample:', filtered.slice(0, 3).map(s => s.course));
 
-    // Summary stats
-    const totalAssignments = assignments.length;
-    const totalStudents = rows.length;
+        // 2. Get relevant topics
+        const relevantAsn = fc
+            ? assignments.filter(a => String(a.course || '').trim().toLowerCase() === fc)
+            : assignments;
+        const topicList = [...new Set(relevantAsn.map(a => a.topic).filter(Boolean))].sort();
+
+        // 3. Build rows
+        const newRows = filtered.map(student => {
+            let studentAsn = assignments.filter(a => String(a.studentId) === String(student.id));
+            if (fc) studentAsn = studentAsn.filter(a => String(a.course || '').trim().toLowerCase() === fc);
+
+            const topicCounts = {};
+            topicList.forEach(t => { topicCounts[t] = 0; });
+            studentAsn.forEach(a => {
+                if (a.topic && topicCounts.hasOwnProperty(a.topic)) topicCounts[a.topic]++;
+            });
+
+            return {
+                key: student.id + '-' + (student.course || '') + '-' + Math.random(),
+                studentId: student.id,
+                name: student.name,
+                course: student.course,
+                batch: student.batch,
+                total: studentAsn.length,
+                topicCounts
+            };
+        });
+
+        setRows(newRows);
+        setTopics(topicList);
+    }, [filterCourse, filterBatch, allStudents.length, assignments.length]);
+
+    // Summary
     const totalFiltered = rows.reduce((s, r) => s + r.total, 0);
-    const avgPerStudent = totalStudents > 0 ? (totalFiltered / totalStudents).toFixed(1) : 0;
+    const avgPerStudent = rows.length > 0 ? (totalFiltered / rows.length).toFixed(1) : 0;
 
     return (
         <div>
@@ -91,11 +103,11 @@ export default function AssignmentAnalysis({ adminData }) {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="card text-center" style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff' }}>
-                    <div className="text-3xl font-bold">{totalAssignments}</div>
+                    <div className="text-3xl font-bold">{assignments.length}</div>
                     <div className="text-sm opacity-80">Total Assignments</div>
                 </div>
                 <div className="card text-center" style={{ background: 'linear-gradient(135deg, #10b981, #34d399)', color: '#fff' }}>
-                    <div className="text-3xl font-bold">{totalStudents}</div>
+                    <div className="text-3xl font-bold">{rows.length}</div>
                     <div className="text-sm opacity-80">Students (Filtered)</div>
                 </div>
                 <div className="card text-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#fff' }}>
@@ -109,7 +121,7 @@ export default function AssignmentAnalysis({ adminData }) {
                 <div className="flex flex-wrap gap-4 items-end">
                     <div className="flex-1 min-w-[180px]">
                         <label className="text-xs font-bold opacity-50 mb-1 block">Course Filter</label>
-                        <select className="inp" value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}>
+                        <select className="inp" value={filterCourse} onChange={(e) => { console.log('[Filter] Course:', e.target.value); setFilterCourse(e.target.value); }}>
                             <option value="">All Courses</option>
                             {courses.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -128,6 +140,11 @@ export default function AssignmentAnalysis({ adminData }) {
                     >
                         Clear Filters
                     </button>
+                </div>
+
+                {/* Debug info */}
+                <div className="text-xs text-gray-400 mt-2">
+                    Total students in data: {allStudents.length} | Courses found: {courses.join(', ')} | Filtered: {rows.length}
                 </div>
             </div>
 
@@ -150,7 +167,7 @@ export default function AssignmentAnalysis({ adminData }) {
                                     <th className="text-left p-3 font-bold border-b" style={{ minWidth: '100px' }}>Course</th>
                                     <th className="text-left p-3 font-bold border-b" style={{ minWidth: '120px' }}>Batch</th>
                                     <th className="text-center p-3 font-bold border-b" style={{ minWidth: '80px', background: 'rgba(16,185,129,0.1)' }}>Total</th>
-                                    {allTopics.map(topic => (
+                                    {topics.map(topic => (
                                         <th key={topic} className="text-center p-3 font-bold border-b" style={{ minWidth: '100px' }}>
                                             {topic}
                                         </th>
@@ -159,7 +176,7 @@ export default function AssignmentAnalysis({ adminData }) {
                             </thead>
                             <tbody>
                                 {rows.map((row, i) => (
-                                    <tr key={row.id} className="border-b hover:bg-gray-50 transition">
+                                    <tr key={row.key} className="border-b hover:bg-gray-50 transition">
                                         <td className="p-3 opacity-40">{i + 1}</td>
                                         <td className="p-3 font-bold">{row.name}</td>
                                         <td className="p-3">
@@ -177,7 +194,7 @@ export default function AssignmentAnalysis({ adminData }) {
                                                 {row.total}
                                             </span>
                                         </td>
-                                        {allTopics.map(topic => (
+                                        {topics.map(topic => (
                                             <td key={topic} className="p-3 text-center">
                                                 <span style={{
                                                     color: row.topicCounts[topic] > 0 ? '#059669' : '#9ca3af',
@@ -193,10 +210,8 @@ export default function AssignmentAnalysis({ adminData }) {
                             <tfoot>
                                 <tr style={{ background: 'rgba(99,102,241,0.06)', fontWeight: 'bold' }}>
                                     <td className="p-3" colSpan="4" style={{ textAlign: 'right' }}>Total:</td>
-                                    <td className="p-3 text-center" style={{ color: '#6366f1' }}>
-                                        {totalFiltered}
-                                    </td>
-                                    {allTopics.map(topic => (
+                                    <td className="p-3 text-center" style={{ color: '#6366f1' }}>{totalFiltered}</td>
+                                    {topics.map(topic => (
                                         <td key={topic} className="p-3 text-center" style={{ color: '#6366f1' }}>
                                             {rows.reduce((s, r) => s + (r.topicCounts[topic] || 0), 0)}
                                         </td>
