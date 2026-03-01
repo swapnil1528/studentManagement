@@ -1,13 +1,15 @@
 /**
  * Inquiries — Admin inquiry management page.
- * Lists all inquiries with status and provides a modal to add new ones.
+ * Lists all inquiries with status.
+ * "Register" button opens Register Student modal (Aadhar, DOB, Photo).
+ * "New Inquiry" button opens new inquiry form.
  */
 
 import { useState } from 'react';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { saveInquiry } from '../../services/api';
+import { saveInquiry, registerStudent } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
 const COLUMNS = [
@@ -24,12 +26,17 @@ export default function Inquiries({ adminData, onReload }) {
     const inquiries = adminData?.inquiries || [];
     const dropdowns = adminData?.dropdowns || {};
 
-    // Form state
+    // New Inquiry form state
     const [form, setForm] = useState({
         name: '', mobile: '', branch: '', course: '', village: '',
         edu: '', gender: 'Male', medium: 'English', board: 'State',
         stream: 'Arts', remark: '',
     });
+
+    // Register Student modal state
+    const [showRegModal, setShowRegModal] = useState(false);
+    const [regSaving, setRegSaving] = useState(false);
+    const [regForm, setRegForm] = useState({ inquiryId: '', aadhar: '', dob: '', photo: '' });
 
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -51,10 +58,37 @@ export default function Inquiries({ adminData, onReload }) {
         setSaving(false);
     };
 
-    // Callback for opening registration (passed via parent in future)
-    const openReg = (inquiryId) => {
-        // This will be handled by the parent or a shared state
-        alert(`Register inquiry ID: ${inquiryId} — navigate to Registrations tab`);
+    // Open Register Student modal
+    const openRegModal = (inquiryId) => {
+        setRegForm({ inquiryId, aadhar: '', dob: '', photo: '' });
+        setShowRegModal(true);
+    };
+
+    // Handle photo file selection
+    const handlePhotoChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => setRegForm((p) => ({ ...p, photo: ev.target.result }));
+        reader.readAsDataURL(file);
+    };
+
+    // Handle Register confirm
+    const handleRegister = async () => {
+        if (!regForm.aadhar) {
+            alert('Please enter Aadhar No');
+            return;
+        }
+        setRegSaving(true);
+        const result = await registerStudent(regForm);
+        if (result?.success) {
+            showToast('Student Registered Successfully!');
+            setShowRegModal(false);
+            onReload?.();
+        } else {
+            alert(result?.error || 'Registration failed');
+        }
+        setRegSaving(false);
     };
 
     return (
@@ -78,8 +112,8 @@ export default function Inquiries({ adminData, onReload }) {
                                 <Badge text="Confirmed" variant="green" />
                             ) : (
                                 <button
-                                    onClick={() => openReg(r[0])}
-                                    className="text-blue-600 font-bold text-xs underline"
+                                    onClick={() => openRegModal(r[0])}
+                                    className="btn py-1 px-3 text-xs"
                                 >
                                     Register
                                 </button>
@@ -127,6 +161,30 @@ export default function Inquiries({ adminData, onReload }) {
                 <div className="flex justify-end gap-2 mt-4">
                     <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowModal(false)}>Cancel</button>
                     <button className="btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+                </div>
+            </Modal>
+
+            {/* Register Student Modal — Aadhar, DOB, Photo */}
+            <Modal isOpen={showRegModal} onClose={() => setShowRegModal(false)} title="Register Student">
+                <input
+                    className="inp"
+                    placeholder="Aadhar No"
+                    value={regForm.aadhar}
+                    onChange={(e) => setRegForm((p) => ({ ...p, aadhar: e.target.value }))}
+                />
+                <input
+                    className="inp"
+                    type="date"
+                    value={regForm.dob}
+                    onChange={(e) => setRegForm((p) => ({ ...p, dob: e.target.value }))}
+                />
+                <div className="mb-4">
+                    <label className="text-xs font-bold text-gray-500">Student Photo</label>
+                    <input className="text-sm block mt-1 w-full" type="file" accept="image/*" onChange={handlePhotoChange} />
+                </div>
+                <div className="flex justify-end gap-2">
+                    <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowRegModal(false)}>Cancel</button>
+                    <button className="btn" onClick={handleRegister} disabled={regSaving}>{regSaving ? 'Saving...' : 'Confirm'}</button>
                 </div>
             </Modal>
         </div>

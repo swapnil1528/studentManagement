@@ -1,10 +1,11 @@
 /**
  * Registrations — Admin registration management page.
- * Shows registered students with photo, ID, name, course, date.
- * "Admit" button opens Admission modal with course & batch selection.
+ * Shows registered students. "Admit" button opens Admission modal.
+ * Admission modal: name (auto), course (from Course Master), fees (auto-fill from Course Master),
+ * discount option, batch (from Batch sheet). No duplicate course per student.
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import { saveCourseAdmission } from '../../services/api';
@@ -22,24 +23,72 @@ const COLUMNS = [
 export default function Registrations({ adminData, onReload }) {
     const registrations = adminData?.registrations || [];
     const dropdowns = adminData?.dropdowns || {};
+    const admissions = adminData?.admissions || [];
+    const courseMaster = dropdowns.courseMaster || [];
+    const batches = dropdowns.batches || [];
 
     // Admission modal state
     const [showAdmitModal, setShowAdmitModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [admitForm, setAdmitForm] = useState({
-        admStudId: '', name: '', admCourse: '', admFees: '', admBatchTime: '08-10 AM'
+        admStudId: '', name: '', admCourse: '', admFees: '', discount: 0, finalFees: '', admBatchTime: ''
     });
 
-    // Open Admission modal for a registered student
+    // Get courses already assigned to this student (prevent duplicates)
+    const studentExistingCourses = useMemo(() => {
+        if (!admitForm.admStudId) return [];
+        return admissions
+            .filter(r => String(r[2]) === String(admitForm.admStudId))
+            .map(r => String(r[7]).toLowerCase());
+    }, [admitForm.admStudId, admissions]);
+
+    // Available courses (exclude already-assigned ones)
+    const availableCourses = useMemo(() => {
+        return courseMaster.filter(cm =>
+            !studentExistingCourses.includes(cm.course.toLowerCase())
+        );
+    }, [courseMaster, studentExistingCourses]);
+
+    // Current year for auto fee lookup
+    const currentYear = new Date().getFullYear();
+
+    // Open Admission modal
     const openAdmitModal = (studentId, studentName) => {
         setAdmitForm({
             admStudId: studentId,
             name: studentName,
             admCourse: '',
             admFees: '',
-            admBatchTime: '08-10 AM'
+            discount: 0,
+            finalFees: '',
+            admBatchTime: batches.length > 0 ? batches[0] : '08-10 AM'
         });
         setShowAdmitModal(true);
+    };
+
+    // When course is selected, auto-fill fees from Course Master
+    const handleCourseChange = (courseName) => {
+        const cm = courseMaster.find(c => c.course === courseName);
+        let fee = '';
+        if (cm && cm.fees) {
+            // Try current year first, then fallback to latest available year
+            fee = cm.fees[String(currentYear)] || '';
+            if (!fee) {
+                const years = Object.keys(cm.fees).sort((a, b) => Number(b) - Number(a));
+                if (years.length > 0) fee = cm.fees[years[0]];
+            }
+        }
+        const discount = admitForm.discount || 0;
+        const finalFees = fee ? Math.max(0, Number(fee) - Number(discount)) : '';
+        setAdmitForm(p => ({ ...p, admCourse: courseName, admFees: fee, finalFees: String(finalFees) }));
+    };
+
+    // When discount changes, recalculate final fees
+    const handleDiscountChange = (discountVal) => {
+        const disc = Number(discountVal) || 0;
+        const baseFee = Number(admitForm.admFees) || 0;
+        const finalFees = Math.max(0, baseFee - disc);
+        setAdmitForm(p => ({ ...p, discount: disc, finalFees: String(finalFees) }));
     };
 
     // Handle admission
@@ -48,8 +97,15 @@ export default function Registrations({ adminData, onReload }) {
             alert('Please select a course');
             return;
         }
+        if (!admitForm.admBatchTime) {
+            alert('Please select a batch');
+            return;
+        }
         setSaving(true);
-        const result = await saveCourseAdmission(admitForm);
+        const result = await saveCourseAdmission({
+            ...admitForm,
+            admFees: admitForm.finalFees || admitForm.admFees
+        });
         if (result?.success) {
             showToast('Student Admitted Successfully!');
             setShowAdmitModal(false);
@@ -88,25 +144,72 @@ export default function Registrations({ adminData, onReload }) {
                 }}
             />
 
-            {/* Admission Modal — Course & Batch selection */}
+            {/* Admission Modal */}
             <Modal isOpen={showAdmitModal} onClose={() => setShowAdmitModal(false)} title="Admission">
-                {/* Student Name (read-only) */}
+                {/* Student Name (read-only, auto-filled) */}
+                <label className="text-xs font-bold opacity-50 mb-1 block">Student Name</label>
                 <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.name} readOnly />
 
-                {/* Course Selection */}
-                <select className="inp" value={admitForm.admCourse} onChange={(e) => setAdmitForm((p) => ({ ...p, admCourse: e.target.value }))}>
+                {/* Course Selection (from Course Master, no duplicates) */}
+                <label className="text-xs font-bold opacity-50 mb-1 block">Course</label>
+                <select className="inp" value={admitForm.admCourse} onChange={(e) => handleCourseChange(e.target.value)}>
                     <option value="">Select</option>
-                    {(dropdowns.courses || []).map((c) => <option key={c}>{c}</option>)}
+                    {availableCourses.map((cm) => (
+                        <option key={cm.course} value={cm.course}>{cm.course}</option>
+                    ))}
                 </select>
+                {studentExistingCourses.length > 0 && (
+                    <div className="text-xs text-amber-600 mb-2 -mt-2">
+                        ⚠️ Already enrolled: {studentExistingCourses.join(', ').toUpperCase()}
+                    </div>
+                )}
 
-                {/* Course Fee (read-only, can be auto-filled later) */}
-                <input className="inp" placeholder="Course Fee" value={admitForm.admFees} onChange={(e) => setAdmitForm((p) => ({ ...p, admFees: e.target.value }))} />
+                {/* Course Fees (auto-filled from Course Master) */}
+                <label className="text-xs font-bold opacity-50 mb-1 block">Course Fees (₹)</label>
+                <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.admFees} readOnly placeholder="Auto-filled from Course Master" />
 
-                {/* Batch Time Selection */}
+                {/* Discount Option */}
+                <label className="text-xs font-bold opacity-50 mb-1 block">Discount (₹)</label>
+                <input
+                    className="inp"
+                    type="number"
+                    placeholder="Enter discount amount"
+                    value={admitForm.discount || ''}
+                    onChange={(e) => handleDiscountChange(e.target.value)}
+                />
+
+                {/* Final Fees */}
+                {admitForm.admFees && (
+                    <div className="mb-3 p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)' }}>
+                        <div className="flex justify-between text-sm">
+                            <span className="opacity-60">Base Fee:</span>
+                            <span className="font-bold">₹{admitForm.admFees}</span>
+                        </div>
+                        {admitForm.discount > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="opacity-60">Discount:</span>
+                                <span className="font-bold" style={{ color: '#10b981' }}>-₹{admitForm.discount}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-sm font-bold mt-1 pt-1" style={{ borderTop: '1px solid rgba(99,102,241,0.15)' }}>
+                            <span>Final Fee:</span>
+                            <span style={{ color: '#6366f1' }}>₹{admitForm.finalFees}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Batch Selection (from Batch sheet) */}
+                <label className="text-xs font-bold opacity-50 mb-1 block">Batch</label>
                 <select className="inp" value={admitForm.admBatchTime} onChange={(e) => setAdmitForm((p) => ({ ...p, admBatchTime: e.target.value }))}>
-                    <option>08-10 AM</option>
-                    <option>10-12 PM</option>
-                    <option>04-06 PM</option>
+                    {batches.length > 0 ? (
+                        batches.map((b) => <option key={b} value={b}>{b}</option>)
+                    ) : (
+                        <>
+                            <option>08-10 AM</option>
+                            <option>10-12 PM</option>
+                            <option>04-06 PM</option>
+                        </>
+                    )}
                 </select>
 
                 {/* Admit Button */}

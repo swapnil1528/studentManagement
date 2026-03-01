@@ -111,6 +111,28 @@ function fetchAllAdminData(b) {
   // Dropdowns
   const getL = (n, c) => ss.getSheetByName(n) ? ss.getSheetByName(n).getRange(2, c, ss.getSheetByName(n).getLastRow() - 1 || 1).getValues().flat().filter(String) : [];
 
+  // Course Master with fees per year
+  const cmSheet = ss.getSheetByName("Course Master");
+  let courseMaster = [];
+  if (cmSheet && cmSheet.getLastRow() > 1) {
+    const cmAll = cmSheet.getDataRange().getValues();
+    const cmHeaders = cmAll[0];
+    courseMaster = cmAll.slice(1).filter(r => r[1]).map(r => {
+      const fees = {};
+      for (let c = 3; c < cmHeaders.length; c++) {
+        if (cmHeaders[c] && r[c]) fees[String(cmHeaders[c])] = r[c];
+      }
+      return { course: String(r[1]), validity: r[2], fees: fees };
+    });
+  }
+
+  // Batch data from Batch sheet
+  const batchSheet = ss.getSheetByName("Batch");
+  let batches = [];
+  if (batchSheet && batchSheet.getLastRow() > 1) {
+    batches = batchSheet.getRange(2, 2, batchSheet.getLastRow() - 1).getValues().flat().filter(String);
+  }
+
   return { 
     inquiries: inq, 
     registrations: getD("Registration Data").filter(r => check(r[8], b)), 
@@ -122,6 +144,8 @@ function fetchAllAdminData(b) {
     dropdowns: { 
       branches: getL("Branch", 2), 
       courses: getL("Course Master", 2), 
+      courseMaster: courseMaster,
+      batches: batches,
       villages: getL("VILLAGES", 2), 
       employees: employees.map(e => e[2]), 
       education: getL("Education", 2) 
