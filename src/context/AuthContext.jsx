@@ -41,6 +41,38 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
+    // ─── Auto-logout after 10 min inactivity ─────────────────
+    useEffect(() => {
+        if (!user) return; // Only track when authenticated
+
+        const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+        let timer = null;
+
+        const resetTimer = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                console.log('[Auth] Auto-logout: 10 min inactivity');
+                setUser(null);
+                localStorage.removeItem(STORAGE_KEY);
+                // Clear any cached admin data
+                try { localStorage.removeItem('adminDataCache'); } catch (e) { }
+                window.location.href = '/login';
+            }, INACTIVITY_TIMEOUT);
+        };
+
+        // Events that indicate user activity
+        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+        events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+
+        // Start the timer
+        resetTimer();
+
+        return () => {
+            if (timer) clearTimeout(timer);
+            events.forEach(evt => window.removeEventListener(evt, resetTimer));
+        };
+    }, [user]);
+
     // ─── Login ───────────────────────────────────────────────
     /**
      * Authenticate with the backend and store the session.
