@@ -82,10 +82,10 @@ export default function Attendance({ adminData, onReload }) {
     };
 
     // --- Analysis Data Processing ---
+    // --- Analysis: Cross-tabulation (Students × Dates) ---
     const analysisData = useMemo(() => {
-        if (!allAttendance.length) return { dayRows: [], monthRows: [], totalPresent: 0, totalAbsent: 0, totalDays: 0, percentage: 0 };
+        if (!allAttendance.length) return { students: [], daysInMonth: 0, monthRows: [], totalPresent: 0, totalAbsent: 0, totalDays: 0, percentage: 0 };
 
-        // Filter by course
         let filtered = allAttendance;
         if (analysisCourse !== 'All') {
             filtered = filtered.filter(r => r.course === analysisCourse);
@@ -98,67 +98,70 @@ export default function Attendance({ adminData, onReload }) {
                 return d.getMonth() === analysisMonth && d.getFullYear() === analysisYear;
             });
 
-            // Group by student + day
-            const studentDayMap = {};
+            // Days in selected month
+            const daysInMonth = new Date(analysisYear, analysisMonth + 1, 0).getDate();
+
+            // Build student → day → { isPresent, hours } map
+            const studentMap = {};
             monthFiltered.forEach(r => {
                 const d = new Date(r.date);
                 const day = d.getDate();
-                const key = `${r.id}_${day}`;
-                if (!studentDayMap[key]) {
-                    studentDayMap[key] = {
-                        id: r.id, name: r.name, course: r.course,
-                        day, dateStr: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-                        checkIn: null, checkOut: null, status: r.status,
-                        isPresent: false,
-                    };
+                const id = r.id;
+
+                if (!studentMap[id]) {
+                    studentMap[id] = { id, name: r.name, course: r.course, days: {} };
                 }
+
+                if (!studentMap[id].days[day]) {
+                    studentMap[id].days[day] = { isPresent: false, checkIn: null, checkOut: null };
+                }
+
                 const status = String(r.status).toLowerCase();
                 if (status.includes('check-in') || status.includes('present')) {
-                    studentDayMap[key].isPresent = true;
-                    studentDayMap[key].checkIn = d;
+                    studentMap[id].days[day].isPresent = true;
+                    studentMap[id].days[day].checkIn = d;
                 }
                 if (status.includes('check-out')) {
-                    studentDayMap[key].checkOut = d;
+                    studentMap[id].days[day].checkOut = d;
                 }
                 if (status.includes('absent')) {
-                    studentDayMap[key].isPresent = false;
+                    studentMap[id].days[day].isPresent = false;
                 }
             });
 
-            const dayRows = Object.values(studentDayMap).sort((a, b) => {
-                if (a.day !== b.day) return a.day - b.day;
-                return a.name.localeCompare(b.name);
-            }).map(r => {
-                // Calculate hours
-                let hours = '--';
-                if (r.checkIn && r.checkOut) {
-                    const diff = (r.checkOut - r.checkIn) / (1000 * 60 * 60);
-                    hours = diff.toFixed(1) + 'h';
+            // Convert to array and compute totals per student
+            const students = Object.values(studentMap).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+                let presentCount = 0, absentCount = 0, totalHours = 0;
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const day = s.days[d];
+                    if (day) {
+                        if (day.isPresent) presentCount++;
+                        else absentCount++;
+                        if (day.checkIn && day.checkOut) {
+                            totalHours += (day.checkOut - day.checkIn) / (1000 * 60 * 60);
+                        }
+                    }
                 }
-                return { ...r, hours };
+                const totalMarked = presentCount + absentCount;
+                const percentage = totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : 0;
+                return { ...s, presentCount, absentCount, totalHours: totalHours.toFixed(1), percentage };
             });
 
-            const present = dayRows.filter(r => r.isPresent).length;
-            const total = dayRows.length;
-            const absent = total - present;
-            const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+            const totalPresent = students.reduce((s, st) => s + st.presentCount, 0);
+            const totalAbsent = students.reduce((s, st) => s + st.absentCount, 0);
+            const totalDays = totalPresent + totalAbsent;
+            const percentage = totalDays > 0 ? Math.round((totalPresent / totalDays) * 100) : 0;
 
-            return { dayRows, monthRows: [], totalPresent: present, totalAbsent: absent, totalDays: total, percentage };
+            return { students, daysInMonth, monthRows: [], totalPresent, totalAbsent, totalDays, percentage };
         } else {
-            // Year view — group by month
-            const yearFiltered = filtered.filter(r => {
-                const d = new Date(r.date);
-                return d.getFullYear() === analysisYear;
-            });
+            // Year view — month-by-month summary
+            const yearFiltered = filtered.filter(r => new Date(r.date).getFullYear() === analysisYear);
 
             const monthRows = MONTHS.map((name, idx) => {
                 const mFiltered = yearFiltered.filter(r => new Date(r.date).getMonth() === idx);
-
-                // Unique student-day combos
                 const dayMap = {};
                 mFiltered.forEach(r => {
-                    const day = new Date(r.date).getDate();
-                    const key = `${r.id}_${day}`;
+                    const key = `${r.id}_${new Date(r.date).getDate()}`;
                     if (!dayMap[key]) dayMap[key] = { isPresent: false, checkIn: null, checkOut: null };
                     const status = String(r.status).toLowerCase();
                     if (status.includes('check-in') || status.includes('present')) dayMap[key].isPresent = true;
@@ -172,14 +175,8 @@ export default function Attendance({ adminData, onReload }) {
                 const absent = total - present;
                 const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
 
-                // Average hours
                 let totalHours = 0, hoursCount = 0;
-                entries.forEach(e => {
-                    if (e.checkIn && e.checkOut) {
-                        totalHours += (e.checkOut - e.checkIn) / (1000 * 60 * 60);
-                        hoursCount++;
-                    }
-                });
+                entries.forEach(e => { if (e.checkIn && e.checkOut) { totalHours += (e.checkOut - e.checkIn) / (1000 * 60 * 60); hoursCount++; } });
                 const avgHours = hoursCount > 0 ? (totalHours / hoursCount).toFixed(1) : '--';
 
                 return { name, month: idx, present, absent, total, percentage, avgHours };
@@ -190,13 +187,12 @@ export default function Attendance({ adminData, onReload }) {
             const totalAbsent = totalDays - totalPresent;
             const percentage = totalDays > 0 ? Math.round((totalPresent / totalDays) * 100) : 0;
 
-            return { dayRows: [], monthRows, totalPresent, totalAbsent, totalDays, percentage };
+            return { students: [], daysInMonth: 0, monthRows, totalPresent, totalAbsent, totalDays, percentage };
         }
     }, [allAttendance, analysisCourse, analysisMonth, analysisYear, analysisView]);
 
     const getPercColor = (p) => p >= 75 ? '#10b981' : p >= 50 ? '#f59e0b' : '#ef4444';
 
-    // Get unique courses from attendance data
     const availableCourses = useMemo(() => {
         const courses = [...new Set(allAttendance.map(r => r.course).filter(Boolean))];
         return ['All', ...courses];
@@ -246,13 +242,10 @@ export default function Attendance({ adminData, onReload }) {
                         <input className="inp" style={{ width: '180px', marginBottom: 0 }} type="date" value={attDate} onChange={(e) => setAttDate(e.target.value)} />
                         <button className="btn" onClick={loadAttList}>Load Students</button>
                     </div>
-
                     {showAttBox && (
                         <div className="card">
                             <table className="w-full mb-4">
-                                <thead className="t-head">
-                                    <tr><th>Name</th><th>Status</th></tr>
-                                </thead>
+                                <thead className="t-head"><tr><th>Name</th><th>Status</th></tr></thead>
                                 <tbody>
                                     {attList.map((s, i) => (
                                         <tr key={s.id} className="t-row">
@@ -283,7 +276,6 @@ export default function Attendance({ adminData, onReload }) {
                         <input className="inp" style={{ width: '200px', marginBottom: 0 }} type="date" value={repDate} onChange={(e) => setRepDate(e.target.value)} />
                         <button className="btn" onClick={loadReport}>Get Report</button>
                     </div>
-
                     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                         <table className="w-full text-left">
                             <thead className="t-head">
@@ -294,7 +286,6 @@ export default function Attendance({ adminData, onReload }) {
                                     <tr><td colSpan={6} className="p-4 text-center">Loading...</td></tr>
                                 ) : reportData.length > 0 ? (
                                     reportData.map((r, i) => {
-                                        // Calculate hours
                                         let hours = '--';
                                         if (r.in !== '--:--' && r.out !== '--:--') {
                                             try {
@@ -406,58 +397,88 @@ export default function Attendance({ adminData, onReload }) {
                         </div>
                     </div>
 
-                    {/* Analysis Table */}
-                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                    {/* Cross-Tabulation Table (Month View) or Year Summary */}
+                    <div className="card" style={{ padding: 0, overflow: 'auto' }}>
                         {analysisView === 'month' ? (
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="t-head">
-                                        <th>#</th>
-                                        <th>Date</th>
-                                        <th>Student ID</th>
-                                        <th>Name</th>
-                                        <th>Course</th>
-                                        <th>Status</th>
-                                        <th>Hours</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {analysisData.dayRows.length > 0 ? (
-                                        analysisData.dayRows.map((r, i) => (
-                                            <tr key={i} className="t-row">
-                                                <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                                                <td className="font-semibold">{r.dateStr}</td>
-                                                <td className="font-mono text-sm">{r.id}</td>
-                                                <td className="font-bold">{r.name}</td>
-                                                <td className="text-sm">{r.course}</td>
-                                                <td>
-                                                    <Badge text={r.isPresent ? 'Present' : 'Absent'} variant={r.isPresent ? 'green' : 'red'} />
-                                                </td>
-                                                <td className="font-mono font-bold" style={{ color: r.hours !== '--' ? '#6366f1' : '#94a3b8' }}>
-                                                    {r.hours}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={7} className="text-center py-8 opacity-40">
-                                                No attendance data for {MONTHS[analysisMonth]} {analysisYear}
-                                                {analysisCourse !== 'All' ? ` (${analysisCourse})` : ''}
-                                            </td>
+                            analysisData.students.length > 0 ? (
+                                <table className="w-full text-center" style={{ minWidth: `${analysisData.daysInMonth * 38 + 300}px` }}>
+                                    <thead>
+                                        <tr className="t-head">
+                                            <th style={{ position: 'sticky', left: 0, zIndex: 2, minWidth: '40px', textAlign: 'center' }}>#</th>
+                                            <th style={{ position: 'sticky', left: '40px', zIndex: 2, minWidth: '160px', textAlign: 'left' }}>Student Name</th>
+                                            {Array.from({ length: analysisData.daysInMonth }, (_, i) => (
+                                                <th key={i + 1} style={{ minWidth: '36px', fontSize: '11px', padding: '10px 4px' }}>
+                                                    {i + 1}
+                                                </th>
+                                            ))}
+                                            <th style={{ minWidth: '50px', fontSize: '11px' }}>P</th>
+                                            <th style={{ minWidth: '50px', fontSize: '11px' }}>A</th>
+                                            <th style={{ minWidth: '55px', fontSize: '11px' }}>Hours</th>
+                                            <th style={{ minWidth: '55px', fontSize: '11px' }}>%</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {analysisData.students.map((student, idx) => (
+                                            <tr key={student.id} className="t-row">
+                                                <td style={{ position: 'sticky', left: 0, zIndex: 1, fontSize: '12px', padding: '8px 4px' }} className="font-mono opacity-50">
+                                                    {idx + 1}
+                                                </td>
+                                                <td style={{ position: 'sticky', left: '40px', zIndex: 1, textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap' }} className="font-semibold text-sm">
+                                                    {student.name}
+                                                    <div className="text-[10px] opacity-40">{student.id}</div>
+                                                </td>
+                                                {Array.from({ length: analysisData.daysInMonth }, (_, i) => {
+                                                    const day = student.days[i + 1];
+                                                    if (!day) {
+                                                        return <td key={i + 1} style={{ padding: '8px 2px', fontSize: '11px' }} className="opacity-20">—</td>;
+                                                    }
+                                                    // Calculate hours for tooltip
+                                                    let hrs = '';
+                                                    if (day.checkIn && day.checkOut) {
+                                                        hrs = ((day.checkOut - day.checkIn) / (1000 * 60 * 60)).toFixed(1) + 'h';
+                                                    }
+                                                    return (
+                                                        <td key={i + 1}
+                                                            style={{ padding: '4px 2px', fontSize: '11px' }}
+                                                            title={hrs ? `${hrs}` : ''}
+                                                        >
+                                                            {day.isPresent ? (
+                                                                <span style={{
+                                                                    display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
+                                                                    borderRadius: '6px', fontSize: '10px', fontWeight: 700,
+                                                                    background: 'rgba(16,185,129,0.15)', color: '#10b981',
+                                                                }}>P</span>
+                                                            ) : (
+                                                                <span style={{
+                                                                    display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
+                                                                    borderRadius: '6px', fontSize: '10px', fontWeight: 700,
+                                                                    background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                                                                }}>A</span>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                                {/* Summary columns */}
+                                                <td className="font-bold text-sm" style={{ color: '#10b981', padding: '8px 4px' }}>{student.presentCount}</td>
+                                                <td className="font-bold text-sm" style={{ color: '#ef4444', padding: '8px 4px' }}>{student.absentCount}</td>
+                                                <td className="font-mono text-sm font-bold" style={{ color: '#6366f1', padding: '8px 4px' }}>{student.totalHours}h</td>
+                                                <td className="font-bold text-sm" style={{ color: getPercColor(student.percentage), padding: '8px 4px' }}>{student.percentage}%</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="text-center py-12 opacity-40">
+                                    No attendance data for {MONTHS[analysisMonth]} {analysisYear}
+                                    {analysisCourse !== 'All' ? ` (${analysisCourse})` : ''}
+                                </div>
+                            )
                         ) : (
+                            /* Year View Table */
                             <table className="w-full">
                                 <thead>
                                     <tr className="t-head">
-                                        <th>Month</th>
-                                        <th>Total</th>
-                                        <th>Present</th>
-                                        <th>Absent</th>
-                                        <th>Avg Hours</th>
-                                        <th>Percentage</th>
+                                        <th>Month</th><th>Total</th><th>Present</th><th>Absent</th><th>Avg Hours</th><th>Percentage</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -473,9 +494,7 @@ export default function Attendance({ adminData, onReload }) {
                                                     <div className="progress-bar" style={{ width: '80px', height: '6px', marginTop: 0 }}>
                                                         <div className="progress-fill" style={{ width: `${m.percentage}%` }} />
                                                     </div>
-                                                    <span className="font-bold text-sm" style={{ color: getPercColor(m.percentage) }}>
-                                                        {m.percentage}%
-                                                    </span>
+                                                    <span className="font-bold text-sm" style={{ color: getPercColor(m.percentage) }}>{m.percentage}%</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -487,9 +506,7 @@ export default function Attendance({ adminData, onReload }) {
                                         <td className="font-bold" style={{ color: '#ef4444' }}>{analysisData.totalAbsent}</td>
                                         <td>--</td>
                                         <td>
-                                            <span className="font-bold text-lg" style={{ color: getPercColor(analysisData.percentage) }}>
-                                                {analysisData.percentage}%
-                                            </span>
+                                            <span className="font-bold text-lg" style={{ color: getPercColor(analysisData.percentage) }}>{analysisData.percentage}%</span>
                                         </td>
                                     </tr>
                                 </tbody>
