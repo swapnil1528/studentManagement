@@ -581,24 +581,49 @@ function uploadAssignment(f) {
   }
 }
 
-// Get assignment history for a student
+// Get assignment history for a student + topics for upload
 function getAssignments(studentId) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+  // Get assignments
   const sheet = ss.getSheetByName("Assignments");
-  if (!sheet || sheet.getLastRow() < 2) return { success: true, assignments: [] };
-  const data = sheet.getDataRange().getValues().slice(1);
-  const assignments = data
-    .filter(r => String(r[2]) === String(studentId))
-    .map(r => ({
-      id: r[0],
-      date: r[1],
-      course: r[4],
-      topic: r[5],
-      fileName: r[6],
-      fileUrl: r[7],
-      fileSize: r[8],
-      mimeType: r[9]
-    }))
-    .reverse(); // Latest first
-  return { success: true, assignments: assignments };
+  let assignments = [];
+  if (sheet && sheet.getLastRow() >= 2) {
+    const data = sheet.getDataRange().getValues().slice(1);
+    assignments = data
+      .filter(r => String(r[2]) === String(studentId))
+      .map(r => ({
+        id: r[0],
+        date: r[1],
+        course: r[4],
+        topic: r[5],
+        fileName: r[6],
+        fileUrl: r[7],
+        fileSize: r[8],
+        mimeType: r[9]
+      }))
+      .reverse();
+  }
+  
+  // Get student's enrolled courses from Admission Data
+  const admSheet = ss.getSheetByName("Admission Data");
+  let studentCourses = [];
+  if (admSheet) {
+    const admData = admSheet.getDataRange().getValues().slice(1);
+    studentCourses = [...new Set(admData.filter(r => String(r[2]) === String(studentId)).map(r => String(r[7])))];
+  }
+  
+  // Get topics from Topic sheet (A=SrNo, B=Course, C=Topic)
+  const topicSheet = ss.getSheetByName("Topic");
+  let topics = [];
+  if (topicSheet && topicSheet.getLastRow() >= 2) {
+    const tData = topicSheet.getDataRange().getValues().slice(1);
+    topics = tData.filter(r => r[2]).map(r => ({ course: String(r[1]), topic: String(r[2]) }));
+    if (studentCourses.length > 0) {
+      const sc = studentCourses.map(c => c.toLowerCase());
+      topics = topics.filter(t => sc.includes(t.course.toLowerCase()));
+    }
+  }
+  
+  return { success: true, assignments: assignments, topics: topics, courses: studentCourses };
 }
