@@ -38,15 +38,21 @@ export default function AssignmentAnalysis({ adminData }) {
         setLoadingState(false);
     };
 
+    // Normalize helper
+    const norm = (s) => String(s || '').trim().toLowerCase();
+
     // Build analysis table data
     const analysisData = useMemo(() => {
-        // Filter students by course and batch
-        let filteredStudents = activeStudents;
-        if (filterCourse) filteredStudents = filteredStudents.filter(s => s.course === filterCourse);
-        if (filterBatch) filteredStudents = filteredStudents.filter(s => s.batch === filterBatch);
+        // Filter students by course and batch (case-insensitive, trimmed)
+        let filteredStudents = [...activeStudents];
+        if (filterCourse) filteredStudents = filteredStudents.filter(s => norm(s.course) === norm(filterCourse));
+        if (filterBatch) filteredStudents = filteredStudents.filter(s => norm(s.batch) === norm(filterBatch));
 
-        // Get unique topics from assignments
-        const allTopics = [...new Set(assignments.map(a => a.topic).filter(Boolean))].sort();
+        // Get unique topics from assignments (filtered by course if active)
+        const relevantAssignments = filterCourse
+            ? assignments.filter(a => norm(a.course) === norm(filterCourse))
+            : assignments;
+        const allTopics = [...new Set(relevantAssignments.map(a => a.topic).filter(Boolean))].sort();
 
         // Build per-student assignment counts
         const rows = filteredStudents.map(student => {
@@ -54,7 +60,7 @@ export default function AssignmentAnalysis({ adminData }) {
 
             // Filter assignments by course filter if active
             const filtered = filterCourse
-                ? studentAssignments.filter(a => a.course === filterCourse)
+                ? studentAssignments.filter(a => norm(a.course) === norm(filterCourse))
                 : studentAssignments;
 
             // Count by topic
