@@ -45,9 +45,8 @@ export default function AdminPage() {
     const { user } = useAuth();
     const cached = getCachedData();
 
-    // If we have cached data, show it instantly (no loading screen)
-    const [adminData, setAdminData] = useState(cached || null);
-    const [firstLoad, setFirstLoad] = useState(!cached); // only show spinner if no cache
+    // Always start with data — cached or empty defaults (NO loading spinner)
+    const [adminData, setAdminData] = useState(cached || EMPTY_DATA);
     const [error, setError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -68,7 +67,7 @@ export default function AdminPage() {
         };
     }, []);
 
-    // Load data from API
+    // Load data from API (always runs in background)
     const loadData = useCallback(async (showRefreshIndicator = false) => {
         if (showRefreshIndicator) setRefreshing(true);
         setError(null);
@@ -81,39 +80,20 @@ export default function AdminPage() {
                 setCachedData(normalized);
             } else {
                 setError(result?.error || 'Failed to load data');
-                if (!adminData) setAdminData(EMPTY_DATA);
             }
         } catch (err) {
             console.error('[AdminPage] Load error:', err);
             setError('Connection error');
-            if (!adminData) setAdminData(EMPTY_DATA);
         } finally {
-            setFirstLoad(false);
             setRefreshing(false);
             setLoading(false);
         }
-    }, [user, processData, adminData]);
+    }, [user, processData]);
 
-    // Fetch fresh data on mount (in background if cached)
+    // Fetch fresh data on mount (silently in background)
     useEffect(() => {
         loadData(false);
     }, []);
-
-    // Show loading spinner ONLY on first visit with no cache
-    if (firstLoad && !adminData) {
-        return (
-            <div className="flex items-center justify-center h-screen"
-                style={{ background: 'linear-gradient(135deg, #f0f4ff, #e8eeff, #f5f0ff)' }}
-            >
-                <div className="text-center">
-                    <div className="w-12 h-12 border-4 rounded-full animate-spin mx-auto mb-4"
-                        style={{ borderColor: '#c7d2fe', borderTopColor: '#6366f1' }}
-                    />
-                    <p className="font-medium" style={{ color: '#6366f1' }}>Loading Dashboard...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <>
