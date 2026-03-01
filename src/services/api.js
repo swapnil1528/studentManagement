@@ -147,3 +147,12 @@ export const markEmployeeAttendance = (id, type, lat, lng, faceDescriptor) =>
 /** Get all courses with fees + batch timings from Course Master & Batch sheets */
 export const getCourseFees = () =>
     apiCall('getCourseFees', {});
+
+// ─── Assignments ─────────────────────────────────────────────
+/** Upload a student assignment file */
+export const uploadAssignment = (form) =>
+    apiCall('uploadAssignment', { form });
+
+/** Get assignment history for a student */
+export const getAssignments = (id) =>
+    apiCall('getAssignments', { id });

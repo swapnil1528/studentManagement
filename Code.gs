@@ -56,6 +56,10 @@ function doPost(e) {
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
     else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng);
 
+    // --- ASSIGNMENTS ---
+    else if(act==='uploadAssignment') res = uploadAssignment(d.form);
+    else if(act==='getAssignments') res = getAssignments(d.id);
+
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
   } catch(e) {
     return ContentService.createTextOutput(JSON.stringify({error: "Server Error: "+e.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -195,7 +199,8 @@ function getStudentPortalData(id) {
     lms: lms.map(r => ({ title: r[2], type: r[3], link: r[4], desc: r[5] })), 
     attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: recentLogs, allLogs: attLogs }, 
     results: res.map(r => ({ exam: r[3], marks: r[5], total: r[6], grade: r[7] })),
-    notices: getNotices('Student')
+    notices: getNotices('Student'),
+    topics: getTopicsList(cs)
   };
 }
 
@@ -499,4 +504,101 @@ function getAllCourseFees() {
   }
   
   return { success: true, courses: courses, batches: batches };
+}
+
+// ============================================
+// TOPICS
+// ============================================
+// Get topics from Topic sheet filtered by student's courses
+function getTopicsList(studentCourses) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Topic");
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const data = sheet.getDataRange().getValues().slice(1);
+  // Filter by student's courses if provided
+  const topics = data.filter(r => r[2]).map(r => ({ course: String(r[1]), topic: String(r[2]) }));
+  if (studentCourses && studentCourses.length > 0) {
+    const sc = studentCourses.map(c => String(c).toLowerCase());
+    return topics.filter(t => sc.includes(t.course.toLowerCase()));
+  }
+  return topics;
+}
+
+// ============================================
+// ASSIGNMENTS
+// ============================================
+// Upload assignment file to Google Drive and log in Assignments sheet
+function uploadAssignment(f) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    // Get student info from Admission Data
+    const admData = ss.getSheetByName("Admission Data");
+    if (!admData) return { error: "Admission Data sheet not found" };
+    const adRows = admData.getDataRange().getValues();
+    const student = adRows.find(r => String(r[2]) === String(f.studentId));
+    const studentName = student ? student[3] : "Unknown";
+    
+    // Create or get student's folder: StudentID-StudentName
+    const parentFolder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    const folderName = f.studentId + "-" + studentName;
+    let studentFolder;
+    const folders = parentFolder.getFoldersByName(folderName);
+    if (folders.hasNext()) {
+      studentFolder = folders.next();
+    } else {
+      studentFolder = parentFolder.createFolder(folderName);
+      studentFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+    
+    // Save the file to Drive
+    const fileData = f.fileData; // base64 string
+    const fileName = f.fileName || "assignment_" + Date.now();
+    const mimeType = f.mimeType || "application/octet-stream";
+    
+    const split = fileData.split('base64,');
+    let blob;
+    if (split.length >= 2) {
+      blob = Utilities.newBlob(Utilities.base64Decode(split[1]), mimeType, fileName);
+    } else {
+      blob = Utilities.newBlob(Utilities.base64Decode(fileData), mimeType, fileName);
+    }
+    
+    const file = studentFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const fileUrl = "https://drive.google.com/file/d/" + file.getId() + "/view";
+    const fileSize = file.getSize();
+    
+    // Log in Assignments sheet
+    const aSheet = ensureSheet("Assignments", ["ID", "Date", "StudentID", "StudentName", "Course", "Topic", "FileName", "FileURL", "FileSize", "MimeType"]);
+    const aId = "ASN-" + Date.now();
+    const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+    aSheet.appendRow([aId, dateStr, f.studentId, studentName, f.course || "", f.topic || "", fileName, fileUrl, fileSize, mimeType]);
+    
+    return { success: true, fileUrl: fileUrl, fileName: fileName, id: aId };
+  } catch(err) {
+    return { error: "Upload failed: " + err.toString() };
+  }
+}
+
+// Get assignment history for a student
+function getAssignments(studentId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Assignments");
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, assignments: [] };
+  const data = sheet.getDataRange().getValues().slice(1);
+  const assignments = data
+    .filter(r => String(r[2]) === String(studentId))
+    .map(r => ({
+      id: r[0],
+      date: r[1],
+      course: r[4],
+      topic: r[5],
+      fileName: r[6],
+      fileUrl: r[7],
+      fileSize: r[8],
+      mimeType: r[9]
+    }))
+    .reverse(); // Latest first
+  return { success: true, assignments: assignments };
 }

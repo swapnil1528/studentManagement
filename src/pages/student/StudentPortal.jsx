@@ -1,12 +1,12 @@
 /**
  * StudentPortal — Student-facing dashboard.
- * Tabs: Attendance (check-in/out), Attendance View, Logs, Notices, LMS, Results.
+ * Tabs: Attendance (check-in/out), Attendance View, Logs, Notices, LMS, Results, Assignments.
  * Uses geolocation for attendance marking.
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getStudentPortalData, markStudentAttendance } from '../../services/api';
+import { getStudentPortalData, markStudentAttendance, uploadAssignment, getAssignments } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
@@ -15,17 +15,31 @@ import AttendanceView from '../../components/AttendanceView';
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
     { id: 'attview', label: 'Attendance View', emoji: '📊' },
+    { id: 'assignments', label: 'Assignments', emoji: '📎' },
     { id: 'logs', label: 'Logs', emoji: '📋' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
     { id: 'lms', label: 'LMS', emoji: '📚' },
     { id: 'results', label: 'Results', emoji: '🏆' },
 ];
 
+// Format file size
+const formatSize = (bytes) => {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
 export default function StudentPortal() {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
 
+    // Assignment state
+    const [assignmentList, setAssignmentList] = useState([]);
+    const [asnLoading, setAsnLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
 
     // Load student data on mount
     useEffect(() => {
@@ -39,8 +53,25 @@ export default function StudentPortal() {
         setLoading(false);
     };
 
+    // Load assignments when tab is selected
+    useEffect(() => {
+        if (activeTab === 'assignments') {
+            loadAssignments();
+        }
+    }, [activeTab]);
+
+    const loadAssignments = async () => {
+        setAsnLoading(true);
+        const result = await getAssignments(user?.studentId || user?.userId);
+        if (result?.success) {
+            setAssignmentList(result.assignments || []);
+        }
+        setAsnLoading(false);
+    };
+
     const profile = data?.profile || {};
     const att = data?.attendance || {};
+    const topics = data?.topics || [];
 
     // Determine attendance button state
     const getAttStatus = () => {
@@ -50,7 +81,7 @@ export default function StudentPortal() {
     };
     const attStatus = getAttStatus();
 
-    // Handle attendance marking (simple — no face or location check)
+    // Handle attendance marking
     const handleAttendance = async (type) => {
         showToast(`Processing ${type}...`);
         const result = await markStudentAttendance(user?.studentId || user?.userId, type, 0, 0, []);
@@ -60,6 +91,85 @@ export default function StudentPortal() {
         } else {
             alert(result?.error || 'Failed');
         }
+    };
+
+    // Handle file selection for assignment
+    const handleFileSelect = (e) => {
+        const selected = Array.from(e.target.files);
+        setAsnForm(prev => ({ ...prev, files: [...prev.files, ...selected] }));
+    };
+
+    const removeFile = (index) => {
+        setAsnForm(prev => ({
+            ...prev,
+            files: prev.files.filter((_, i) => i !== index)
+        }));
+    };
+
+    // Upload all selected files
+    const handleUploadAssignment = async () => {
+        if (!asnForm.topic) {
+            alert('Please select a topic');
+            return;
+        }
+        if (asnForm.files.length === 0) {
+            alert('Please select at least one file');
+            return;
+        }
+
+        setUploading(true);
+        let successCount = 0;
+
+        for (const file of asnForm.files) {
+            try {
+                const base64 = await fileToBase64(file);
+                const result = await uploadAssignment({
+                    studentId: user?.studentId || user?.userId,
+                    course: asnForm.course,
+                    topic: asnForm.topic,
+                    fileName: file.name,
+                    fileData: base64,
+                    mimeType: file.type
+                });
+                if (result?.success) successCount++;
+            } catch (err) {
+                console.error('Upload error:', err);
+            }
+        }
+
+        if (successCount > 0) {
+            showToast(`${successCount} file(s) uploaded successfully!`);
+            setAsnForm({ topic: '', course: '', files: [] });
+            loadAssignments();
+        } else {
+            alert('Upload failed. Please try again.');
+        }
+        setUploading(false);
+    };
+
+    // Convert file to base64
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    // File type icon
+    const getFileIcon = (mimeType, fileName) => {
+        if (!mimeType && !fileName) return '📄';
+        const ext = fileName?.split('.').pop()?.toLowerCase() || '';
+        if (mimeType?.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return '🖼️';
+        if (mimeType?.includes('pdf') || ext === 'pdf') return '📕';
+        if (mimeType?.includes('word') || ['doc', 'docx'].includes(ext)) return '📘';
+        if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || ['xls', 'xlsx', 'csv'].includes(ext)) return '📗';
+        if (mimeType?.includes('powerpoint') || mimeType?.includes('presentation') || ['ppt', 'pptx'].includes(ext)) return '📙';
+        if (mimeType?.includes('video') || ['mp4', 'avi', 'mkv', 'mov'].includes(ext)) return '🎬';
+        if (mimeType?.includes('audio') || ['mp3', 'wav', 'ogg'].includes(ext)) return '🎵';
+        if (mimeType?.includes('zip') || ['zip', 'rar', '7z', 'tar'].includes(ext)) return '📦';
+        return '📄';
     };
 
     return (
@@ -130,6 +240,155 @@ export default function StudentPortal() {
             {/* === Attendance View Tab === */}
             {activeTab === 'attview' && (
                 <AttendanceView logs={att.allLogs || att.logs || []} type="student" />
+            )}
+
+            {/* === Assignments Tab === */}
+            {activeTab === 'assignments' && (
+                <div className="space-y-6">
+                    {/* Upload Assignment Card */}
+                    <div className="card">
+                        <h3 className="font-bold text-lg mb-4">📎 Upload Assignment</h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {/* Course Selection */}
+                            <div>
+                                <label className="text-xs font-bold opacity-50 mb-1 block">Course</label>
+                                <select
+                                    className="inp"
+                                    value={asnForm.course}
+                                    onChange={(e) => {
+                                        setAsnForm(p => ({ ...p, course: e.target.value, topic: '' }));
+                                    }}
+                                >
+                                    <option value="">Select Course</option>
+                                    {(data?.courses || []).map((c) => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Topic Selection (from Topic sheet) */}
+                            <div>
+                                <label className="text-xs font-bold opacity-50 mb-1 block">Select Topic</label>
+                                <select
+                                    className="inp"
+                                    value={asnForm.topic}
+                                    onChange={(e) => setAsnForm(p => ({ ...p, topic: e.target.value }))}
+                                >
+                                    <option value="">Select Topic</option>
+                                    {topics
+                                        .filter(t => !asnForm.course || t.course.toLowerCase() === asnForm.course.toLowerCase())
+                                        .map((t, i) => <option key={i} value={t.topic}>{t.topic}</option>)
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* File Selection */}
+                        <div className="mb-4">
+                            <label className="text-xs font-bold opacity-50 mb-1 block">Select Files (All types supported)</label>
+                            <input
+                                type="file"
+                                multiple
+                                onChange={handleFileSelect}
+                                className="text-sm block w-full border rounded-lg p-2"
+                            />
+                        </div>
+
+                        {/* Selected files list */}
+                        {asnForm.files.length > 0 && (
+                            <div className="mb-4 p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.06)' }}>
+                                <div className="text-xs font-bold opacity-50 mb-2">Selected Files ({asnForm.files.length})</div>
+                                {asnForm.files.map((f, i) => (
+                                    <div key={i} className="flex items-center justify-between py-1 px-2 mb-1 bg-white rounded border text-sm">
+                                        <span className="flex items-center gap-2">
+                                            <span>{getFileIcon(f.type, f.name)}</span>
+                                            <span className="truncate max-w-[200px]">{f.name}</span>
+                                            <span className="text-xs opacity-40">{formatSize(f.size)}</span>
+                                        </span>
+                                        <button
+                                            className="text-red-400 hover:text-red-600 text-xs font-bold px-2"
+                                            onClick={() => removeFile(i)}
+                                        >✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Upload button */}
+                        <button
+                            className="btn w-full"
+                            onClick={handleUploadAssignment}
+                            disabled={uploading || asnForm.files.length === 0}
+                        >
+                            {uploading ? '⏳ Uploading...' : `📤 Upload ${asnForm.files.length > 0 ? `(${asnForm.files.length} file${asnForm.files.length > 1 ? 's' : ''})` : ''}`}
+                        </button>
+                    </div>
+
+                    {/* Assignment History */}
+                    <div className="card">
+                        <h3 className="font-bold text-lg mb-4">📋 Assignment History</h3>
+                        {asnLoading ? (
+                            <div className="text-center py-8">
+                                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                <p className="text-gray-400 text-sm">Loading assignments...</p>
+                            </div>
+                        ) : assignmentList.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left border-b">
+                                            <th className="pb-2 font-bold opacity-50">#</th>
+                                            <th className="pb-2 font-bold opacity-50">Date</th>
+                                            <th className="pb-2 font-bold opacity-50">Course</th>
+                                            <th className="pb-2 font-bold opacity-50">Topic</th>
+                                            <th className="pb-2 font-bold opacity-50">File</th>
+                                            <th className="pb-2 font-bold opacity-50">Size</th>
+                                            <th className="pb-2 font-bold opacity-50">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {assignmentList.map((a, i) => (
+                                            <tr key={i} className="border-b hover:bg-gray-50 transition">
+                                                <td className="py-3 opacity-40">{i + 1}</td>
+                                                <td className="py-3 text-xs">
+                                                    {a.date ? new Date(a.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                </td>
+                                                <td className="py-3">
+                                                    <span className="px-2 py-1 rounded-full text-xs font-bold" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+                                                        {a.course || '—'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 font-medium">{a.topic || '—'}</td>
+                                                <td className="py-3">
+                                                    <span className="flex items-center gap-1">
+                                                        <span>{getFileIcon(a.mimeType, a.fileName)}</span>
+                                                        <span className="truncate max-w-[150px]">{a.fileName || '—'}</span>
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 text-xs opacity-50">{formatSize(a.fileSize)}</td>
+                                                <td className="py-3">
+                                                    <a
+                                                        href={a.fileUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 font-bold text-xs underline hover:text-blue-800"
+                                                    >
+                                                        📥 Download
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8">
+                                <div className="text-4xl mb-2">📎</div>
+                                <p className="text-gray-400 text-sm">No assignments uploaded yet.</p>
+                                <p className="text-gray-300 text-xs mt-1">Upload your first assignment above!</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* === Logs Tab === */}
