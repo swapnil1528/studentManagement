@@ -160,13 +160,14 @@ function getStudentPortalData(id) {
     lastCheckInTime = last[0];
   }
   
-  const attLogs = att.map(r => ({ time: r[0], status: r[4], location: r[6] || "N/A", distance: r[7] || "N/A" })).reverse().slice(0, 6);
+  const attLogs = att.map(r => ({ time: r[0], status: r[4], location: r[6] || "N/A", distance: r[7] || "N/A" })).reverse();
+  const recentLogs = attLogs.slice(0, 6);
   
   return { 
     profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", hasFace: true }, 
     courses: cs, 
     lms: lms.map(r => ({ title: r[2], type: r[3], link: r[4], desc: r[5] })), 
-    attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: attLogs }, 
+    attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: recentLogs, allLogs: attLogs }, 
     results: res.map(r => ({ exam: r[3], marks: r[5], total: r[6], grade: r[7] })),
     notices: getNotices('Student')
   };
@@ -220,12 +221,14 @@ function getEmployeePortalData(id) {
     lastTime = last[0];
   }
   
-  const logs = myAtt.map(r => ({ time: r[0], status: r[3], location: r[4], distance: r[5] })).reverse().slice(0, 6);
+  const allLogs = myAtt.map(r => ({ time: r[0], status: r[3], location: r[4], distance: r[5] })).reverse();
+  const recentLogs = allLogs.slice(0, 6);
   
   return { 
     profile: { name: profile[2] || "Employee", id: id, role: profile[3] || "Staff", hasFace: true }, 
     stats: { totalDays: [...new Set(myAtt.map(r => Utilities.formatDate(new Date(r[0]), "GMT+5:30", "yyyy-MM-dd")))].length, todayStatus: todayStatus, lastCheckTime: lastTime }, 
-    logs: logs,
+    logs: recentLogs,
+    allLogs: allLogs,
     leaves: myLeaves.map(l => ({ type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), status: l[8] })),
     notices: getNotices('Employee')
   };

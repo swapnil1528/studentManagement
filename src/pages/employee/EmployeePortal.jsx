@@ -1,6 +1,6 @@
 /**
  * EmployeePortal — Employee-facing dashboard.
- * Tabs: Attendance (check-in/out), Logs, Notices, Leave Requests.
+ * Tabs: Attendance (check-in/out), Attendance View, Logs, Notices, Leave Requests.
  */
 
 import { useState, useEffect } from 'react';
@@ -9,10 +9,12 @@ import { getEmployeePortalData, markEmployeeAttendance, saveLeaveRequest } from 
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
+import AttendanceView from '../../components/AttendanceView';
 import Badge from '../../components/ui/Badge';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
+    { id: 'attview', label: 'Attendance View', emoji: '📊' },
     { id: 'logs', label: 'Logs', emoji: '📋' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
     { id: 'leaves', label: 'Leaves', emoji: '✈️' },
@@ -137,6 +139,11 @@ export default function EmployeePortal() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* === Attendance View Tab === */}
+            {activeTab === 'attview' && (
+                <AttendanceView logs={data?.allLogs || data?.logs || []} type="employee" />
             )}
 
             {/* === Logs Tab === */}

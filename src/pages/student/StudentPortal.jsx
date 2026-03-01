@@ -1,6 +1,6 @@
 /**
  * StudentPortal — Student-facing dashboard.
- * Tabs: Attendance (check-in/out), Logs, Notices, LMS, Results.
+ * Tabs: Attendance (check-in/out), Attendance View, Logs, Notices, LMS, Results.
  * Uses geolocation for attendance marking.
  */
 
@@ -10,9 +10,11 @@ import { getStudentPortalData, markStudentAttendance } from '../../services/api'
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
+import AttendanceView from '../../components/AttendanceView';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
+    { id: 'attview', label: 'Attendance View', emoji: '📊' },
     { id: 'logs', label: 'Logs', emoji: '📋' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
     { id: 'lms', label: 'LMS', emoji: '📚' },
@@ -123,6 +125,11 @@ export default function StudentPortal() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* === Attendance View Tab === */}
+            {activeTab === 'attview' && (
+                <AttendanceView logs={att.allLogs || att.logs || []} type="student" />
             )}
 
             {/* === Logs Tab === */}
