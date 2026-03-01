@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import AttendanceView from '../../components/AttendanceView';
+import EmployeeAttendanceMatrix from '../../components/EmployeeAttendanceMatrix';
 
 export default function HRManagement({ adminData, onReload }) {
     const { user } = useAuth();
@@ -157,29 +158,8 @@ export default function HRManagement({ adminData, onReload }) {
 
             {/* === Employee Attendance Tab === */}
             {subTab === 'att' && (
-                <div>
-                    <div className="card mb-4 flex items-center gap-4">
-                        <h3 className="font-bold">Select Employee:</h3>
-                        <select
-                            className="inp flex-1 max-w-sm"
-                            style={{ marginBottom: 0 }}
-                            value={selectedAttEmp}
-                            onChange={(e) => setSelectedAttEmp(e.target.value)}
-                        >
-                            <option value="">-- Choose Employee --</option>
-                            {employees.map(e => (
-                                <option key={e.id} value={e.id}>{e.name} ({e.id})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedAttEmp ? (
-                        <AttendanceView logs={selectedEmpLogs} type="employee" />
-                    ) : (
-                        <div className="card text-center text-gray-400 py-12">
-                            Please select an employee to view their attendance records.
-                        </div>
-                    )}
+                <div className="animate-fade-in">
+                    <EmployeeAttendanceMatrix employees={employees} logs={empAttendance} />
                 </div>
             )}
 
