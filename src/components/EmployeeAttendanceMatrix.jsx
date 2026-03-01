@@ -49,13 +49,21 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
         // { time, empId, name, status, loc, dist, date }
 
         const empRows = employees.map(emp => {
-            const empLogs = logs.filter(l => String(l.empId) === String(emp.id));
+            const empLogs = logs.filter(l => String(l.empId).trim() === String(emp.id).trim());
             const empLeaves = leaves.filter(l => String(l.empId) === String(emp.id));
 
             // Map day -> array of logs
             const logsByDay = {};
             empLogs.forEach(log => {
-                const logDate = new Date(log.time);
+                let logDate;
+                if (log.date) {
+                    logDate = new Date(log.date); // Use clean date string if available
+                } else if (log.time) {
+                    logDate = new Date(String(log.time).replace(' ', 'T')); // Convert to ISO for safe parsing
+                } else {
+                    return; // No time data
+                }
+
                 if (logDate.getFullYear() === selectedYear && logDate.getMonth() === selectedMonth) {
                     const d = logDate.getDate();
                     if (!logsByDay[d]) logsByDay[d] = [];

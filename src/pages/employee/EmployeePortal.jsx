@@ -11,6 +11,7 @@ import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
 import Badge from '../../components/ui/Badge';
+import SalarySlip from '../../components/SalarySlip';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -18,6 +19,7 @@ const TABS = [
     { id: 'logs', label: 'Logs', emoji: '📋' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
     { id: 'leaves', label: 'Leaves', emoji: '✈️' },
+    { id: 'payslips', label: 'Payslips', emoji: '💰' },
 ];
 
 export default function EmployeePortal() {
@@ -31,6 +33,7 @@ export default function EmployeePortal() {
         type: 'Sick Leave', reason: '', from: '', to: '',
     });
     const [savingLeave, setSavingLeave] = useState(false);
+    const [viewingSlip, setViewingSlip] = useState(null);
 
     useEffect(() => {
         loadData();
@@ -221,6 +224,47 @@ export default function EmployeePortal() {
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* === Payslips Tab === */}
+            {activeTab === 'payslips' && (
+                <div className="card">
+                    <h3 className="font-bold mb-4">My Salary Slips</h3>
+                    {data?.payroll && data.payroll.length > 0 ? (
+                        <div className="grid gap-3">
+                            {data.payroll.map((p, i) => (
+                                <div key={i} className="bg-white p-4 rounded-xl shadow-sm border flex flex-wrap justify-between items-center gap-4">
+                                    <div>
+                                        <div className="font-bold text-lg text-gray-800">₹{p.amount}</div>
+                                        <div className="text-sm text-gray-500">Date: {new Date(p.date).toLocaleDateString('en-IN')}</div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Badge text="Paid" variant="green" />
+                                        <button
+                                            onClick={() => setViewingSlip({ id: p.id, date: p.date, empId: user?.userId, name: profile.name, days: p.days, amount: p.amount })}
+                                            className="btn-outline text-sm py-1.5 border-blue-500 text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                                        >
+                                            <i className="fas fa-file-invoice-dollar"></i> View Slip
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center p-6 text-gray-400">
+                            <i className="fas fa-wallet text-4xl mb-3 opacity-50"></i>
+                            <p>No salary slips generated yet.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {viewingSlip && (
+                <SalarySlip
+                    slip={viewingSlip}
+                    employee={{ id: user?.userId, name: profile.name, role: profile.role || 'Staff' }}
+                    onClose={() => setViewingSlip(null)}
+                />
             )}
         </PortalLayout>
     );

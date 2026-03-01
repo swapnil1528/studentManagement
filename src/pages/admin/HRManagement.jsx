@@ -11,6 +11,7 @@ import Badge from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import AttendanceView from '../../components/AttendanceView';
 import EmployeeAttendanceMatrix from '../../components/EmployeeAttendanceMatrix';
+import SalarySlip from '../../components/SalarySlip';
 
 export default function HRManagement({ adminData, onReload }) {
     const { user } = useAuth();
@@ -51,6 +52,7 @@ export default function HRManagement({ adminData, onReload }) {
     const [payForm, setPayForm] = useState({ empId: '', days: 26, amount: '', date: '' });
     const [baseSalary, setBaseSalary] = useState(0);
     const [savingPay, setSavingPay] = useState(false);
+    const [viewingSlip, setViewingSlip] = useState(null);
 
     const handleEmpSelect = (empId) => {
         const emp = employees.find((e) => e.id === empId);
@@ -77,6 +79,22 @@ export default function HRManagement({ adminData, onReload }) {
         });
         if (result?.success) { showToast('Payroll Saved'); onReload?.(); }
         setSavingPay(false);
+    };
+
+    const exportToExcel = () => {
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Date,Employee ID,Employee Name,Amount,Status\n";
+        payroll.forEach(function (rowArray) {
+            let row = new Date(rowArray[1]).toLocaleDateString('en-IN') + "," + rowArray[2] + "," + rowArray[3] + "," + rowArray[5] + ",Paid";
+            csvContent += row + "\n";
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Payroll_Records_${new Date().toLocaleDateString('en-IN')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const subTabs = [
@@ -211,24 +229,49 @@ export default function HRManagement({ adminData, onReload }) {
                         <button className="btn w-full" onClick={handlePayroll} disabled={savingPay}>{savingPay ? 'Saving...' : 'Save Salary Record'}</button>
                     </div>
 
-                    <div className="card p-0 overflow-x-auto">
+                    <div className="card p-0 overflow-x-auto print:hidden">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="font-bold">Recent Payroll Logs</h3>
+                            <button onClick={exportToExcel} className="btn-outline text-sm py-1 border-green-500 text-green-600 hover:bg-green-50 flex items-center gap-2">
+                                <i className="fas fa-file-excel"></i> Export Excel
+                            </button>
+                        </div>
                         <table className="w-full text-left min-w-[600px]">
                             <thead className="t-head">
-                                <tr><th>Date</th><th>Employee</th><th>Amount</th><th>Status</th></tr>
+                                <tr><th>Date</th><th>Employee</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 {payroll.map((p, i) => (
                                     <tr key={i} className="t-row">
-                                        <td>{new Date(p[1]).toLocaleDateString()}</td>
-                                        <td className="font-bold">{p[3]}</td>
+                                        <td>{new Date(p[1]).toLocaleDateString('en-IN')}</td>
+                                        <td className="font-bold">{p[3]}<br /><span className="text-xs text-gray-400 font-normal">{p[2]}</span></td>
                                         <td className="text-green-600 font-bold">₹{p[5]}</td>
                                         <td><Badge text="Paid" variant="green" /></td>
+                                        <td>
+                                            <button
+                                                onClick={() => setViewingSlip({ id: p[0], date: p[1], empId: p[2], name: p[3], days: p[4], amount: p[5] })}
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1"
+                                            >
+                                                <i className="fas fa-file-invoice-dollar"></i> View Slip
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
+                                {payroll.length === 0 && (
+                                    <tr><td colSpan="5" className="text-center p-4 text-gray-500">No payroll records found.</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            )}
+
+            {viewingSlip && (
+                <SalarySlip
+                    slip={viewingSlip}
+                    employee={employees.find(e => String(e.id) === String(viewingSlip.empId))}
+                    onClose={() => setViewingSlip(null)}
+                />
             )}
         </div>
     );

@@ -257,6 +257,10 @@ function getEmployeePortalData(id) {
   const leaveData = leaveSheet ? leaveSheet.getDataRange().getValues().slice(1) : [];
   const myLeaves = leaveData.filter(r => String(r[2]) === String(id));
 
+  const payrollSheet = ss.getSheetByName("Payroll");
+  const payrollData = payrollSheet ? payrollSheet.getDataRange().getValues().slice(1) : [];
+  const myPayroll = payrollData.filter(r => String(r[2]) === String(id));
+
   const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd");
   let todayStatus = "None", lastTime = null;
   const todaysEntries = myAtt.filter(r => {
@@ -279,6 +283,7 @@ function getEmployeePortalData(id) {
     logs: recentLogs,
     allLogs: allLogs,
     leaves: myLeaves.map(l => ({ type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), status: l[8] })),
+    payroll: myPayroll.map(p => ({ id: p[0], date: p[1], days: p[4], amount: p[5], status: p[6] })),
     notices: getNotices('Employee')
   };
 }
