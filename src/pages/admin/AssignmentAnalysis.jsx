@@ -42,7 +42,6 @@ export default function AssignmentAnalysis({ adminData }) {
         const fc = filterCourse ? String(filterCourse).trim().toLowerCase() : '';
         const fb = filterBatch ? String(filterBatch).trim().toLowerCase() : '';
 
-        console.log('[AssignmentAnalysis] Filter:', { fc, fb, totalStudents: allStudents.length, totalAssignments: assignments.length });
 
         // 1. Filter students
         let filtered = allStudents.filter(s => {
@@ -53,7 +52,6 @@ export default function AssignmentAnalysis({ adminData }) {
             return true;
         });
 
-        console.log('[AssignmentAnalysis] Filtered students:', filtered.length, 'sample:', filtered.slice(0, 3).map(s => s.course));
 
         // 2. Get relevant topics
         const relevantAsn = fc
@@ -121,7 +119,7 @@ export default function AssignmentAnalysis({ adminData }) {
                 <div className="flex flex-wrap gap-4 items-end">
                     <div className="flex-1 min-w-[180px]">
                         <label className="text-xs font-bold opacity-50 mb-1 block">Course Filter</label>
-                        <select className="inp" value={filterCourse} onChange={(e) => { console.log('[Filter] Course:', e.target.value); setFilterCourse(e.target.value); }}>
+                        <select className="inp" value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}>
                             <option value="">All Courses</option>
                             {courses.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -142,10 +140,7 @@ export default function AssignmentAnalysis({ adminData }) {
                     </button>
                 </div>
 
-                {/* Debug info */}
-                <div className="text-xs text-gray-400 mt-2">
-                    Total students in data: {allStudents.length} | Courses found: {courses.join(', ')} | Filtered: {rows.length}
-                </div>
+
             </div>
 
             {/* Analysis Table */}
