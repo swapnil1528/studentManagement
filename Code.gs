@@ -127,7 +127,8 @@ function fetchAllAdminData(b) {
       education: getL("Education", 2) 
     }, 
     activeStudents: activeStudents.map(r => ({ id: r[2], name: r[3], course: r[7], batch: r[8] })), 
-    stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) }
+    stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) },
+    _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] }))
   };
 }
 
