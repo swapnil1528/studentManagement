@@ -118,6 +118,7 @@ function fetchAllAdminData(b) {
   const employees = getD("Employee");
   const leaves = getD("Leave Requests").filter(r => r[8] === "Pending");
   const payroll = getD("Payroll");
+  const empAtt = getD("Employee Attendance");
 
   // Dropdowns
   const getL = (n, c) => ss.getSheetByName(n) ? ss.getSheetByName(n).getRange(2, c, ss.getSheetByName(n).getLastRow() - 1 || 1).getValues().flat().filter(String) : [];
@@ -163,7 +164,8 @@ function fetchAllAdminData(b) {
     }, 
     activeStudents: activeStudents.map(r => ({ id: r[2], name: r[3], course: r[7], batch: r[8] })), 
     stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) },
-    _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] }))
+    _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] })),
+    empAttendance: empAtt.map(r => ({ time: r[0], empId: String(r[1]), name: r[2], status: r[3], loc: r[4], dist: r[5], date: r[6] }))
   };
 }
 

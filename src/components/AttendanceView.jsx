@@ -53,7 +53,6 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
     const monthData = useMemo(() => {
         const filtered = parsedLogs.filter(l => l.year === selectedYear && l.month === selectedMonth);
 
-        // Group by day — only count unique days
         const dayMap = {};
         filtered.forEach(log => {
             const dayKey = log.day;
@@ -64,14 +63,41 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
             if (log.isPresent) dayMap[dayKey].isPresent = true;
         });
 
-        const days = Object.values(dayMap).sort((a, b) => a.day - b.day);
-        const present = days.filter(d => d.isPresent).length;
-        const totalDays = days.length;
-        const absent = totalDays - present;
-        const percentage = totalDays > 0 ? Math.round((present / totalDays) * 100) : 0;
+        // Determine how many days to show in the month
+        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        const isCurrentMonth = currentYear === selectedYear && currentMonth === selectedMonth;
+        const maxDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
 
-        return { days, present, absent, totalDays, percentage };
-    }, [parsedLogs, selectedYear, selectedMonth]);
+        const days = [];
+        let present = 0;
+        let absent = 0;
+        let holidays = 0;
+
+        for (let d = 1; d <= maxDay; d++) {
+            const dateObj = new Date(selectedYear, selectedMonth, d);
+            const isSunday = dateObj.getDay() === 0;
+            const dateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+            const dayRecord = dayMap[d] || { day: d, dateStr, entries: [], isPresent: false };
+
+            if (isSunday) {
+                holidays++;
+            } else {
+                if (dayRecord.isPresent) present++;
+                else absent++;
+            }
+
+            days.push({
+                ...dayRecord,
+                isSunday
+            });
+        }
+
+        const totalWorkingDays = days.length - holidays;
+        const percentage = totalWorkingDays > 0 ? Math.round((present / totalWorkingDays) * 100) : 0;
+
+        return { days, present, absent, holidays, totalDays: totalWorkingDays, percentage };
+    }, [parsedLogs, selectedYear, selectedMonth, currentYear, currentMonth]);
 
     // --- YEAR VIEW: Show month-by-month summary for selected year ---
     const yearData = useMemo(() => {
@@ -229,16 +255,22 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
                                     const checkIn = day.entries.find(e => String(e.status).toLowerCase().includes('check-in'));
                                     const checkOut = day.entries.find(e => String(e.status).toLowerCase().includes('check-out'));
                                     return (
-                                        <tr key={i} className="t-row">
-                                            <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                                            <td className="font-semibold">{day.dateStr}</td>
+                                        <tr key={i} className={`t-row ${day.isSunday ? 'bg-yellow-50' : ''}`} style={day.isSunday ? { backgroundColor: '#fef3c7' } : {}}>
+                                            <td className={`font-mono text-sm opacity-50 ${day.isSunday ? 'text-yellow-800' : ''}`}>{day.day}</td>
+                                            <td className={`font-semibold ${day.isSunday ? 'text-yellow-900' : ''}`}>{day.dateStr}</td>
                                             <td>
-                                                <span className={`badge ${day.isPresent ? 'b-green' : 'b-red'}`}>
-                                                    {day.isPresent ? 'Present' : 'Absent'}
-                                                </span>
+                                                {day.isSunday ? (
+                                                    <span className="badge" style={{ backgroundColor: '#fde68a', color: '#92400e', border: '1px solid #fcd34d' }}>
+                                                        Holiday (Sunday)
+                                                    </span>
+                                                ) : (
+                                                    <span className={`badge ${day.isPresent ? 'b-green' : 'b-red'}`}>
+                                                        {day.isPresent ? 'Present' : 'Absent'}
+                                                    </span>
+                                                )}
                                             </td>
-                                            <td className="text-sm">{checkIn ? checkIn.timeStr : '--:--'}</td>
-                                            <td className="text-sm">{checkOut ? checkOut.timeStr : '--:--'}</td>
+                                            <td className={`text-sm ${day.isSunday ? 'text-yellow-800' : ''}`}>{checkIn ? checkIn.timeStr : '--:--'}</td>
+                                            <td className={`text-sm ${day.isSunday ? 'text-yellow-800' : ''}`}>{checkOut ? checkOut.timeStr : '--:--'}</td>
                                         </tr>
                                     );
                                 })

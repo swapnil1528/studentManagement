@@ -9,6 +9,7 @@ import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
+import AttendanceView from '../../components/AttendanceView';
 
 export default function HRManagement({ adminData, onReload }) {
     const { user } = useAuth();
@@ -79,16 +80,24 @@ export default function HRManagement({ adminData, onReload }) {
 
     const subTabs = [
         { id: 'emp', label: 'Employees' },
+        { id: 'att', label: 'Attendance' },
         { id: 'leave', label: 'Leave Requests' },
         { id: 'pay', label: 'Payroll' },
     ];
+
+    // --- Employee Attendance ---
+    const [selectedAttEmp, setSelectedAttEmp] = useState('');
+    const empAttendance = adminData?.empAttendance || [];
+
+    // Filter logs for selected employee
+    const selectedEmpLogs = empAttendance.filter(r => String(r.empId) === String(selectedAttEmp));
 
     return (
         <div>
             <h1 className="text-2xl font-bold mb-4">HR Management</h1>
 
             {/* Sub-tabs */}
-            <div className="flex gap-4 mb-6 border-b">
+            <div className="flex gap-4 mb-6 border-b overflow-x-auto whitespace-nowrap scrollbar-hide">
                 {subTabs.map((t) => (
                     <button
                         key={t.id}
@@ -108,8 +117,8 @@ export default function HRManagement({ adminData, onReload }) {
                             <i className="fas fa-plus" /> Add Employee
                         </button>
                     </div>
-                    <div className="card p-0 overflow-hidden">
-                        <table className="w-full text-left">
+                    <div className="card p-0 overflow-x-auto">
+                        <table className="w-full text-left min-w-[600px]">
                             <thead className="t-head">
                                 <tr><th>ID</th><th>Name</th><th>Role</th><th>Mobile</th><th>Salary</th></tr>
                             </thead>
@@ -146,10 +155,38 @@ export default function HRManagement({ adminData, onReload }) {
                 </div>
             )}
 
+            {/* === Employee Attendance Tab === */}
+            {subTab === 'att' && (
+                <div>
+                    <div className="card mb-4 flex items-center gap-4">
+                        <h3 className="font-bold">Select Employee:</h3>
+                        <select
+                            className="inp flex-1 max-w-sm"
+                            style={{ marginBottom: 0 }}
+                            value={selectedAttEmp}
+                            onChange={(e) => setSelectedAttEmp(e.target.value)}
+                        >
+                            <option value="">-- Choose Employee --</option>
+                            {employees.map(e => (
+                                <option key={e.id} value={e.id}>{e.name} ({e.id})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {selectedAttEmp ? (
+                        <AttendanceView logs={selectedEmpLogs} type="employee" />
+                    ) : (
+                        <div className="card text-center text-gray-400 py-12">
+                            Please select an employee to view their attendance records.
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* === Leave Requests Tab === */}
             {subTab === 'leave' && (
-                <div className="card p-0 overflow-hidden">
-                    <table className="w-full text-left">
+                <div className="card p-0 overflow-x-auto">
+                    <table className="w-full text-left min-w-[600px]">
                         <thead className="t-head">
                             <tr><th>Emp Name</th><th>Type</th><th>Dates</th><th>Reason</th><th>Action</th></tr>
                         </thead>
@@ -161,8 +198,8 @@ export default function HRManagement({ adminData, onReload }) {
                                     <td>{l.from} - {l.to}</td>
                                     <td>{l.reason}</td>
                                     <td>
-                                        <button onClick={() => handleLeaveAction(l.id, 'Approved')} className="text-green-600 font-bold mr-2">Approve</button>
-                                        <button onClick={() => handleLeaveAction(l.id, 'Rejected')} className="text-red-600 font-bold">Reject</button>
+                                        <button onClick={() => handleLeaveAction(l.id, 'Approved')} className="text-green-600 font-bold mr-2 border border-green-200 bg-green-50 px-3 py-1 rounded">Approve</button>
+                                        <button onClick={() => handleLeaveAction(l.id, 'Rejected')} className="text-red-600 font-bold border border-red-200 bg-red-50 px-3 py-1 rounded">Reject</button>
                                     </td>
                                 </tr>
                             )) : (
@@ -190,8 +227,8 @@ export default function HRManagement({ adminData, onReload }) {
                         <button className="btn w-full" onClick={handlePayroll} disabled={savingPay}>{savingPay ? 'Saving...' : 'Save Salary Record'}</button>
                     </div>
 
-                    <div className="card p-0 overflow-hidden">
-                        <table className="w-full text-left">
+                    <div className="card p-0 overflow-x-auto">
+                        <table className="w-full text-left min-w-[600px]">
                             <thead className="t-head">
                                 <tr><th>Date</th><th>Employee</th><th>Amount</th><th>Status</th></tr>
                             </thead>
