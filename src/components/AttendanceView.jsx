@@ -25,8 +25,8 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
         return logs.map(log => {
             const date = new Date(log.time);
             const status = String(log.status || '').toLowerCase();
-            // Count as present if status contains check-in or present
-            const isPresent = status.includes('check-in') || status.includes('present');
+            // Count as present if status contains check-in, check in, checkout, or present
+            const isPresent = status.includes('check-in') || status.includes('check in') || status.includes('check-out') || status.includes('present');
             const isAbsent = status.includes('absent');
             return {
                 date,
@@ -64,9 +64,15 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
         });
 
         // Determine how many days to show in the month
+        const currentDate = new Date();
         const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        const isCurrentMonth = currentYear === selectedYear && currentMonth === selectedMonth;
-        const maxDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
+
+        let maxDay = daysInMonth;
+        if (selectedYear === currentDate.getFullYear() && selectedMonth === currentDate.getMonth()) {
+            maxDay = currentDate.getDate(); // Restrict to today for current month
+        } else if (selectedYear > currentDate.getFullYear() || (selectedYear === currentDate.getFullYear() && selectedMonth > currentDate.getMonth())) {
+            maxDay = 0; // Future months have no working days yet
+        }
 
         const days = [];
         let present = 0;
