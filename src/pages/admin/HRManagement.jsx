@@ -159,7 +159,11 @@ export default function HRManagement({ adminData, onReload }) {
             {/* === Employee Attendance Tab === */}
             {subTab === 'att' && (
                 <div className="animate-fade-in">
-                    <EmployeeAttendanceMatrix employees={employees} logs={empAttendance} />
+                    <EmployeeAttendanceMatrix
+                        employees={employees}
+                        logs={empAttendance}
+                        leaves={adminData?.approvedLeaves || []}
+                    />
                 </div>
             )}
 

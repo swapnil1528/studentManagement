@@ -117,6 +117,7 @@ function fetchAllAdminData(b) {
   // HR Data
   const employees = getD("Employee");
   const leaves = getD("Leave Requests").filter(r => r[8] === "Pending");
+  const approvedLeaves = getD("Leave Requests").filter(r => r[8] === "Approved");
   const payroll = getD("Payroll");
   const empAtt = getD("Employee Attendance");
 
@@ -152,6 +153,7 @@ function fetchAllAdminData(b) {
     fees: getD("FEE MANAGEMENT"), 
     employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5] })),
     leaves: leaves.map(l => ({ id: l[0], empId: l[2], name: l[3], type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), to: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "dd-MMM"), reason: l[7] })),
+    approvedLeaves: approvedLeaves.map(l => ({ id: l[0], empId: l[2], type: l[4], fromDate: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "yyyy-MM-dd"), toDate: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "yyyy-MM-dd") })),
     payroll: payroll,
     dropdowns: { 
       branches: getL("Branch", 2), 

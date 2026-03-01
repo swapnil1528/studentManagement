@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) {
+export default function EmployeeAttendanceMatrix({ employees = [], logs = [], leaves = [] }) {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
 
@@ -43,6 +43,7 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
 
         const empRows = employees.map(emp => {
             const empLogs = logs.filter(l => String(l.empId) === String(emp.id));
+            const empLeaves = leaves.filter(l => String(l.empId) === String(emp.id));
 
             // Map day -> array of logs
             const logsByDay = {};
@@ -55,6 +56,11 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
                 }
             });
 
+            let empWorkingDays = totalWorkingDays;
+            let presentCount = 0;
+            let absentCount = 0;
+            let leaveCount = 0;
+
             // Process each day
             const dailyData = daysToRender.map(dayObj => {
                 const dayLogs = logsByDay[dayObj.day] || [];
@@ -63,6 +69,32 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
 
                 // Present if there's any valid log for the day
                 const isPresent = dayLogs.length > 0;
+                let isLeave = false;
+
+                // Check leave
+                if (!isPresent && !dayObj.isSunday) {
+                    const currentDateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(dayObj.day).padStart(2, '0')}`;
+                    isLeave = empLeaves.some(lv => {
+                        return currentDateStr >= lv.fromDate && currentDateStr <= lv.toDate;
+                    });
+                }
+
+                // Tallying counts dynamically for this employee
+                if (dayObj.isSunday) {
+                    if (isPresent) {
+                        presentCount++;
+                        empWorkingDays++; // Worked on a holiday, counts towards their total working days
+                    }
+                } else {
+                    if (isPresent) {
+                        presentCount++;
+                    } else if (isLeave) {
+                        leaveCount++;
+                        empWorkingDays--; // Approved leave reduces required working days
+                    } else {
+                        absentCount++;
+                    }
+                }
 
                 let timeText = '--';
                 if (viewMode === 'time') {
@@ -83,21 +115,21 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
                     day: dayObj.day,
                     isSunday: dayObj.isSunday,
                     isPresent,
+                    isLeave,
                     checkIn,
                     checkOut,
                     timeText
                 };
             });
 
-            const presentCount = dailyData.filter(d => !d.isSunday && d.isPresent).length;
-            const absentCount = totalWorkingDays - presentCount;
-            const perc = totalWorkingDays > 0 ? Math.round((presentCount / totalWorkingDays) * 100) : 0;
+            const perc = empWorkingDays > 0 ? Math.round((presentCount / empWorkingDays) * 100) : 0;
 
             return {
                 emp,
                 dailyData,
                 presentCount,
                 absentCount,
+                leaveCount,
                 perc
             };
         });
@@ -164,7 +196,8 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
                             ))}
                             <th className="p-2 border bg-green-50 text-green-800 text-center font-bold">P</th>
                             <th className="p-2 border bg-red-50 text-red-800 text-center font-bold">A</th>
-                            <th className="p-2 border bg-blue-50 text-blue-800 text-center font-bold">%</th>
+                            <th className="p-2 border bg-blue-50 text-blue-800 text-center font-bold">L</th>
+                            <th className="p-2 border bg-gray-100 text-gray-800 text-center font-bold">%</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -175,29 +208,45 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
                                     <div className="text-[10px] text-gray-400 font-normal">{row.emp.role}</div>
                                 </td>
 
-                                {row.dailyData.map(d => (
-                                    <td
-                                        key={d.day}
-                                        className={`border text-center align-middle ${d.isSunday ? 'bg-yellow-50' : ''}`}
-                                        style={{ minWidth: viewMode === 'time' ? '70px' : '40px', padding: viewMode === 'time' ? '4px' : '8px' }}
-                                    >
-                                        {d.isSunday ? (
-                                            <span className="text-yellow-600 font-bold text-xs opacity-70">S</span>
-                                        ) : viewMode === 'status' ? (
-                                            d.isPresent ? (
-                                                <span className="text-green-600 font-bold">P</span>
+                                {row.dailyData.map(d => {
+                                    // Highlight Sunday ONLY if they didn't work on it
+                                    const showSundayBg = d.isSunday && !d.isPresent;
+
+                                    return (
+                                        <td
+                                            key={d.day}
+                                            className={`border text-center align-middle ${showSundayBg ? 'bg-yellow-50' : ''}`}
+                                            style={{ minWidth: viewMode === 'time' ? '70px' : '40px', padding: viewMode === 'time' ? '4px' : '8px' }}
+                                        >
+                                            {viewMode === 'status' ? (
+                                                d.isPresent ? (
+                                                    <span className="text-green-600 font-bold">P</span>
+                                                ) : d.isLeave ? (
+                                                    <span className="text-blue-600 font-bold bg-blue-50 px-1 rounded">L</span>
+                                                ) : d.isSunday ? (
+                                                    <span className="text-yellow-600 font-bold text-xs opacity-70">S</span>
+                                                ) : (
+                                                    <span className="text-red-400 font-bold opacity-70">A</span>
+                                                )
                                             ) : (
-                                                <span className="text-red-400 font-bold opacity-70">A</span>
-                                            )
-                                        ) : (
-                                            d.timeText
-                                        )}
-                                    </td>
-                                ))}
+                                                d.isPresent ? (
+                                                    d.timeText
+                                                ) : d.isLeave ? (
+                                                    <span className="text-blue-600 font-bold text-[10px] opacity-70">Leave</span>
+                                                ) : d.isSunday ? (
+                                                    <span className="text-yellow-600 font-bold text-[10px] opacity-70">S</span>
+                                                ) : (
+                                                    <span className="text-red-400 font-bold opacity-70">-</span>
+                                                )
+                                            )}
+                                        </td>
+                                    );
+                                })}
 
                                 <td className="p-2 border text-center font-bold text-green-600 bg-green-50/30">{row.presentCount}</td>
                                 <td className="p-2 border text-center font-bold text-red-500 bg-red-50/30">{row.absentCount}</td>
-                                <td className="p-2 border text-center font-bold text-blue-600 bg-blue-50/30">{row.perc}%</td>
+                                <td className="p-2 border text-center font-bold text-blue-600 bg-blue-50/30">{row.leaveCount || '-'}</td>
+                                <td className="p-2 border text-center font-bold text-gray-700 bg-gray-50">{row.perc}%</td>
                             </tr>
                         ))}
                     </tbody>
@@ -210,11 +259,19 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [] }) 
             </div>
 
             {/* Legend */}
-            {viewMode === 'time' && (
-                <div className="flex gap-4 mt-4 text-xs justify-center items-center bg-gray-50 p-2 rounded border">
+            {viewMode === 'time' ? (
+                <div className="flex flex-wrap gap-4 mt-4 text-xs justify-center items-center bg-gray-50 p-2 rounded border">
                     <span className="font-bold whitespace-nowrap"><span className="text-green-700">Top Time:</span> In</span>
                     <span className="font-bold whitespace-nowrap"><span className="text-red-700">Bottom Time:</span> Out</span>
                     <span className="font-bold whitespace-nowrap"><span className="text-yellow-600 bg-yellow-100 px-1 rounded">S:</span> Sunday/Holiday</span>
+                    <span className="font-bold whitespace-nowrap"><span className="text-blue-600 bg-blue-100 px-1 rounded">Leave:</span> Approved Leave</span>
+                </div>
+            ) : (
+                <div className="flex flex-wrap gap-4 mt-4 text-xs justify-center items-center bg-gray-50 p-2 rounded border">
+                    <span className="font-bold whitespace-nowrap"><span className="text-green-600">P:</span> Present</span>
+                    <span className="font-bold whitespace-nowrap"><span className="text-red-400">A:</span> Absent</span>
+                    <span className="font-bold whitespace-nowrap"><span className="text-blue-600 bg-blue-100 px-1 rounded">L:</span> Approved Leave</span>
+                    <span className="font-bold whitespace-nowrap"><span className="text-yellow-600 bg-yellow-100 px-1 rounded">S:</span> Sunday</span>
                 </div>
             )}
         </div>
