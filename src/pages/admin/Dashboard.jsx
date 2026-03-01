@@ -1,14 +1,46 @@
 /**
  * Dashboard — Admin overview page.
- * Shows KPI stat cards and recent activity.
+ * Shows KPI stat cards, recent activity, and system settings.
  */
 
+import { useState, useEffect } from 'react';
 import StatCard from '../../components/ui/StatCard';
+import { apiCall } from '../../services/api';
+import { showToast } from '../../components/ui/Toast';
 
 export default function Dashboard({ adminData }) {
     const stats = adminData?.stats || {};
     const inquiries = adminData?.inquiries || [];
-    const admissions = adminData?.admissions || [];
+
+    // Mobile check-in toggle
+    const [mobileCheckIn, setMobileCheckIn] = useState(false);
+    const [settingsLoading, setSettingsLoading] = useState(true);
+
+    // Load settings on mount
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        setSettingsLoading(true);
+        const result = await apiCall('getSettings', {});
+        if (result?.success) {
+            setMobileCheckIn(result.mobileCheckIn === true || result.mobileCheckIn === 'true');
+        }
+        setSettingsLoading(false);
+    };
+
+    const toggleMobileCheckIn = async () => {
+        const newValue = !mobileCheckIn;
+        setMobileCheckIn(newValue);
+        const result = await apiCall('saveSetting', { key: 'mobileCheckIn', value: newValue ? 'true' : 'false' });
+        if (result?.success) {
+            showToast(`Mobile check-in ${newValue ? 'enabled' : 'disabled'}`);
+        } else {
+            setMobileCheckIn(!newValue); // revert
+            showToast('Failed to save setting');
+        }
+    };
 
     // Recent activity: last 5 inquiries
     const recentInquiries = inquiries.slice(-5).reverse();
@@ -45,6 +77,38 @@ export default function Dashboard({ adminData }) {
                     icon="fas fa-clock"
                     iconColor="text-orange-500"
                 />
+            </div>
+
+            {/* Settings Card — Mobile Check-in Control */}
+            <div className="card mb-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                    <i className="fas fa-cog text-gray-400" /> System Settings
+                </h3>
+                <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                    <div>
+                        <div className="font-bold text-sm flex items-center gap-2">
+                            <i className="fas fa-mobile-alt text-indigo-500"></i>
+                            Mobile Check-In / Check-Out
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {mobileCheckIn
+                                ? '✅ Students & Employees can check-in from mobile devices'
+                                : '🖥️ Check-in only allowed from desktop/laptop devices'
+                            }
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold" style={{ color: mobileCheckIn ? '#059669' : '#9ca3af' }}>
+                            {settingsLoading ? '...' : mobileCheckIn ? 'ON' : 'OFF'}
+                        </span>
+                        <button
+                            className={`toggle-switch ${mobileCheckIn ? 'active' : ''}`}
+                            onClick={toggleMobileCheckIn}
+                            disabled={settingsLoading}
+                            title={mobileCheckIn ? 'Disable mobile check-in' : 'Enable mobile check-in'}
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Recent Activity */}

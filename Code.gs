@@ -61,6 +61,11 @@ function doPost(e) {
     else if(act==='getAssignments') res = getAssignments(d.id);
     else if(act==='getAllAssignments') res = getAllAssignments();
 
+    // --- SETTINGS ---
+    else if(act==='getSettings') res = getSettings();
+    else if(act==='saveSetting') res = saveSetting(d.key, d.value);
+    else if(act==='checkMobileAllowed') res = checkMobileAllowed();
+
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
   } catch(e) {
     return ContentService.createTextOutput(JSON.stringify({error: "Server Error: "+e.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -648,4 +653,41 @@ function getAllAssignments() {
     mimeType: r[9]
   }));
   return { success: true, assignments: assignments };
+}
+
+// ============================================
+// SETTINGS
+// ============================================
+// Get all settings
+function getSettings() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ensureSheet("Settings", ["Key", "Value"]);
+  if (sheet.getLastRow() < 2) return { success: true, mobileCheckIn: false };
+  const data = sheet.getDataRange().getValues().slice(1);
+  const settings = {};
+  data.forEach(r => { if (r[0]) settings[r[0]] = r[1]; });
+  return { success: true, mobileCheckIn: settings.mobileCheckIn === 'true' };
+}
+
+// Save a setting
+function saveSetting(key, value) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ensureSheet("Settings", ["Key", "Value"]);
+  const data = sheet.getDataRange().getValues();
+  let found = false;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(key)) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      found = true;
+      break;
+    }
+  }
+  if (!found) sheet.appendRow([key, value]);
+  return { success: true };
+}
+
+// Check if mobile attendance is allowed
+function checkMobileAllowed() {
+  const settings = getSettings();
+  return { success: true, mobileCheckIn: settings.mobileCheckIn === true };
 }

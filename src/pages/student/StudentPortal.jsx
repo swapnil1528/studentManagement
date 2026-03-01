@@ -7,10 +7,17 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getStudentPortalData, markStudentAttendance, uploadAssignment, getAssignments } from '../../services/api';
+import { apiCall } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
+
+// Detect mobile device
+const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        || window.innerWidth <= 768;
+};
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -40,10 +47,18 @@ export default function StudentPortal() {
     const [asnLoading, setAsnLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
+    const [asnTopics, setAsnTopics] = useState([]);
+    const [asnCourses, setAsnCourses] = useState([]);
 
-    // Load student data on mount
+    // Mobile check-in control
+    const [isMobile, setIsMobile] = useState(false);
+    const [mobileAllowed, setMobileAllowed] = useState(false);
+    const [mobileCheckDone, setMobileCheckDone] = useState(false);
+
+    // Load student data & mobile setting on mount
     useEffect(() => {
         loadData();
+        checkMobile();
     }, []);
 
     const loadData = async () => {
@@ -53,11 +68,16 @@ export default function StudentPortal() {
         setLoading(false);
     };
 
+    const checkMobile = async () => {
+        setIsMobile(isMobileDevice());
+        const result = await apiCall('checkMobileAllowed', {});
+        if (result?.success) setMobileAllowed(result.mobileCheckIn === true);
+        setMobileCheckDone(true);
+    };
+
     // Load assignments when tab is selected
     useEffect(() => {
-        if (activeTab === 'assignments') {
-            loadAssignments();
-        }
+        if (activeTab === 'assignments') loadAssignments();
     }, [activeTab]);
 
     const loadAssignments = async () => {
@@ -65,13 +85,19 @@ export default function StudentPortal() {
         const result = await getAssignments(user?.studentId || user?.userId);
         if (result?.success) {
             setAssignmentList(result.assignments || []);
+            if (result.topics?.length > 0) setAsnTopics(result.topics);
+            if (result.courses?.length > 0) setAsnCourses(result.courses);
         }
         setAsnLoading(false);
     };
 
     const profile = data?.profile || {};
     const att = data?.attendance || {};
-    const topics = data?.topics || [];
+    const topics = asnTopics.length > 0 ? asnTopics : (data?.topics || []);
+    const studentCourses = asnCourses.length > 0 ? asnCourses : (data?.courses || []);
+
+    // Check if attendance is allowed on this device
+    const canMarkAttendance = !isMobile || mobileAllowed;
 
     // Determine attendance button state
     const getAttStatus = () => {
@@ -83,6 +109,11 @@ export default function StudentPortal() {
 
     // Handle attendance marking
     const handleAttendance = async (type) => {
+        // Re-check mobile on click
+        if (isMobileDevice() && !mobileAllowed) {
+            alert('❌ Mobile check-in is currently disabled by the admin. Please use a desktop/laptop device.');
+            return;
+        }
         showToast(`Processing ${type}...`);
         const result = await markStudentAttendance(user?.studentId || user?.userId, type, 0, 0, []);
         if (result?.success) {
@@ -191,6 +222,23 @@ export default function StudentPortal() {
                     {/* Mark Attendance Card */}
                     <div className="card text-center">
                         <h3 className="font-bold text-lg mb-4">Mark Attendance</h3>
+
+                        {/* Mobile restriction banner */}
+                        {isMobile && !mobileAllowed && mobileCheckDone && (
+                            <div className="p-3 mb-4 rounded-lg text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                <div className="font-bold text-red-600 mb-1">🖥️ Desktop Only</div>
+                                <p className="text-red-500 text-xs">
+                                    Mobile check-in is disabled by admin. Please use a desktop device.
+                                </p>
+                            </div>
+                        )}
+
+                        {isMobile && mobileAllowed && mobileCheckDone && (
+                            <div className="p-2 mb-3 rounded-lg text-xs" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                                <span className="text-green-600">📱 Mobile check-in enabled</span>
+                            </div>
+                        )}
+
                         <div className="mb-4">
                             <div className={`status-indicator ${attStatus.class}`}>
                                 <span>{attStatus.label}</span>
@@ -203,12 +251,20 @@ export default function StudentPortal() {
                         )}
                         <div className="flex gap-2 justify-center">
                             {!attStatus.showOut && (
-                                <button className="btn btn-success w-full" onClick={() => handleAttendance('Check-In')}>
+                                <button
+                                    className="btn btn-success w-full"
+                                    onClick={() => handleAttendance('Check-In')}
+                                    disabled={isMobile && !mobileAllowed}
+                                >
                                     Check-In
                                 </button>
                             )}
                             {attStatus.showOut && (
-                                <button className="btn btn-danger w-full" onClick={() => handleAttendance('Check-Out')}>
+                                <button
+                                    className="btn btn-danger w-full"
+                                    onClick={() => handleAttendance('Check-Out')}
+                                    disabled={isMobile && !mobileAllowed}
+                                >
                                     Check-Out
                                 </button>
                             )}
