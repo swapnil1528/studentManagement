@@ -1,14 +1,15 @@
 /**
  * Registrations — Admin registration management page.
  * Shows registered students. "Admit" button opens Admission modal.
- * Admission modal: name (auto), course (from Course Master), fees (auto-fill from Course Master),
- * discount option, batch (from Batch sheet). No duplicate course per student.
+ * Fetches Course Master (with fees) and Batch data from a dedicated API.
+ * Admission modal: name (auto), course (Course Master), fees (auto-fill),
+ * discount option, batch (Batch sheet). No duplicate course per student.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { saveCourseAdmission } from '../../services/api';
+import { saveCourseAdmission, getCourseFees } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
 const COLUMNS = [
@@ -24,8 +25,33 @@ export default function Registrations({ adminData, onReload }) {
     const registrations = adminData?.registrations || [];
     const dropdowns = adminData?.dropdowns || {};
     const admissions = adminData?.admissions || [];
-    const courseMaster = dropdowns.courseMaster || [];
-    const batches = dropdowns.batches || [];
+
+    // Course Master & Batch data from dedicated API
+    const [courseMasterData, setCourseMasterData] = useState([]);
+    const [batchData, setBatchData] = useState([]);
+
+    // Fetch Course Master + Batch data on component mount
+    useEffect(() => {
+        // First try from adminData (if backend has been redeployed with courseMaster/batches)
+        if (dropdowns.courseMaster?.length > 0) {
+            setCourseMasterData(dropdowns.courseMaster);
+        }
+        if (dropdowns.batches?.length > 0) {
+            setBatchData(dropdowns.batches);
+        }
+
+        // Also fetch from dedicated API (works after Code.gs deploy)
+        getCourseFees().then(result => {
+            if (result?.success) {
+                if (result.courses?.length > 0) {
+                    setCourseMasterData(result.courses);
+                }
+                if (result.batches?.length > 0) {
+                    setBatchData(result.batches);
+                }
+            }
+        }).catch(() => { });
+    }, [dropdowns.courseMaster, dropdowns.batches]);
 
     // Admission modal state
     const [showAdmitModal, setShowAdmitModal] = useState(false);
@@ -43,15 +69,15 @@ export default function Registrations({ adminData, onReload }) {
     }, [admitForm.admStudId, admissions]);
 
     // Available courses (exclude already-assigned ones)
-    // If courseMaster from backend is empty, fall back to dropdowns.courses
+    // Use courseMasterData if available, else fallback to dropdowns.courses
     const availableCourses = useMemo(() => {
-        let courseList = courseMaster.length > 0
-            ? courseMaster
+        let courseList = courseMasterData.length > 0
+            ? courseMasterData
             : (dropdowns.courses || []).map(c => ({ course: c, validity: '', fees: {} }));
         return courseList.filter(cm =>
             !studentExistingCourses.includes(cm.course.toLowerCase())
         );
-    }, [courseMaster, dropdowns.courses, studentExistingCourses]);
+    }, [courseMasterData, dropdowns.courses, studentExistingCourses]);
 
     // Current year for auto fee lookup
     const currentYear = new Date().getFullYear();
@@ -65,26 +91,35 @@ export default function Registrations({ adminData, onReload }) {
             admFees: '',
             discount: 0,
             finalFees: '',
-            admBatchTime: batches.length > 0 ? batches[0] : '08-10 AM'
+            admBatchTime: batchData.length > 0 ? batchData[0] : '08-10 AM'
         });
         setShowAdmitModal(true);
     };
 
     // When course is selected, auto-fill fees from Course Master
     const handleCourseChange = (courseName) => {
-        const cm = courseMaster.find(c => c.course === courseName);
+        const cm = courseMasterData.find(c => c.course === courseName);
         let fee = '';
         if (cm && cm.fees) {
-            // Try current year first, then fallback to latest available year
-            fee = cm.fees[String(currentYear)] || '';
+            // Try current year, then nearby years
+            fee = cm.fees[String(currentYear)] || cm.fees[currentYear] || '';
             if (!fee) {
+                // Try all years, pick the latest with a fee
                 const years = Object.keys(cm.fees).sort((a, b) => Number(b) - Number(a));
-                if (years.length > 0) fee = cm.fees[years[0]];
+                for (const y of years) {
+                    if (cm.fees[y]) { fee = cm.fees[y]; break; }
+                }
             }
         }
         const discount = admitForm.discount || 0;
-        const finalFees = fee ? Math.max(0, Number(fee) - Number(discount)) : '';
-        setAdmitForm(p => ({ ...p, admCourse: courseName, admFees: fee, finalFees: String(finalFees) }));
+        const numFee = Number(fee) || 0;
+        const finalFees = numFee > 0 ? Math.max(0, numFee - Number(discount)) : '';
+        setAdmitForm(p => ({
+            ...p,
+            admCourse: courseName,
+            admFees: numFee > 0 ? String(numFee) : '',
+            finalFees: finalFees ? String(finalFees) : ''
+        }));
     };
 
     // When discount changes, recalculate final fees
@@ -170,7 +205,7 @@ export default function Registrations({ adminData, onReload }) {
 
                 {/* Course Fees (auto-filled from Course Master) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Course Fees (₹)</label>
-                <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.admFees} readOnly placeholder="Auto-filled from Course Master" />
+                <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.admFees ? `₹${admitForm.admFees}` : ''} readOnly placeholder="Select a course to see fees" />
 
                 {/* Discount Option */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Discount (₹)</label>
@@ -182,7 +217,7 @@ export default function Registrations({ adminData, onReload }) {
                     onChange={(e) => handleDiscountChange(e.target.value)}
                 />
 
-                {/* Final Fees */}
+                {/* Final Fees Summary */}
                 {admitForm.admFees && (
                     <div className="mb-3 p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)' }}>
                         <div className="flex justify-between text-sm">
@@ -205,8 +240,8 @@ export default function Registrations({ adminData, onReload }) {
                 {/* Batch Selection (from Batch sheet) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Batch</label>
                 <select className="inp" value={admitForm.admBatchTime} onChange={(e) => setAdmitForm((p) => ({ ...p, admBatchTime: e.target.value }))}>
-                    {batches.length > 0 ? (
-                        batches.map((b) => <option key={b} value={b}>{b}</option>)
+                    {batchData.length > 0 ? (
+                        batchData.map((b) => <option key={b} value={b}>{b}</option>)
                     ) : (
                         <>
                             <option>08-10 AM</option>

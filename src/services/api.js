@@ -142,3 +142,8 @@ export const markStudentAttendance = (id, type, lat, lng, faceDescriptor) =>
 /** Mark employee attendance with face + geolocation */
 export const markEmployeeAttendance = (id, type, lat, lng, faceDescriptor) =>
     apiCall('markEmployeeAtt', { id, type, lat, lng, faceDescriptor });
+
+// ─── Course Fees & Batches ───────────────────────────────────
+/** Get all courses with fees + batch timings from Course Master & Batch sheets */
+export const getCourseFees = () =>
+    apiCall('getCourseFees', {});

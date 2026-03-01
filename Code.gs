@@ -41,6 +41,7 @@ function doPost(e) {
     else if(act==='saveExam') res = saveExamResult(d.form);
     else if(act==='getAttReport') res = getDailyAttendanceReport(d.date);
     else if(act==='saveNotice') res = saveNotice(d.form);
+    else if(act==='getCourseFees') res = getAllCourseFees();
     
     // --- HR & PAYROLL ---
     else if(act==='addEmployee') res = addNewEmployee(d.form);
@@ -469,4 +470,33 @@ function getCourseFee(c) {
   const d = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Course Master").getDataRange().getValues();
   for (let i = 1; i < d.length; i++) if (d[i][1] == c) return { fee: d[i][2] };
   return { fee: 0 };
+}
+
+// Returns ALL courses with year-wise fees + all batches
+function getAllCourseFees() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+  // Course Master: A=SrNo, B=Course, C=Validity, D=2024, E=2025, F=2026, G=2027, H=2028
+  const cmSheet = ss.getSheetByName("Course Master");
+  let courses = [];
+  if (cmSheet && cmSheet.getLastRow() > 1) {
+    const cmData = cmSheet.getDataRange().getValues();
+    const headers = cmData[0];
+    courses = cmData.slice(1).filter(r => r[1]).map(r => {
+      const fees = {};
+      for (let c = 3; c < headers.length; c++) {
+        if (headers[c]) fees[String(headers[c])] = r[c] || 0;
+      }
+      return { course: String(r[1]), validity: r[2], fees: fees };
+    });
+  }
+  
+  // Batch sheet: A=Srno, B=Batch
+  const batchSheet = ss.getSheetByName("Batch");
+  let batches = [];
+  if (batchSheet && batchSheet.getLastRow() > 1) {
+    batches = batchSheet.getRange(2, 2, batchSheet.getLastRow() - 1).getValues().flat().filter(String);
+  }
+  
+  return { success: true, courses: courses, batches: batches };
 }
