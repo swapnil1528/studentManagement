@@ -19,9 +19,16 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
 
     // Parse logs and organize by employee and day
     const matrixData = useMemo(() => {
+        const currentDate = new Date();
         const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        const isCurrentMonth = currentYear === selectedYear && currentMonth === selectedMonth;
-        const maxDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
+
+        // If we selected a future month/year, render nothing or up to 0 days
+        let maxDay = daysInMonth;
+        if (selectedYear === currentDate.getFullYear() && selectedMonth === currentDate.getMonth()) {
+            maxDay = currentDate.getDate(); // Restrict to today for current month
+        } else if (selectedYear > currentDate.getFullYear() || (selectedYear === currentDate.getFullYear() && selectedMonth > currentDate.getMonth())) {
+            maxDay = 0; // Future months have no working days yet
+        }
 
         // Create an array of days [1...maxDay]
         const daysToRender = [];

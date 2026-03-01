@@ -71,7 +71,9 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
         const days = [];
         let present = 0;
         let absent = 0;
-        let holidays = 0;
+
+        // Start counting total working days - baseline is total days minus Sundays
+        let totalWorkingDays = 0;
 
         for (let d = 1; d <= maxDay; d++) {
             const dateObj = new Date(selectedYear, selectedMonth, d);
@@ -81,10 +83,17 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
             const dayRecord = dayMap[d] || { day: d, dateStr, entries: [], isPresent: false };
 
             if (isSunday) {
-                holidays++;
+                if (dayRecord.isPresent) {
+                    present++;
+                    totalWorkingDays++; // Add working day back if they worked on a Sunday
+                }
             } else {
-                if (dayRecord.isPresent) present++;
-                else absent++;
+                totalWorkingDays++; // Normal working day
+                if (dayRecord.isPresent) {
+                    present++;
+                } else {
+                    absent++;
+                }
             }
 
             days.push({
@@ -93,10 +102,9 @@ export default function AttendanceView({ logs = [], type = 'student' }) {
             });
         }
 
-        const totalWorkingDays = days.length - holidays;
         const percentage = totalWorkingDays > 0 ? Math.round((present / totalWorkingDays) * 100) : 0;
 
-        return { days, present, absent, holidays, totalDays: totalWorkingDays, percentage };
+        return { days, present, absent, totalDays: totalWorkingDays, percentage };
     }, [parsedLogs, selectedYear, selectedMonth, currentYear, currentMonth]);
 
     // --- YEAR VIEW: Show month-by-month summary for selected year ---
