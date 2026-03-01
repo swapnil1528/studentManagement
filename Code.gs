@@ -52,7 +52,7 @@ function doPost(e) {
     // --- PORTAL ACTIONS ---
     else if(act==='registerFace') res = registerFaceData(d.id, d.descriptor);
     else if(act==='getStudent') res = getStudentPortalData(d.id);
-    else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng);
+    else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device);
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
     else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng);
 
@@ -210,9 +210,17 @@ function getStudentPortalData(id) {
   };
 }
 
-// --- MARK STUDENT ATTENDANCE (No face, no location check) ---
-function markStudentAttendance(id, type, lat, lng) {
+// --- MARK STUDENT ATTENDANCE (with mobile device check) ---
+function markStudentAttendance(id, type, lat, lng, device) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+  // Backend enforcement: block mobile if setting is off
+  if (String(device).toLowerCase() === 'mobile') {
+    var settings = getSettings();
+    if (!settings.mobileCheckIn) {
+      return { error: "Mobile check-in is disabled by admin. Please use a desktop device." };
+    }
+  }
   
   // Find student in Admission Data
   const adData = ss.getSheetByName("Admission Data").getDataRange().getValues();

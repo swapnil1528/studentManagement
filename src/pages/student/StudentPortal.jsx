@@ -50,8 +50,8 @@ export default function StudentPortal() {
     const [asnTopics, setAsnTopics] = useState([]);
     const [asnCourses, setAsnCourses] = useState([]);
 
-    // Mobile check-in control
-    const [isMobile, setIsMobile] = useState(false);
+    // Mobile check-in control — default to blocking mobile until confirmed
+    const [isMobile] = useState(() => isMobileDevice());
     const [mobileAllowed, setMobileAllowed] = useState(false);
     const [mobileCheckDone, setMobileCheckDone] = useState(false);
 
@@ -69,9 +69,15 @@ export default function StudentPortal() {
     };
 
     const checkMobile = async () => {
-        setIsMobile(isMobileDevice());
-        const result = await apiCall('checkMobileAllowed', {});
-        if (result?.success) setMobileAllowed(result.mobileCheckIn === true);
+        try {
+            const result = await apiCall('checkMobileAllowed', {});
+            if (result?.success) {
+                setMobileAllowed(result.mobileCheckIn === true);
+            }
+            // If API fails, mobileAllowed stays false (fail-safe: block mobile)
+        } catch (e) {
+            setMobileAllowed(false);
+        }
         setMobileCheckDone(true);
     };
 
@@ -109,13 +115,22 @@ export default function StudentPortal() {
 
     // Handle attendance marking
     const handleAttendance = async (type) => {
-        // Re-check mobile on click
-        if (isMobileDevice() && !mobileAllowed) {
+        const mobile = isMobileDevice();
+        // Frontend block: re-check on click
+        if (mobile && !mobileAllowed) {
             alert('❌ Mobile check-in is currently disabled by the admin. Please use a desktop/laptop device.');
             return;
         }
         showToast(`Processing ${type}...`);
-        const result = await markStudentAttendance(user?.studentId || user?.userId, type, 0, 0, []);
+        // Pass device flag so backend can also enforce
+        const result = await apiCall('markStudentAtt', {
+            id: user?.studentId || user?.userId,
+            type,
+            lat: 0,
+            lng: 0,
+            faceDescriptor: [],
+            device: mobile ? 'mobile' : 'desktop'
+        });
         if (result?.success) {
             showToast(`${type} Successful!`);
             loadData();
