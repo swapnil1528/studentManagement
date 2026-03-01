@@ -674,7 +674,10 @@ function getSettings() {
   const data = sheet.getDataRange().getValues().slice(1);
   const settings = {};
   data.forEach(r => { if (r[0]) settings[r[0]] = r[1]; });
-  return { success: true, mobileCheckIn: settings.mobileCheckIn === 'true' };
+  
+  // Handle both boolean true and string 'true' (Google Sheets may auto-convert)
+  const isMobileOn = settings.mobileCheckIn === true || settings.mobileCheckIn === 'true';
+  return { success: true, mobileCheckIn: isMobileOn };
 }
 
 // Save a setting
