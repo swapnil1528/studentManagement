@@ -55,14 +55,16 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
             // Map day -> array of logs
             const logsByDay = {};
             empLogs.forEach(log => {
-                let logDate;
-                if (log.date) {
-                    logDate = new Date(log.date); // Use clean date string if available
-                } else if (log.time) {
-                    logDate = new Date(String(log.time).replace(' ', 'T')); // Convert to ISO for safe parsing
-                } else {
-                    return; // No time data
+                // Always prioritize parsing log.time for precision, just like AttendanceView
+                let logDate = new Date(log.time);
+                if (isNaN(logDate.getTime()) && log.time) {
+                    logDate = new Date(String(log.time).replace(' ', 'T'));
                 }
+                if (isNaN(logDate.getTime()) && log.date) {
+                    logDate = new Date(log.date);
+                }
+
+                if (isNaN(logDate.getTime())) return; // Failed to parse
 
                 if (logDate.getFullYear() === selectedYear && logDate.getMonth() === selectedMonth) {
                     const d = logDate.getDate();
@@ -79,8 +81,14 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
             // Process each day
             const dailyData = daysToRender.map(dayObj => {
                 const dayLogs = logsByDay[dayObj.day] || [];
-                const checkIn = dayLogs.find(l => String(l.status).toLowerCase().includes('check-in'));
-                const checkOut = dayLogs.find(l => String(l.status).toLowerCase().includes('check-out'));
+                const checkIn = dayLogs.find(l => {
+                    const s = String(l.status).toLowerCase();
+                    return s.includes('check-in') || s.includes('check in') || s.includes('present');
+                });
+                const checkOut = dayLogs.find(l => {
+                    const s = String(l.status).toLowerCase();
+                    return s.includes('check-out') || s.includes('check out');
+                });
 
                 // Present if there's any valid log for the day
                 const isPresent = dayLogs.length > 0;
