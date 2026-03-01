@@ -43,11 +43,15 @@ export default function Registrations({ adminData, onReload }) {
     }, [admitForm.admStudId, admissions]);
 
     // Available courses (exclude already-assigned ones)
+    // If courseMaster from backend is empty, fall back to dropdowns.courses
     const availableCourses = useMemo(() => {
-        return courseMaster.filter(cm =>
+        let courseList = courseMaster.length > 0
+            ? courseMaster
+            : (dropdowns.courses || []).map(c => ({ course: c, validity: '', fees: {} }));
+        return courseList.filter(cm =>
             !studentExistingCourses.includes(cm.course.toLowerCase())
         );
-    }, [courseMaster, studentExistingCourses]);
+    }, [courseMaster, dropdowns.courses, studentExistingCourses]);
 
     // Current year for auto fee lookup
     const currentYear = new Date().getFullYear();
