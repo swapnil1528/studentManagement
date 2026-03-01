@@ -59,6 +59,7 @@ function doPost(e) {
     // --- ASSIGNMENTS ---
     else if(act==='uploadAssignment') res = uploadAssignment(d.form);
     else if(act==='getAssignments') res = getAssignments(d.id);
+    else if(act==='getAllAssignments') res = getAllAssignments();
 
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
   } catch(e) {
@@ -626,4 +627,25 @@ function getAssignments(studentId) {
   }
   
   return { success: true, assignments: assignments, topics: topics, courses: studentCourses };
+}
+
+// Get ALL assignments for admin analysis
+function getAllAssignments() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Assignments");
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, assignments: [] };
+  const data = sheet.getDataRange().getValues().slice(1);
+  const assignments = data.map(r => ({
+    id: r[0],
+    date: r[1],
+    studentId: String(r[2]),
+    studentName: r[3],
+    course: r[4],
+    topic: r[5],
+    fileName: r[6],
+    fileUrl: r[7],
+    fileSize: r[8],
+    mimeType: r[9]
+  }));
+  return { success: true, assignments: assignments };
 }

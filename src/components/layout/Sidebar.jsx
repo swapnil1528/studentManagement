@@ -21,6 +21,7 @@ const NAV_ITEMS = [
     { id: 'divider' },
     { id: 'lms', icon: 'fas fa-cloud-upload-alt', label: 'LMS Upload' },
     { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results' },
+    { id: 'asn', icon: 'fas fa-paperclip', label: 'Assignments' },
 ];
 
 export default function Sidebar({ activeTab }) {

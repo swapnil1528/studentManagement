@@ -17,6 +17,7 @@ import Notices from '../../pages/admin/Notices';
 import HRManagement from '../../pages/admin/HRManagement';
 import LMSUpload from '../../pages/admin/LMSUpload';
 import ExamResults from '../../pages/admin/ExamResults';
+import AssignmentAnalysis from '../../pages/admin/AssignmentAnalysis';
 
 // Map URL paths to components
 const PAGE_MAP = {
@@ -31,6 +32,7 @@ const PAGE_MAP = {
     'hr': HRManagement,
     'lms': LMSUpload,
     'exams': ExamResults,
+    'assignments': AssignmentAnalysis,
 };
 
 // Map old tab IDs to new URL slugs (for Sidebar compatibility)
@@ -46,6 +48,7 @@ export const TAB_TO_SLUG = {
     hr: 'hr',
     lms: 'lms',
     exam: 'exams',
+    asn: 'assignments',
 };
 
 export const SLUG_TO_TAB = Object.fromEntries(
