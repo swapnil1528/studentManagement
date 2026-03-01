@@ -49,7 +49,13 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
         // { time, empId, name, status, loc, dist, date }
 
         const empRows = employees.map(emp => {
-            const empLogs = logs.filter(l => String(l.empId).trim() === String(emp.id).trim());
+            // Robust matching: Match by exact ID or by exact Name (case-insensitive)
+            // This prevents data loss if the Employee Sheet ID is out of sync with Attendance Logs
+            const empLogs = logs.filter(l =>
+                String(l.empId).trim().toLowerCase() === String(emp.id).trim().toLowerCase() ||
+                String(l.name).trim().toLowerCase() === String(emp.name).trim().toLowerCase()
+            );
+
             const empLeaves = leaves.filter(l => String(l.empId) === String(emp.id));
 
             // Map day -> array of logs
@@ -153,7 +159,8 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
                 presentCount,
                 absentCount,
                 leaveCount,
-                perc
+                perc,
+                hasLogs: empLogs.length > 0 // debug indicator
             };
         });
 
@@ -225,10 +232,13 @@ export default function EmployeeAttendanceMatrix({ employees = [], logs = [], le
                     </thead>
                     <tbody>
                         {matrixData.empRows.map((row, i) => (
-                            <tr key={row.emp.id} className="hover:bg-gray-50 transition">
+                            <tr key={row.emp.id || i} className="hover:bg-gray-50 transition">
                                 <td className="p-3 border sticky left-0 bg-white z-10 font-bold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate max-w-[200px]" title={row.emp.name}>
-                                    <div>{row.emp.name}</div>
-                                    <div className="text-[10px] text-gray-400 font-normal">{row.emp.role}</div>
+                                    <div className="flex items-center gap-1">
+                                        {row.emp.name}
+                                        {row.hasLogs && <span className="w-2 h-2 rounded-full bg-green-500 inline-block" title="Has valid logs"></span>}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-normal">ID: {row.emp.id} • {row.emp.role}</div>
                                 </td>
 
                                 {row.dailyData.map(d => {
