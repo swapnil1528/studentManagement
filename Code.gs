@@ -52,6 +52,8 @@ function doPost(e) {
     // --- PORTAL ACTIONS ---
     else if(act==='registerFace') res = registerFaceData(d.id, d.descriptor);
     else if(act==='getStudent') res = getStudentPortalData(d.id);
+    else if(act==='getStudentBasic') res = getStudentBasic(d.id);
+    else if(act==='getStudentExtra') res = getStudentExtra(d.id, d.cs);
     else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device, d);
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
     else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng, d.photo);
@@ -174,6 +176,55 @@ function fetchAllAdminData(b) {
 // ============================================
 // STUDENT PORTAL
 // ============================================
+function getStudentBasic(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
+  
+  const ad = safeGet("Admission Data").filter(r => r[2] == id);
+  const cs = [...new Set(ad.map(r => r[7]))];
+  const att = safeGet("Attendance").filter(r => r[1] == id);
+  
+  let p = 0;
+  att.forEach(r => { if(String(r[4]).toLowerCase().includes('present') || String(r[4]).toLowerCase().includes('check-in')) p++; });
+  
+  const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd");
+  let todayStatus = "None", lastCheckInTime = null;
+  const todaysEntries = att.filter(r => {
+    let d = r[0];
+    let dStr = (d instanceof Date) ? Utilities.formatDate(d, "GMT+5:30", "yyyy-MM-dd") : String(d).substring(0, 10);
+    return dStr === todayStr;
+  });
+  if (todaysEntries.length > 0) {
+    const last = todaysEntries[todaysEntries.length - 1];
+    todayStatus = last[4];
+    lastCheckInTime = last[0];
+  }
+  
+  const attLogs = att.map(r => ({ time: r[0], status: r[4], location: r[6] || "N/A", distance: r[7] || "N/A" })).reverse();
+  const recentLogs = attLogs.slice(0, 6);
+  
+  return { 
+    profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", hasFace: true }, 
+    courses: cs, 
+    attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: recentLogs, allLogs: attLogs }
+  };
+}
+
+function getStudentExtra(id, cs) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
+  
+  const lms = safeGet("LMS Content").filter(r => cs.includes(r[1]));
+  const res = safeGet("Exam Results").filter(r => r[1] == id);
+  
+  return {
+    lms: lms.map(r => ({ title: r[2], type: r[3], link: r[4], desc: r[5] })), 
+    results: res.map(r => ({ exam: r[3], marks: r[5], total: r[6], grade: r[7] })),
+    notices: getNotices('Student'),
+    topics: getTopicsList(cs)
+  };
+}
+
 function getStudentPortalData(id) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];

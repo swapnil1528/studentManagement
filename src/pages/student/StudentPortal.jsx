@@ -73,9 +73,20 @@ export default function StudentPortal({ portalData, onReload }) {
         }
         setMobileCheckDone(true);
 
-        const result = await getStudentPortalData(user?.studentId || user?.userId);
-        if (result && !result.error) setData(result);
-        setLoading(false);
+        const resultBasic = await apiCall('getStudentBasic', { id: user?.studentId || user?.userId });
+        if (resultBasic && !resultBasic.error) {
+            setData(resultBasic);
+            setLoading(false); // Enable the UI immediately with Profile + Attendance data
+
+            // Background load heavy data (LMS, Results, Topics)
+            apiCall('getStudentExtra', { id: user?.studentId || user?.userId, cs: resultBasic.courses }).then(resultExtra => {
+                if (resultExtra && !resultExtra.error) {
+                    setData(prev => ({ ...prev, ...resultExtra }));
+                }
+            });
+        } else {
+            setLoading(false);
+        }
     };
 
     // Load assignments when tab is selected
