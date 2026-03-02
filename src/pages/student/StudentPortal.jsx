@@ -47,6 +47,7 @@ export default function StudentPortal({ portalData, onReload }) {
 
     // Assignment state
     const [assignmentList, setAssignmentList] = useState([]);
+    const [asnLoading, setAsnLoading] = useState(false);
     const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
     const [uploading, setUploading] = useState(false);
     const [asnTopics, setAsnTopics] = useState([]);
@@ -84,12 +85,14 @@ export default function StudentPortal({ portalData, onReload }) {
 
     const loadAssignments = async () => {
         setLoading(true); // Use global loading for assignments too
+        setAsnLoading(true);
         const result = await getAssignments(user?.studentId || user?.userId);
         if (result?.success) {
             setAssignmentList(result.assignments || []);
             if (result.topics?.length > 0) setAsnTopics(result.topics);
             if (result.courses?.length > 0) setAsnCourses(result.courses);
         }
+        setAsnLoading(false);
         setLoading(false);
     };
 
