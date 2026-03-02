@@ -44,6 +44,7 @@ export default function StudentPortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     // Assignment state
     const [assignmentList, setAssignmentList] = useState([]);
