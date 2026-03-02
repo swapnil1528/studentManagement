@@ -170,7 +170,6 @@ export default function EmployeePortal({ portalData, onReload }) {
                         </div>
                     </div>
 
-
                     <div className="card">
                         <h3 className="font-bold text-lg mb-4">Stats</h3>
                         <div className="bg-white p-4 rounded-xl shadow border-b-4 border-purple-500 mb-4">
@@ -183,6 +182,19 @@ export default function EmployeePortal({ portalData, onReload }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Camera Modal */}
+            {showCamera && (
+                <Modal title={`Secure ${attTypePending}`} isOpen={showCamera} onClose={() => setShowCamera(false)}>
+                    <div className="text-center mb-4 text-sm text-gray-500">
+                        Please look at the camera to capture your attendance photo. A timestamp will be embedded.
+                    </div>
+                    <CameraCapture
+                        onCapture={(b64) => handleAttendance(b64)}
+                        onCancel={() => setShowCamera(false)}
+                    />
+                </Modal>
             )}
 
             {/* === Attendance View Tab === */}
