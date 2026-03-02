@@ -14,6 +14,9 @@ export default function Dashboard({ adminData }) {
 
     // Mobile check-in toggle
     const [mobileCheckIn, setMobileCheckIn] = useState(false);
+    // Student Camera toggle
+    const [studentCamera, setStudentCamera] = useState(false);
+
     const [settingsLoading, setSettingsLoading] = useState(true);
 
     // Load settings on mount
@@ -26,6 +29,7 @@ export default function Dashboard({ adminData }) {
         const result = await apiCall('getSettings', {});
         if (result?.success) {
             setMobileCheckIn(result.mobileCheckIn === true || result.mobileCheckIn === 'true');
+            setStudentCamera(result.studentCameraCheckIn === true || result.studentCameraCheckIn === 'true');
         }
         setSettingsLoading(false);
     };
@@ -38,6 +42,18 @@ export default function Dashboard({ adminData }) {
             showToast(`Mobile check-in ${newValue ? 'enabled' : 'disabled'}`);
         } else {
             setMobileCheckIn(!newValue); // revert
+            showToast('Failed to save setting');
+        }
+    };
+
+    const toggleStudentCamera = async () => {
+        const newValue = !studentCamera;
+        setStudentCamera(newValue);
+        const result = await apiCall('saveSetting', { key: 'studentCameraCheckIn', value: newValue ? 'true' : 'false' });
+        if (result?.success) {
+            showToast(`Student Camera Check-in ${newValue ? 'Enforced' : 'Disabled'}`);
+        } else {
+            setStudentCamera(!newValue); // revert
             showToast('Failed to save setting');
         }
     };
@@ -106,6 +122,32 @@ export default function Dashboard({ adminData }) {
                             onClick={toggleMobileCheckIn}
                             disabled={settingsLoading}
                             title={mobileCheckIn ? 'Disable mobile check-in' : 'Enable mobile check-in'}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl mt-3" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                    <div>
+                        <div className="font-bold text-sm flex items-center gap-2">
+                            <i className="fas fa-camera text-indigo-500"></i>
+                            Student Camera Enforcement
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {studentCamera
+                                ? '✅ Students MUST capture a live timestamped photo to check-in'
+                                : '🖥️ Students can check-in simply by clicking the button'
+                            }
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold" style={{ color: studentCamera ? '#059669' : '#9ca3af' }}>
+                            {settingsLoading ? '...' : studentCamera ? 'ON' : 'OFF'}
+                        </span>
+                        <button
+                            className={`toggle-switch ${studentCamera ? 'active' : ''}`}
+                            onClick={toggleStudentCamera}
+                            disabled={settingsLoading}
+                            title={studentCamera ? 'Disable student camera' : 'Enable student camera'}
                         />
                     </div>
                 </div>

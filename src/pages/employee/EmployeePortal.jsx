@@ -5,13 +5,15 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getEmployeePortalData, markEmployeeAttendance, saveLeaveRequest } from '../../services/api';
+import { getEmployeePortalData, markEmployeeAttendance, saveLeaveRequest, apiCall } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
 import Badge from '../../components/ui/Badge';
 import SalarySlip from '../../components/SalarySlip';
+import CameraCapture from '../../components/CameraCapture';
+import Modal from '../../components/ui/Modal';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -22,7 +24,7 @@ const TABS = [
     { id: 'payslips', label: 'Payslips', emoji: '💰' },
 ];
 
-export default function EmployeePortal() {
+export default function EmployeePortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
@@ -56,17 +58,53 @@ export default function EmployeePortal() {
         return { showIn: true, showOut: false, icon: 'fas fa-clock text-gray-300', iconClass: 'text-5xl mb-4 text-gray-300', label: 'Not Marked', lastText: 'Mark your attendance' };
     };
     const attState = getAttButtons();
+    const todayStatus = stats.todayStatus || 'None';
+    const [marking, setMarking] = useState(false);
 
-    // Handle attendance (simple — no face or location check)
-    const handleAttendance = async (type) => {
-        showToast(`Processing ${type}...`);
-        const result = await markEmployeeAttendance(user?.userId, type, 0, 0, []);
-        if (result?.success) {
-            showToast(`${type} Successful!`);
-            loadData();
-        } else {
-            alert(result?.error || 'Failed');
-        }
+    // Camera state
+    const [showCamera, setShowCamera] = useState(false);
+    const [attTypePending, setAttTypePending] = useState(''); // 'Check-In' or 'Check-Out'
+
+    // Open camera modal instead of direct API call
+    const initiateAttendance = (type) => {
+        setAttTypePending(type);
+        setShowCamera(true);
+    };
+
+    const handleAttendance = async (photoBase64) => {
+        setShowCamera(false);
+        setMarking(true);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const result = await apiCall('markEmployeeAtt', {
+                    id: user.userId,
+                    type: attTypePending,
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    photo: photoBase64
+                });
+                if (result?.error) alert(result.error);
+                else { showToast(`${attTypePending} Successful`); onReload?.(); }
+                setMarking(false);
+            },
+            () => {
+                // Fallback if no location
+                submitAttendanceFallback(photoBase64);
+            }
+        );
+    };
+
+    const submitAttendanceFallback = async (photoBase64) => {
+        const result = await apiCall('markEmployeeAtt', {
+            id: user.userId,
+            type: attTypePending,
+            lat: null,
+            lng: null,
+            photo: photoBase64
+        });
+        if (result?.error) alert(result.error);
+        else { showToast(`${attTypePending} Successful`); onReload?.(); }
+        setMarking(false);
     };
 
     // Submit leave request
@@ -110,25 +148,28 @@ export default function EmployeePortal() {
                         <h3 className="font-bold text-lg mb-4">Mark Attendance</h3>
                         <div className={attState.iconClass}><i className={attState.icon} /></div>
                         <p className="text-sm text-gray-400 mb-6">{attState.lastText}</p>
-                        <div className="grid grid-cols-2 gap-4">
-                            {attState.showIn && (
+                        <div className="flex justify-center gap-4 mt-8">
+                            {(todayStatus === 'None' || todayStatus === 'Check-Out') && (
                                 <button
-                                    className="bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 rounded-xl shadow-lg font-bold hover:scale-105 transition transform flex flex-col items-center justify-center"
-                                    onClick={() => handleAttendance('Check-In')}
+                                    className="btn bg-green-600 px-8 py-3 text-lg"
+                                    onClick={() => initiateAttendance('Check-In')}
+                                    disabled={marking}
                                 >
-                                    <i className="fas fa-sign-in-alt text-2xl mb-1" /> Check In
+                                    <i className="fas fa-sign-in-alt mr-2" /> {marking ? 'Wait...' : 'Check In (Camera)'}
                                 </button>
                             )}
-                            {attState.showOut && (
+                            {todayStatus === 'Check-In' && (
                                 <button
-                                    className="bg-gradient-to-r from-red-500 to-pink-600 text-white py-4 rounded-xl shadow-lg font-bold hover:scale-105 transition transform flex flex-col items-center justify-center"
-                                    onClick={() => handleAttendance('Check-Out')}
+                                    className="btn bg-red-600 px-8 py-3 text-lg"
+                                    onClick={() => initiateAttendance('Check-Out')}
+                                    disabled={marking}
                                 >
-                                    <i className="fas fa-sign-out-alt text-2xl mb-1" /> Check Out
+                                    <i className="fas fa-sign-out-alt mr-2" /> {marking ? 'Wait...' : 'Check Out (Camera)'}
                                 </button>
                             )}
                         </div>
                     </div>
+
 
                     <div className="card">
                         <h3 className="font-bold text-lg mb-4">Stats</h3>

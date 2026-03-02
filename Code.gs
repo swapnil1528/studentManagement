@@ -52,9 +52,9 @@ function doPost(e) {
     // --- PORTAL ACTIONS ---
     else if(act==='registerFace') res = registerFaceData(d.id, d.descriptor);
     else if(act==='getStudent') res = getStudentPortalData(d.id);
-    else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device);
+    else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device, d);
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
-    else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng);
+    else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng, d.photo);
 
     // --- ASSIGNMENTS ---
     else if(act==='uploadAssignment') res = uploadAssignment(d.form);
@@ -214,16 +214,21 @@ function getStudentPortalData(id) {
   };
 }
 
-// --- MARK STUDENT ATTENDANCE (with mobile device check) ---
-function markStudentAttendance(id, type, lat, lng, device) {
+// --- MARK STUDENT ATTENDANCE (with mobile device check + photo check) ---
+function markStudentAttendance(id, type, lat, lng, device, d) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   // Backend enforcement: block mobile if setting is off
+  var settings = getSettings();
   if (String(device).toLowerCase() === 'mobile') {
-    var settings = getSettings();
     if (!settings.mobileCheckIn) {
       return { error: "Mobile check-in is disabled by admin. Please use a desktop device." };
     }
+  }
+  
+  // Backend enforcement: block checkin if photo missing but required
+  if (settings.studentCameraCheckIn && !d.photo) {
+      return { error: "Camera check-in is enforced by Admin. Photo is required." };
   }
   
   // Find student in Admission Data
@@ -231,13 +236,37 @@ function markStudentAttendance(id, type, lat, lng, device) {
   const studentRow = adData.find(r => String(r[2]) === String(id) && String(r[11]) === "Active");
   if (!studentRow) return { error: "Student not Active" };
   
+  // Save the photo if provided
+  let photoUrl = "";
+  if (d.photo) {
+    try {
+      photoUrl = saveToDriveBase64(d.photo, "Attendance Photos", "Student_" + id + "_" + Date.now() + ".jpg");
+    } catch(e) {
+      console.log("Photo save failed for " + id, e);
+    }
+  }
+
   // Save attendance record
   const attSheet = ss.getSheetByName("Attendance");
   const timestamp = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const loc = (lat && lng) ? lat + "," + lng : "N/A";
-  attSheet.appendRow([timestamp, id, studentRow[3], studentRow[7], type, studentRow[8], loc, "0m"]);
   
-  return { success: true, time: timestamp, type: type };
+  // Find PhotoURL Column or add it
+  const headers = attSheet.getRange(1, 1, 1, attSheet.getLastColumn()).getValues()[0];
+  let photoColIndex = headers.indexOf("PhotoURL");
+  if (photoColIndex === -1) {
+    attSheet.getRange(1, headers.length + 1).setValue("PhotoURL");
+    photoColIndex = headers.length;
+  }
+  
+  const rowData = [timestamp, id, studentRow[3], studentRow[7], type, studentRow[8], loc, "0m"];
+  // padding row data up to photo column
+  while(rowData.length < photoColIndex) rowData.push("");
+  rowData[photoColIndex] = photoUrl;
+  
+  attSheet.appendRow(rowData);
+  
+  return { success: true, time: timestamp, type: type, photoUrl: photoUrl };
 }
 
 // ============================================
@@ -288,8 +317,8 @@ function getEmployeePortalData(id) {
   };
 }
 
-// --- MARK EMPLOYEE ATTENDANCE (No face, no location check) ---
-function markEmployeeAttendance(id, type, lat, lng) {
+// --- MARK EMPLOYEE ATTENDANCE (with photo) ---
+function markEmployeeAttendance(id, type, lat, lng, photoStr) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   const attSheet = ensureSheet("Employee Attendance", ["Time", "ID", "Name", "Type", "Loc", "Dist", "Date"]);
@@ -306,8 +335,32 @@ function markEmployeeAttendance(id, type, lat, lng) {
     if (empRow) empName = empRow[2];
   }
   
-  attSheet.appendRow([timeStr, id, empName, type, loc, "0m", dateStr]);
-  return { success: true, time: timeStr, type: type };
+  
+  // Save the photo if provided
+  let photoUrl = "";
+  if (photoStr) {
+    try {
+      photoUrl = saveToDriveBase64(photoStr, "Attendance Photos", "Emp_" + id + "_" + Date.now() + ".jpg");
+    } catch(e) {
+      console.log("Photo save failed for Employee " + id, e);
+    }
+  }
+  
+  // Find PhotoURL Column or add it
+  const headers = attSheet.getRange(1, 1, 1, attSheet.getLastColumn()).getValues()[0];
+  let photoColIndex = headers.indexOf("PhotoURL");
+  if (photoColIndex === -1) {
+    attSheet.getRange(1, headers.length + 1).setValue("PhotoURL");
+    photoColIndex = headers.length;
+  }
+  
+  const rowData = [timeStr, id, empName, type, loc, "0m", dateStr];
+  // padding row data up to photo column
+  while(rowData.length < photoColIndex) rowData.push("");
+  rowData[photoColIndex] = photoUrl;
+  
+  attSheet.appendRow(rowData);
+  return { success: true, time: timeStr, type: type, photoUrl: photoUrl };
 }
 
 // ============================================
@@ -686,7 +739,8 @@ function getSettings() {
   
   // Handle both boolean true and string 'true' (Google Sheets may auto-convert)
   const isMobileOn = settings.mobileCheckIn === true || settings.mobileCheckIn === 'true';
-  return { success: true, mobileCheckIn: isMobileOn };
+  const isCamOn = settings.studentCameraCheckIn === true || settings.studentCameraCheckIn === 'true';
+  return { success: true, mobileCheckIn: isMobileOn, studentCameraCheckIn: isCamOn };
 }
 
 // Save a setting
@@ -710,4 +764,28 @@ function saveSetting(key, value) {
 function checkMobileAllowed() {
   const settings = getSettings();
   return { success: true, mobileCheckIn: settings.mobileCheckIn === true };
+// Save base64 photo utility for attendance
+function saveToDriveBase64(fileData, parentFolderName, fileName) {
+  const mimeType = "image/jpeg";
+  const parentFolder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  let targetFolder;
+  const folders = parentFolder.getFoldersByName(parentFolderName);
+  if (folders.hasNext()) {
+    targetFolder = folders.next();
+  } else {
+    targetFolder = parentFolder.createFolder(parentFolderName);
+    targetFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  }
+  
+  const split = fileData.split('base64,');
+  let blob;
+  if (split.length >= 2) {
+    blob = Utilities.newBlob(Utilities.base64Decode(split[1]), mimeType, fileName);
+  } else {
+    blob = Utilities.newBlob(Utilities.base64Decode(fileData), mimeType, fileName);
+  }
+  
+  const file = targetFolder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return "https://drive.google.com/file/d/" + file.getId() + "/view";
 }

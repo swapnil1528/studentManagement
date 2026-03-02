@@ -10,8 +10,11 @@ import { getStudentPortalData, markStudentAttendance, uploadAssignment, getAssig
 import { apiCall } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
+import Modal from '../../components/ui/Modal';
+import Badge from '../../components/ui/Badge';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
+import CameraCapture from '../../components/CameraCapture';
 
 // Detect mobile device
 const isMobileDevice = () => {
@@ -37,48 +40,41 @@ const formatSize = (bytes) => {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
-export default function StudentPortal() {
+export default function StudentPortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
     const [data, setData] = useState(null);
 
     // Assignment state
     const [assignmentList, setAssignmentList] = useState([]);
-    const [asnLoading, setAsnLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
+    const [uploading, setUploading] = useState(false);
     const [asnTopics, setAsnTopics] = useState([]);
     const [asnCourses, setAsnCourses] = useState([]);
 
-    // Mobile check-in control — default to blocking mobile until confirmed
-    const [isMobile] = useState(() => isMobileDevice());
-    const [mobileAllowed, setMobileAllowed] = useState(false);
+    // Check-in constraints
+    const [mobileAllowed, setMobileAllowed] = useState(true);
+    const [cameraRequired, setCameraRequired] = useState(false);
     const [mobileCheckDone, setMobileCheckDone] = useState(false);
 
-    // Load student data & mobile setting on mount
+    // Initial load: settings and history
     useEffect(() => {
         loadData();
-        checkMobile();
     }, []);
 
     const loadData = async () => {
         setLoading(true);
+        // Load Settings
+        const settings = await apiCall('getSettings', {});
+        if (settings?.success) {
+            setMobileAllowed(settings.mobileCheckIn);
+            setCameraRequired(settings.studentCameraCheckIn);
+        }
+        setMobileCheckDone(true);
+
         const result = await getStudentPortalData(user?.studentId || user?.userId);
         if (result && !result.error) setData(result);
         setLoading(false);
-    };
-
-    const checkMobile = async () => {
-        try {
-            const result = await apiCall('checkMobileAllowed', {});
-            if (result?.success) {
-                setMobileAllowed(result.mobileCheckIn === true);
-            }
-            // If API fails, mobileAllowed stays false (fail-safe: block mobile)
-        } catch (e) {
-            setMobileAllowed(false);
-        }
-        setMobileCheckDone(true);
     };
 
     // Load assignments when tab is selected
@@ -87,14 +83,14 @@ export default function StudentPortal() {
     }, [activeTab]);
 
     const loadAssignments = async () => {
-        setAsnLoading(true);
+        setLoading(true); // Use global loading for assignments too
         const result = await getAssignments(user?.studentId || user?.userId);
         if (result?.success) {
             setAssignmentList(result.assignments || []);
             if (result.topics?.length > 0) setAsnTopics(result.topics);
             if (result.courses?.length > 0) setAsnCourses(result.courses);
         }
-        setAsnLoading(false);
+        setLoading(false);
     };
 
     const profile = data?.profile || {};
@@ -103,6 +99,7 @@ export default function StudentPortal() {
     const studentCourses = asnCourses.length > 0 ? asnCourses : (data?.courses || []);
 
     // Check if attendance is allowed on this device
+    const isMobile = isMobileDevice();
     const canMarkAttendance = !isMobile || mobileAllowed;
 
     // Determine attendance button state
@@ -113,22 +110,38 @@ export default function StudentPortal() {
     };
     const attStatus = getAttStatus();
 
-    // Handle attendance marking
-    const handleAttendance = async (type) => {
+    // Camera state
+    const [showCamera, setShowCamera] = useState(false);
+    const [attTypePending, setAttTypePending] = useState('');
+
+    const initiateAttendance = (type) => {
         const mobile = isMobileDevice();
-        // Frontend block: re-check on click
         if (mobile && !mobileAllowed) {
             alert('❌ Mobile check-in is currently disabled by the admin. Please use a desktop/laptop device.');
             return;
         }
+
+        if (cameraRequired) {
+            setAttTypePending(type);
+            setShowCamera(true);
+        } else {
+            handleAttendance(type, ""); // No photo required
+        }
+    };
+
+    // Handle attendance marking
+    const handleAttendance = async (type, photoBase64) => {
+        const mobile = isMobileDevice();
+        setShowCamera(false);
         showToast(`Processing ${type}...`);
+
         // Pass device flag so backend can also enforce
         const result = await apiCall('markStudentAtt', {
             id: user?.studentId || user?.userId,
             type,
             lat: 0,
             lng: 0,
-            faceDescriptor: [],
+            photo: photoBase64,
             device: mobile ? 'mobile' : 'desktop'
         });
         if (result?.success) {
@@ -265,27 +278,40 @@ export default function StudentPortal() {
                             </p>
                         )}
                         <div className="flex gap-2 justify-center">
-                            {!attStatus.showOut && (
-                                <button
-                                    className="btn btn-success w-full"
-                                    onClick={() => handleAttendance('Check-In')}
-                                    disabled={isMobile && !mobileAllowed}
-                                >
-                                    Check-In
-                                </button>
-                            )}
+                            {/* Disable buttons completely if not allowed */}
                             {attStatus.showOut && (
                                 <button
-                                    className="btn btn-danger w-full"
-                                    onClick={() => handleAttendance('Check-Out')}
-                                    disabled={isMobile && !mobileAllowed}
+                                    className="btn bg-red-600 w-full mb-3 py-3 font-bold text-lg"
+                                    onClick={() => initiateAttendance('Check-Out')}
+                                    disabled={!canMarkAttendance}
                                 >
-                                    Check-Out
+                                    <i className="fas fa-sign-out-alt mr-2" /> Check Out {cameraRequired ? '(Camera)' : ''}
+                                </button>
+                            )}
+                            {!attStatus.showOut && att.todayStatus !== 'Check-In' && (
+                                <button
+                                    className="btn bg-green-600 w-full mb-3 py-3 font-bold text-lg"
+                                    onClick={() => initiateAttendance('Check-In')}
+                                    disabled={!canMarkAttendance || att.todayStatus === 'Check-Out'}
+                                >
+                                    <i className="fas fa-sign-in-alt mr-2" /> Check In {cameraRequired ? '(Camera)' : ''}
                                 </button>
                             )}
                         </div>
                     </div>
 
+                    {/* Camera Modal */}
+                    {showCamera && (
+                        <Modal title={`Secure ${attTypePending}`} isOpen={showCamera} onClose={() => setShowCamera(false)}>
+                            <div className="text-center mb-4 text-sm text-gray-500">
+                                Please look at the camera to capture your attendance photo. A timestamp will be embedded.
+                            </div>
+                            <CameraCapture
+                                onCapture={(b64) => handleAttendance(attTypePending, b64)}
+                                onCancel={() => setShowCamera(false)}
+                            />
+                        </Modal>
+                    )}
                     {/* Overview Card */}
                     <div className="card">
                         <h3 className="font-bold text-lg mb-4">Overview</h3>
