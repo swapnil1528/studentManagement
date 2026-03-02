@@ -78,16 +78,34 @@ function doPost(e) {
 // AUTHENTICATION
 // ============================================
 function checkLogin(u, p) {
-  const d = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Users").getDataRange().getValues();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const d = ss.getSheetByName("Users").getDataRange().getValues();
   for (let i = 1; i < d.length; i++) {
     if (String(d[i][0]).toLowerCase() == String(u).toLowerCase() && String(d[i][1]) == String(p)) {
+      let role = String(d[i][2]);
+      let userId = String(d[i][4]);
+      let profileData = {};
+      
+      // If student, fetch basic profile logic immediately 
+      if(role.toLowerCase() === 'student') {
+        const ad = ss.getSheetByName("Admission Data").getDataRange().getValues().slice(1).find(r => String(r[2]) === userId);
+        if(ad) {
+          profileData = {
+            name: ad[3],
+            photo: ad[12],
+            batch: ad[8]
+          };
+        }
+      }
+
       return {
         success: true,
         username: d[i][0],
-        role: d[i][2],
+        role: role,
         branch: d[i][3],
-        userId: d[i][4],
-        studentId: d[i][4]
+        userId: userId,
+        studentId: userId,
+        ...profileData
       };
     }
   }

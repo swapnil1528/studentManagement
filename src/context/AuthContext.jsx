@@ -94,6 +94,9 @@ export function AuthProvider({ children }) {
                 branch: result.branch || 'All',
                 userId: result.userId || result.id || '',
                 studentId: result.studentId || result.studId || '',
+                name: result.name || '',
+                photo: result.photo || '',
+                batch: result.batch || ''
             };
             console.log('[Auth] Stored user:', userData);
             setUser(userData);

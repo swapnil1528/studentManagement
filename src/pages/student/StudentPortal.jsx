@@ -95,7 +95,6 @@ export default function StudentPortal({ portalData, onReload }) {
     }, [activeTab]);
 
     const loadAssignments = async () => {
-        setLoading(true); // Use global loading for assignments too
         setAsnLoading(true);
         const result = await getAssignments(user?.studentId || user?.userId);
         if (result?.success) {
@@ -104,10 +103,19 @@ export default function StudentPortal({ portalData, onReload }) {
             if (result.courses?.length > 0) setAsnCourses(result.courses);
         }
         setAsnLoading(false);
-        setLoading(false);
     };
 
-    const profile = data?.profile || {};
+    // If we have no data at all, and no cached profile, show loading
+    if (loading && !data && !user?.name) {
+        return <LoadingBar message="Starting up Student Portal..." />;
+    }
+
+    const profile = data?.profile || {
+        name: user?.name || 'Student',
+        id: user?.studentId || user?.userId,
+        photo: user?.photo || '',
+        batch: user?.batch || 'Student',
+    };
     const att = data?.attendance || {};
     const topics = asnTopics.length > 0 ? asnTopics : (data?.topics || []);
     const studentCourses = asnCourses.length > 0 ? asnCourses : (data?.courses || []);
