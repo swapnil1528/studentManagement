@@ -20,6 +20,7 @@ const EMPTY_DATA = {
     dropdowns: { branches: [], courses: [], villages: [], employees: [], education: [] },
     stats: { todayPresent: 0, todayAbsent: 0 },
     _rawAttendance: [],
+    empAttendance: [],
 };
 
 /** Read cached admin data from localStorage */
@@ -64,6 +65,7 @@ export default function AdminPage() {
             dropdowns: result.dropdowns || EMPTY_DATA.dropdowns,
             stats: result.stats || EMPTY_DATA.stats,
             _rawAttendance: result._rawAttendance || [],
+            empAttendance: result.empAttendance || [],
         };
     }, []);
 
