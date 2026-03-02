@@ -6,12 +6,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getStudentPortalData, markStudentAttendance, uploadAssignment, getAssignments } from '../../services/api';
-import { apiCall } from '../../services/api';
+import { apiCall, getStudentPortalData, markStudentAttendance, uploadAssignment, getAssignments } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import { setLoading } from '../../components/ui/LoadingBar';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
 import CameraCapture from '../../components/CameraCapture';
@@ -43,67 +43,55 @@ const formatSize = (bytes) => {
 export default function StudentPortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
 
-    // Assignment state
-    const [assignmentList, setAssignmentList] = useState([]);
-    const [asnLoading, setAsnLoading] = useState(false);
+    // Assignment form state
     const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
     const [uploading, setUploading] = useState(false);
-    const [asnTopics, setAsnTopics] = useState([]);
-    const [asnCourses, setAsnCourses] = useState([]);
 
-    // Check-in constraints
-    const [mobileAllowed, setMobileAllowed] = useState(true);
-    const [cameraRequired, setCameraRequired] = useState(false);
-    const [mobileCheckDone, setMobileCheckDone] = useState(false);
+    // Queries
+    const { data: settings } = useQuery({
+        queryKey: ['settings'],
+        queryFn: () => apiCall('getSettings', {}),
+        staleTime: 1000 * 60 * 30, // 30 minutes
+    });
 
-    // Initial load: settings and history
-    useEffect(() => {
-        loadData();
-    }, []);
+    const mobileAllowed = settings?.success ? settings.mobileCheckIn : true;
+    const cameraRequired = settings?.success ? settings.studentCameraCheckIn : false;
+    const mobileCheckDone = settings !== undefined;
 
-    const loadData = async () => {
-        setLoading(true);
-        // Load Settings
-        const settings = await apiCall('getSettings', {});
-        if (settings?.success) {
-            setMobileAllowed(settings.mobileCheckIn);
-            setCameraRequired(settings.studentCameraCheckIn);
-        }
-        setMobileCheckDone(true);
+    const { data: resultBasic, isLoading: loading } = useQuery({
+        queryKey: ['studentBasic', user?.studentId || user?.userId],
+        queryFn: () => apiCall('getStudentBasic', { id: user?.studentId || user?.userId }),
+        enabled: !!user,
+    });
 
-        const resultBasic = await apiCall('getStudentBasic', { id: user?.studentId || user?.userId });
-        if (resultBasic && !resultBasic.error) {
-            setData(resultBasic);
-            setLoading(false); // Enable the UI immediately with Profile + Attendance data
+    const { data: resultExtra } = useQuery({
+        queryKey: ['studentExtra', user?.studentId || user?.userId, resultBasic?.courses],
+        queryFn: () => apiCall('getStudentExtra', { id: user?.studentId || user?.userId, cs: resultBasic?.courses || [] }),
+        enabled: !!resultBasic?.courses,
+    });
 
-            // Background load heavy data (LMS, Results, Topics)
-            apiCall('getStudentExtra', { id: user?.studentId || user?.userId, cs: resultBasic.courses }).then(resultExtra => {
-                if (resultExtra && !resultExtra.error) {
-                    setData(prev => ({ ...prev, ...resultExtra }));
-                }
-            });
-        } else {
-            setLoading(false);
-        }
+    const { data: assignmentsData, isLoading: asnLoading } = useQuery({
+        queryKey: ['assignments', user?.studentId || user?.userId],
+        queryFn: () => getAssignments(user?.studentId || user?.userId),
+        enabled: !!user && activeTab === 'assignments',
+    });
+
+    const data = { ...resultBasic, ...resultExtra };
+
+    const assignmentList = assignmentsData?.success ? assignmentsData.assignments : [];
+    const asnTopics = assignmentsData?.success && assignmentsData.topics ? assignmentsData.topics : [];
+    const asnCourses = assignmentsData?.success && assignmentsData.courses ? assignmentsData.courses : [];
+
+    const loadData = () => {
+        queryClient.invalidateQueries(['studentBasic']);
+        queryClient.invalidateQueries(['studentExtra']);
+        queryClient.invalidateQueries(['settings']);
     };
 
-    // Load assignments when tab is selected
-    useEffect(() => {
-        if (activeTab === 'assignments') loadAssignments();
-    }, [activeTab]);
-
-    const loadAssignments = async () => {
-        setAsnLoading(true);
-        const result = await getAssignments(user?.studentId || user?.userId);
-        if (result?.success) {
-            setAssignmentList(result.assignments || []);
-            if (result.topics?.length > 0) setAsnTopics(result.topics);
-            if (result.courses?.length > 0) setAsnCourses(result.courses);
-        }
-        setAsnLoading(false);
+    const loadAssignments = () => {
+        queryClient.invalidateQueries(['assignments']);
     };
 
     // If we have no data at all, and no cached profile, show loading

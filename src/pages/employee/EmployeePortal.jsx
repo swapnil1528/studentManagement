@@ -14,6 +14,7 @@ import Badge from '../../components/ui/Badge';
 import SalarySlip from '../../components/SalarySlip';
 import CameraCapture from '../../components/CameraCapture';
 import Modal from '../../components/ui/Modal';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -27,8 +28,15 @@ const TABS = [
 export default function EmployeePortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('attendance');
-    const [data, setData] = useState(null);
+    const queryClient = useQueryClient();
 
+    const { data: result, isLoading: loading } = useQuery({
+        queryKey: ['employeeData', user?.userId],
+        queryFn: () => getEmployeePortalData(user?.userId),
+        enabled: !!user,
+    });
+
+    const data = result && !result.error ? result : null;
 
     // Leave form state
     const [leaveForm, setLeaveForm] = useState({
@@ -37,15 +45,8 @@ export default function EmployeePortal({ portalData, onReload }) {
     const [savingLeave, setSavingLeave] = useState(false);
     const [viewingSlip, setViewingSlip] = useState(null);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
-        setLoading(true);
-        const result = await getEmployeePortalData(user?.userId);
-        if (result && !result.error) setData(result);
-        setLoading(false);
+    const loadData = () => {
+        queryClient.invalidateQueries(['employeeData']);
     };
 
     const profile = data?.profile || {};
