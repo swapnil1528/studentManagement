@@ -5,6 +5,7 @@ export default function CameraCapture({ onCapture, onCancel }) {
     const canvasRef = useRef(null);
     const [error, setError] = useState('');
     const [stream, setStream] = useState(null);
+    const [locationText, setLocationText] = useState("Fetching Location...");
 
     // Initialize camera stream
     useEffect(() => {
@@ -26,6 +27,29 @@ export default function CameraCapture({ onCapture, onCancel }) {
             }
         }
         startCamera();
+
+        // Fetch location for stamp
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+                    if (!res.ok) throw new Error('API failed');
+                    const data = await res.json();
+                    let locName = data?.display_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+                    if (locName.length > 60) locName = locName.substring(0, 57) + '...';
+                    setLocationText(locName);
+                } catch (e) {
+                    setLocationText(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+                }
+            },
+            (err) => {
+                console.log("Geolocation error:", err);
+                setLocationText("Location Unavailable");
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+        );
 
         // Cleanup function to stop tracks when component unmounts
         return () => {
@@ -55,14 +79,19 @@ export default function CameraCapture({ onCapture, onCancel }) {
 
         // Build a semi-transparent background bar for the text
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
 
-        // Add text
-        ctx.font = '20px Arial';
+        // Add Date text
+        ctx.font = '16px Arial';
         ctx.fillStyle = '#ffffff'; // White text
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(`Recorded at: ${timestampStr}`, canvas.width / 2, canvas.height - 20);
+        ctx.fillText(`Recorded at: ${timestampStr}`, canvas.width / 2, canvas.height - 40);
+
+        // Add Location text
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#FFD700'; // Gold text
+        ctx.fillText(`📍 ${locationText}`, canvas.width / 2, canvas.height - 15);
 
         // Convert the painted canvas to a base64 JPEG
         const base64Data = canvas.toDataURL('image/jpeg', 0.8); // 80% quality
