@@ -764,6 +764,8 @@ function saveSetting(key, value) {
 function checkMobileAllowed() {
   const settings = getSettings();
   return { success: true, mobileCheckIn: settings.mobileCheckIn === true };
+}
+
 // Save base64 photo utility for attendance
 function saveToDriveBase64(fileData, parentFolderName, fileName) {
   const mimeType = "image/jpeg";

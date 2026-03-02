@@ -84,7 +84,7 @@ export default function EmployeePortal({ portalData, onReload }) {
                     photo: photoBase64
                 });
                 if (result?.error) alert(result.error);
-                else { showToast(`${attTypePending} Successful`); onReload?.(); }
+                else { showToast(`${attTypePending} Successful`); loadData(); }
                 setMarking(false);
             },
             () => {
@@ -103,7 +103,7 @@ export default function EmployeePortal({ portalData, onReload }) {
             photo: photoBase64
         });
         if (result?.error) alert(result.error);
-        else { showToast(`${attTypePending} Successful`); onReload?.(); }
+        else { showToast(`${attTypePending} Successful`); loadData(); }
         setMarking(false);
     };
 
