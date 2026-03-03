@@ -1,15 +1,12 @@
 /**
  * Registrations — Admin registration management page.
- * Shows registered students. "Admit" button opens Admission modal.
- * Fetches Course Master (with fees) and Batch data from a dedicated API.
- * Admission modal: name (auto), course (Course Master), fees (auto-fill),
- * discount option, batch (Batch sheet). No duplicate course per student.
+ * Shows registered students. Supports: Edit, Delete, Admit.
  */
 
 import { useState, useMemo, useEffect } from 'react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { saveCourseAdmission, getCourseFees } from '../../services/api';
+import { saveCourseAdmission, getCourseFees, updateRegistration, deleteRegistration } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
 const COLUMNS = [
@@ -18,49 +15,55 @@ const COLUMNS = [
     { key: 'name', label: 'Name' },
     { key: 'course', label: 'Course' },
     { key: 'date', label: 'Date' },
-    { key: 'action', label: 'Action' },
+    { key: 'action', label: 'Actions' },
 ];
+
+// Row indices for Registrations sheet:
+// r[0]=rowIndex, r[1]=?, r[2]=studentId, r[3]=date, r[4]=time,
+// r[5]=name, r[6]=?, r[7]=?, r[8]=?, r[9]=course,
+// r[10]=aadhar, r[11]=photo, r[12]=dob ...
+// (actual indices depend on sheet structure — using same as before)
 
 export default function Registrations({ adminData, onReload }) {
     const registrations = adminData?.registrations || [];
     const dropdowns = adminData?.dropdowns || {};
     const admissions = adminData?.admissions || [];
 
-    // Course Master & Batch data from dedicated API
     const [courseMasterData, setCourseMasterData] = useState([]);
     const [batchData, setBatchData] = useState([]);
 
-    // Fetch Course Master + Batch data on component mount
     useEffect(() => {
-        // First try from adminData (if backend has been redeployed with courseMaster/batches)
-        if (dropdowns.courseMaster?.length > 0) {
-            setCourseMasterData(dropdowns.courseMaster);
-        }
-        if (dropdowns.batches?.length > 0) {
-            setBatchData(dropdowns.batches);
-        }
-
-        // Also fetch from dedicated API (works after Code.gs deploy)
+        if (dropdowns.courseMaster?.length > 0) setCourseMasterData(dropdowns.courseMaster);
+        if (dropdowns.batches?.length > 0) setBatchData(dropdowns.batches);
         getCourseFees().then(result => {
             if (result?.success) {
-                if (result.courses?.length > 0) {
-                    setCourseMasterData(result.courses);
-                }
-                if (result.batches?.length > 0) {
-                    setBatchData(result.batches);
-                }
+                if (result.courses?.length > 0) setCourseMasterData(result.courses);
+                if (result.batches?.length > 0) setBatchData(result.batches);
             }
         }).catch(() => { });
     }, [dropdowns.courseMaster, dropdowns.batches]);
 
-    // Admission modal state
+    // ── Admission modal ────────────────────────────────────────
     const [showAdmitModal, setShowAdmitModal] = useState(false);
-    const [saving, setSaving] = useState(false);
+    const [admitSaving, setAdmitSaving] = useState(false);
     const [admitForm, setAdmitForm] = useState({
         admStudId: '', name: '', admCourse: '', admFees: '', discount: 0, finalFees: '', admBatchTime: ''
     });
 
-    // Get courses already assigned to this student (prevent duplicates)
+    // ── Edit modal ─────────────────────────────────────────────
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editSaving, setEditSaving] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const [editForm, setEditForm] = useState({
+        name: '', mobile: '', aadhar: '', dob: '', course: '', branch: '',
+    });
+
+    // ── Confirm delete ─────────────────────────────────────────
+    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const currentYear = new Date().getFullYear();
+
     const studentExistingCourses = useMemo(() => {
         if (!admitForm.admStudId) return [];
         return admissions
@@ -68,8 +71,6 @@ export default function Registrations({ adminData, onReload }) {
             .map(r => String(r[7]).toLowerCase());
     }, [admitForm.admStudId, admissions]);
 
-    // Available courses (exclude already-assigned ones)
-    // Use courseMasterData if available, else fallback to dropdowns.courses
     const availableCourses = useMemo(() => {
         let courseList = courseMasterData.length > 0
             ? courseMasterData
@@ -79,80 +80,95 @@ export default function Registrations({ adminData, onReload }) {
         );
     }, [courseMasterData, dropdowns.courses, studentExistingCourses]);
 
-    // Current year for auto fee lookup
-    const currentYear = new Date().getFullYear();
-
-    // Open Admission modal
+    // ── Open Admit modal ───────────────────────────────────────
     const openAdmitModal = (studentId, studentName) => {
         setAdmitForm({
-            admStudId: studentId,
-            name: studentName,
-            admCourse: '',
-            admFees: '',
-            discount: 0,
-            finalFees: '',
+            admStudId: studentId, name: studentName,
+            admCourse: '', admFees: '', discount: 0, finalFees: '',
             admBatchTime: batchData.length > 0 ? batchData[0] : '08-10 AM'
         });
         setShowAdmitModal(true);
     };
 
-    // When course is selected, auto-fill fees from Course Master
     const handleCourseChange = (courseName) => {
         const cm = courseMasterData.find(c => c.course === courseName);
         let fee = '';
         if (cm && cm.fees) {
-            // Try current year, then nearby years
             fee = cm.fees[String(currentYear)] || cm.fees[currentYear] || '';
             if (!fee) {
-                // Try all years, pick the latest with a fee
                 const years = Object.keys(cm.fees).sort((a, b) => Number(b) - Number(a));
-                for (const y of years) {
-                    if (cm.fees[y]) { fee = cm.fees[y]; break; }
-                }
+                for (const y of years) { if (cm.fees[y]) { fee = cm.fees[y]; break; } }
             }
         }
         const discount = admitForm.discount || 0;
         const numFee = Number(fee) || 0;
         const finalFees = numFee > 0 ? Math.max(0, numFee - Number(discount)) : '';
         setAdmitForm(p => ({
-            ...p,
-            admCourse: courseName,
+            ...p, admCourse: courseName,
             admFees: numFee > 0 ? String(numFee) : '',
             finalFees: finalFees ? String(finalFees) : ''
         }));
     };
 
-    // When discount changes, recalculate final fees
     const handleDiscountChange = (discountVal) => {
         const disc = Number(discountVal) || 0;
         const baseFee = Number(admitForm.admFees) || 0;
-        const finalFees = Math.max(0, baseFee - disc);
-        setAdmitForm(p => ({ ...p, discount: disc, finalFees: String(finalFees) }));
+        setAdmitForm(p => ({ ...p, discount: disc, finalFees: String(Math.max(0, baseFee - disc)) }));
     };
 
-    // Handle admission
     const handleAdmit = async () => {
-        if (!admitForm.admCourse) {
-            alert('Please select a course');
-            return;
-        }
-        if (!admitForm.admBatchTime) {
-            alert('Please select a batch');
-            return;
-        }
-        setSaving(true);
+        if (!admitForm.admCourse) { alert('Please select a course'); return; }
+        if (!admitForm.admBatchTime) { alert('Please select a batch'); return; }
+        setAdmitSaving(true);
         const result = await saveCourseAdmission({
-            ...admitForm,
-            admFees: admitForm.finalFees || admitForm.admFees
+            ...admitForm, admFees: admitForm.finalFees || admitForm.admFees
         });
         if (result?.success) {
-            showToast('Student Admitted Successfully!');
+            showToast('Student Admitted Successfully! 🎉');
             setShowAdmitModal(false);
             onReload?.();
-        } else {
-            alert(result?.error || 'Failed to admit student');
-        }
-        setSaving(false);
+        } else { alert(result?.error || 'Failed to admit student'); }
+        setAdmitSaving(false);
+    };
+
+    // ── Open Edit modal ────────────────────────────────────────
+    // r[2]=studentId, r[5]=name, r[4]=mobile?, r[10]=aadhar, r[3]=date/dob?, r[9]=course
+    const openEdit = (r) => {
+        setEditId(r[2]);
+        setEditForm({
+            name: r[5] || '',
+            mobile: r[4] || '',
+            aadhar: r[10] || '',
+            dob: r[3] || '',
+            course: r[9] || '',
+            branch: r[6] || '',
+        });
+        setShowEditModal(true);
+    };
+
+    const handleEditSave = async () => {
+        if (!editForm.name) { alert('Name is required'); return; }
+        setEditSaving(true);
+        const result = await updateRegistration(editId, editForm);
+        if (result?.success) {
+            showToast('Registration Updated ✅');
+            setShowEditModal(false);
+            onReload?.();
+        } else { alert(result?.error || 'Update failed'); }
+        setEditSaving(false);
+    };
+
+    // ── Delete ─────────────────────────────────────────────────
+    const handleDelete = async () => {
+        if (!confirmDelete) return;
+        setDeleting(true);
+        const result = await deleteRegistration(confirmDelete.id);
+        if (result?.success) {
+            showToast('Registration Deleted 🗑️');
+            setConfirmDelete(null);
+            onReload?.();
+        } else { alert(result?.error || 'Delete failed'); }
+        setDeleting(false);
     };
 
     return (
@@ -174,22 +190,52 @@ export default function Registrations({ adminData, onReload }) {
                             <td>{r[9]}</td>
                             <td>{r[3]}</td>
                             <td>
-                                <button className="btn py-1 px-3 text-xs" onClick={() => openAdmitModal(r[2], r[5])}>
-                                    Admit
-                                </button>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {/* Edit */}
+                                    <button
+                                        onClick={() => openEdit(r)}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: 8,
+                                            border: '1.5px solid #e0d9ff',
+                                            background: '#f5f3ff', color: '#7c3aed',
+                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                        }}
+                                    >
+                                        ✏️ Edit
+                                    </button>
+
+                                    {/* Delete */}
+                                    <button
+                                        onClick={() => setConfirmDelete({ id: r[2], name: r[5] })}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: 8,
+                                            border: '1.5px solid #fecdd3',
+                                            background: '#fff1f2', color: '#e11d48',
+                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                        }}
+                                    >
+                                        🗑️ Delete
+                                    </button>
+
+                                    {/* Admit */}
+                                    <button
+                                        className="btn py-1 px-3 text-xs"
+                                        onClick={() => openAdmitModal(r[2], r[5])}
+                                    >
+                                        Admit
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     );
                 }}
             />
 
-            {/* Admission Modal */}
+            {/* ── Admission Modal ── */}
             <Modal isOpen={showAdmitModal} onClose={() => setShowAdmitModal(false)} title="Admission">
-                {/* Student Name (read-only, auto-filled) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Student Name</label>
                 <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.name} readOnly />
 
-                {/* Course Selection (from Course Master, no duplicates) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Course</label>
                 <select className="inp" value={admitForm.admCourse} onChange={(e) => handleCourseChange(e.target.value)}>
                     <option value="">Select</option>
@@ -203,21 +249,12 @@ export default function Registrations({ adminData, onReload }) {
                     </div>
                 )}
 
-                {/* Course Fees (auto-filled from Course Master) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Course Fees (₹)</label>
                 <input className="inp" style={{ background: '#f3f4f6' }} value={admitForm.admFees ? `₹${admitForm.admFees}` : ''} readOnly placeholder="Select a course to see fees" />
 
-                {/* Discount Option */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Discount (₹)</label>
-                <input
-                    className="inp"
-                    type="number"
-                    placeholder="Enter discount amount"
-                    value={admitForm.discount || ''}
-                    onChange={(e) => handleDiscountChange(e.target.value)}
-                />
+                <input className="inp" type="number" placeholder="Enter discount amount" value={admitForm.discount || ''} onChange={(e) => handleDiscountChange(e.target.value)} />
 
-                {/* Final Fees Summary */}
                 {admitForm.admFees && (
                     <div className="mb-3 p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)' }}>
                         <div className="flex justify-between text-sm">
@@ -237,27 +274,90 @@ export default function Registrations({ adminData, onReload }) {
                     </div>
                 )}
 
-                {/* Batch Selection (from Batch sheet) */}
                 <label className="text-xs font-bold opacity-50 mb-1 block">Batch</label>
-                <select className="inp" value={admitForm.admBatchTime} onChange={(e) => setAdmitForm((p) => ({ ...p, admBatchTime: e.target.value }))}>
+                <select className="inp" value={admitForm.admBatchTime} onChange={(e) => setAdmitForm(p => ({ ...p, admBatchTime: e.target.value }))}>
                     {batchData.length > 0 ? (
-                        batchData.map((b) => <option key={b} value={b}>{b}</option>)
+                        batchData.map(b => <option key={b} value={b}>{b}</option>)
                     ) : (
-                        <>
-                            <option>08-10 AM</option>
-                            <option>10-12 PM</option>
-                            <option>04-06 PM</option>
-                        </>
+                        <><option>08-10 AM</option><option>10-12 PM</option><option>04-06 PM</option></>
                     )}
                 </select>
 
-                {/* Admit Button */}
-                <button className="btn w-full mb-2" onClick={handleAdmit} disabled={saving}>
-                    {saving ? 'Saving...' : 'Admit'}
+                <button className="btn w-full mb-2" onClick={handleAdmit} disabled={admitSaving}>
+                    {admitSaving ? 'Saving...' : 'Admit'}
                 </button>
-                <button className="w-full text-gray-500 text-sm py-2" onClick={() => setShowAdmitModal(false)}>
-                    Cancel
-                </button>
+                <button className="w-full text-gray-500 text-sm py-2" onClick={() => setShowAdmitModal(false)}>Cancel</button>
+            </Modal>
+
+            {/* ── Edit Registration Modal ── */}
+            <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="✏️ Edit Registration" width="w-[500px]">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Student Name</label>
+                        <input className="inp" placeholder="Name *" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Mobile</label>
+                        <input className="inp" placeholder="Mobile" value={editForm.mobile} onChange={e => setEditForm(p => ({ ...p, mobile: e.target.value }))} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Aadhar No</label>
+                        <input className="inp" placeholder="Aadhar" value={editForm.aadhar} onChange={e => setEditForm(p => ({ ...p, aadhar: e.target.value }))} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Date of Birth</label>
+                        <input className="inp" type="date" value={editForm.dob} onChange={e => setEditForm(p => ({ ...p, dob: e.target.value }))} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Course</label>
+                        <select className="inp" value={editForm.course} onChange={e => setEditForm(p => ({ ...p, course: e.target.value }))}>
+                            <option value="">Select Course</option>
+                            {(dropdowns.courses || []).map(c => <option key={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Branch</label>
+                        <select className="inp" value={editForm.branch} onChange={e => setEditForm(p => ({ ...p, branch: e.target.value }))}>
+                            <option value="">Select Branch</option>
+                            {(dropdowns.branches || []).map(b => <option key={b}>{b}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                    <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowEditModal(false)}>Cancel</button>
+                    <button className="btn" onClick={handleEditSave} disabled={editSaving}>
+                        {editSaving ? 'Saving...' : 'Update'}
+                    </button>
+                </div>
+            </Modal>
+
+            {/* ── Delete Confirm Modal ── */}
+            <Modal isOpen={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete Registration">
+                <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🗑️</div>
+                    <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+                        Delete registration for <span style={{ color: '#7c3aed' }}>{confirmDelete?.name}</span>?
+                    </p>
+                    <p style={{ fontSize: 13, color: '#94a3b8' }}>
+                        Student ID: {confirmDelete?.id} — This action cannot be undone.
+                    </p>
+                </div>
+                <div className="flex gap-3 justify-center">
+                    <button className="px-5 py-2 rounded-xl text-gray-500 font-bold hover:bg-gray-100 border" onClick={() => setConfirmDelete(null)}>
+                        Cancel
+                    </button>
+                    <button
+                        disabled={deleting}
+                        onClick={handleDelete}
+                        style={{
+                            padding: '8px 24px', borderRadius: 12, border: 'none',
+                            background: '#e11d48', color: 'white',
+                            fontWeight: 800, fontSize: 14, cursor: 'pointer',
+                        }}
+                    >
+                        {deleting ? 'Deleting...' : 'Yes, Delete'}
+                    </button>
+                </div>
             </Modal>
         </div>
     );

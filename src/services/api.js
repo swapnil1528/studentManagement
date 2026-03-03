@@ -64,15 +64,39 @@ export const fetchAdminData = (branch) =>
 export const saveInquiry = (form) =>
     apiCall('saveInq', { form });
 
+/** Update an existing inquiry by row ID */
+export const updateInquiry = (id, form) =>
+    apiCall('updateInq', { id, form });
+
+/** Delete an inquiry by row ID */
+export const deleteInquiry = (id) =>
+    apiCall('deleteInq', { id });
+
 // ─── Student Registration ────────────────────────────────────
 /** Register a student from an inquiry */
 export const registerStudent = (form) =>
     apiCall('regStudent', { form });
 
+/** Update a registration record by student ID */
+export const updateRegistration = (id, form) =>
+    apiCall('updateReg', { id, form });
+
+/** Delete a registration record by student ID */
+export const deleteRegistration = (id) =>
+    apiCall('deleteReg', { id });
+
 // ─── Course Admission ────────────────────────────────────────
 /** Admit a registered student to a course */
 export const saveCourseAdmission = (form) =>
     apiCall('saveAdm', { form });
+
+/** Update an admission record by admission row ID */
+export const updateAdmission = (id, form) =>
+    apiCall('updateAdm', { id, form });
+
+/** Delete an admission record by admission row ID */
+export const deleteAdmission = (id) =>
+    apiCall('deleteAdm', { id });
 
 // ─── Fee Collection ──────────────────────────────────────────
 /** Record a fee payment */
