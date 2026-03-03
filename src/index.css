@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ============================================
@@ -14,6 +14,25 @@
   --sidebar-to: #312e81;
   --glass-bg: rgba(255, 255, 255, 0.85);
   --glass-border: rgba(255, 255, 255, 0.3);
+
+  /* ═══ Gen Z Student Portal Tokens ═══ */
+  --gz-violet: #7c3aed;
+  --gz-violet-light: #8b5cf6;
+  --gz-cyan: #06b6d4;
+  --gz-coral: #f43f5e;
+  --gz-amber: #f59e0b;
+  --gz-green: #10b981;
+  --gz-bg: #f8f7ff;
+  --gz-bg-dark: #0e0c1a;
+  --gz-card: #ffffff;
+  --gz-card-dark: #1a1630;
+  --gz-border: rgba(124, 58, 237, 0.1);
+  --gz-border-dark: rgba(139, 92, 246, 0.18);
+  --gz-text: #1a1035;
+  --gz-text-muted: #6b7280;
+  --gz-text-dark: #ede9fe;
+  --gz-text-muted-dark: #94a3b8;
+  --gz-nav-height: 72px;
 }
 
 body {
@@ -313,23 +332,28 @@ body {
 /* ============================================
    STUDENT / EMPLOYEE PORTAL
    ============================================ */
+/* ═══════════════════════════════════════════════
+   GEN Z STUDENT PORTAL — Layout & Navigation
+   ═══════════════════════════════════════════════ */
+
 .sp-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 20px calc(var(--gz-nav-height) + 20px);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 
+/* ─── Compact Top Header ─── */
 .sp-header {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
+  background: #ffffff;
   border-radius: 20px;
-  padding: 25px;
+  padding: 16px 20px;
   margin-bottom: 20px;
-  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 2px 16px rgba(124, 58, 237, 0.07);
   display: flex;
   align-items: center;
-  gap: 20px;
-  border: 1px solid var(--glass-border);
+  gap: 14px;
+  border: 1.5px solid rgba(124, 58, 237, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -340,19 +364,93 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  height: 3px;
+  background: linear-gradient(90deg, var(--gz-violet), var(--gz-cyan), var(--gz-coral));
 }
 
 .sp-header img {
-  width: 80px;
-  height: 80px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #818cf8;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  border: 2.5px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(135deg, var(--gz-violet), var(--gz-cyan)) border-box;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
+/* ─── Bottom Navigation Bar ─── */
+.sp-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(124, 58, 237, 0.1);
+  box-shadow: 0 -4px 24px rgba(124, 58, 237, 0.08);
+}
+
+.sp-nav-inner {
+  display: flex;
+  gap: 4px;
+  max-width: 700px;
+  width: 100%;
+  justify-content: space-around;
+}
+
+.sp-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-width: 52px;
+  font-family: inherit;
+}
+
+.sp-nav-item .nav-icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sp-nav-item .nav-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.sp-nav-item:hover .nav-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+
+.sp-nav-item.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(6, 182, 212, 0.08));
+}
+
+.sp-nav-item.active .nav-icon {
+  transform: translateY(-2px) scale(1.15);
+}
+
+.sp-nav-item.active .nav-label {
+  color: var(--gz-violet);
+}
+
+/* ─── Keep old sp-tabs for potential reuse ─── */
 .sp-tabs {
   display: flex;
   gap: 10px;
@@ -384,9 +482,27 @@ body {
   box-shadow: 0 5px 20px rgba(99, 102, 241, 0.3);
 }
 
-/* ============================================
-   ATTENDANCE STATUS
-   ============================================ */
+/* ═══════════════════════════════════════════════
+   GEN Z CARD — Lightweight, clean
+   ═══════════════════════════════════════════════ */
+.gz-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1.5px solid rgba(124, 58, 237, 0.08);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 16px;
+}
+
+.gz-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(124, 58, 237, 0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   ATTENDANCE STATUS  (updated Gen Z palette)
+   ═══════════════════════════════════════════════ */
 .status-indicator {
   display: inline-flex;
   align-items: center;
@@ -398,27 +514,27 @@ body {
 }
 
 .status-checkin {
-  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  background: #d1fae5;
   color: #065f46;
 }
 
 .status-checkout {
-  background: linear-gradient(135deg, #fee2e2, #fecaca);
-  color: #991b1b;
+  background: #ffe4e6;
+  color: #be123c;
 }
 
 .status-none {
-  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-  color: #475569;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
-/* --- Log Items --- */
+/* ─── Log Items ─── */
 .log-item {
   padding: 14px;
-  background: linear-gradient(135deg, #faf5ff, #f0f4ff);
+  background: #faf5ff;
   border-radius: 12px;
   margin-bottom: 10px;
-  border-left: 4px solid #8b5cf6;
+  border-left: 4px solid var(--gz-violet);
   transition: transform 0.15s ease;
 }
 
@@ -426,11 +542,11 @@ body {
   transform: translateX(4px);
 }
 
-/* --- Progress Bar --- */
+/* ─── Progress Bars ─── */
 .progress-bar {
   width: 100%;
   height: 10px;
-  background: #e0e7ff;
+  background: #ede9fe;
   border-radius: 10px;
   overflow: hidden;
   margin-top: 10px;
@@ -438,12 +554,11 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-  transition: width 0.5s ease;
+  background: linear-gradient(90deg, var(--gz-violet), var(--gz-cyan));
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   border-radius: 10px;
 }
 
-/* --- Location Info --- */
 .location-info {
   background: linear-gradient(135deg, #f0f4ff, #e8eeff);
   border-radius: 10px;
@@ -451,6 +566,143 @@ body {
   font-size: 13px;
   margin-bottom: 15px;
   text-align: center;
+}
+
+/* ═══════════════════════════════════════════════
+   GEN Z SPECIFIC ATOMS
+   ═══════════════════════════════════════════════ */
+
+/* Streak Badge */
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1.5px solid #fed7aa;
+  color: #c2410c;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+
+/* Grade Pills */
+.grade-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-weight: 900;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.grade-A {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.grade-B {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.grade-C {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.grade-D {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.grade-F {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Schedule Chip */
+.schedule-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--gz-violet);
+}
+
+/* Gen Z check-in button */
+.gz-checkin-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 18px;
+  border: none;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: inherit;
+}
+
+.gz-checkin-btn:active {
+  transform: scale(0.97);
+}
+
+.gz-checkin-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.gz-btn-in {
+  background: linear-gradient(135deg, var(--gz-violet), var(--gz-cyan));
+  color: white;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+}
+
+.gz-btn-in:hover:not(:disabled) {
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.45);
+  transform: translateY(-2px);
+}
+
+.gz-btn-out {
+  background: linear-gradient(135deg, var(--gz-coral), #fb7185);
+  color: white;
+  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.3);
+}
+
+.gz-btn-out:hover:not(:disabled) {
+  box-shadow: 0 12px 32px rgba(244, 63, 94, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Motivational quote strip */
+.gz-quote-strip {
+  background: linear-gradient(135deg, var(--gz-violet), var(--gz-cyan));
+  border-radius: 16px;
+  padding: 14px 18px;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gz-quote-strip::after {
+  content: '✨';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  opacity: 0.6;
 }
 
 /* ============================================
