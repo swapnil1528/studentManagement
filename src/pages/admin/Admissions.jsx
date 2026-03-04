@@ -11,7 +11,7 @@ import Modal from '../../components/ui/Modal';
 import { updateAdmission, deleteAdmission } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
-const COLUMNS = [
+const BASE_COLUMNS = [
     { key: 'sr', label: '#' },
     { key: 'photo', label: 'Photo' },
     { key: 'id', label: 'ID' },
@@ -22,7 +22,11 @@ const COLUMNS = [
     { key: 'action', label: 'Actions' },
 ];
 
-export default function Admissions({ adminData, onReload }) {
+export default function Admissions({ adminData, user, onReload }) {
+    const isAdmin = user?.role === 'admin';
+    const COLUMNS = isAdmin
+        ? [...BASE_COLUMNS.slice(0, 4), { key: 'branch', label: 'Branch' }, ...BASE_COLUMNS.slice(4)]
+        : BASE_COLUMNS;
     const admissions = adminData?.admissions || [];
     const dropdowns = adminData?.dropdowns || {};
 

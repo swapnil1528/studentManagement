@@ -10,7 +10,7 @@ import Modal from '../../components/ui/Modal';
 import { saveCourseAdmission, getCourseFees, updateRegistration, deleteRegistration } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
-const COLUMNS = [
+const BASE_COLUMNS = [
     { key: 'sr', label: '#' },
     { key: 'photo', label: 'Photo' },
     { key: 'id', label: 'ID' },
@@ -20,7 +20,11 @@ const COLUMNS = [
     { key: 'action', label: 'Actions' },
 ];
 
-export default function Registrations({ adminData, onReload }) {
+export default function Registrations({ adminData, user, onReload }) {
+    const isAdmin = user?.role === 'admin';
+    const COLUMNS = isAdmin
+        ? [...BASE_COLUMNS.slice(0, 4), { key: 'branch', label: 'Branch' }, ...BASE_COLUMNS.slice(4)]
+        : BASE_COLUMNS;
     const registrations = adminData?.registrations || [];
     const dropdowns = adminData?.dropdowns || {};
     const admissions = adminData?.admissions || [];

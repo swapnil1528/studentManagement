@@ -1,6 +1,25 @@
 /**
  * Inquiries — Admin inquiry management page.
  * Lists all inquiries. Supports: New, Edit, Delete, Register.
+ *
+ * Google Sheet column order (0-indexed from backend array):
+ *  r[0]  = Row Index (internal)
+ *  r[1]  = Inquiry ID
+ *  r[2]  = Date
+ *  r[3]  = Name
+ *  r[4]  = Mobile
+ *  r[5]  = Branch
+ *  r[6]  = Course
+ *  r[7]  = Status
+ *  r[8]  = Village
+ *  r[9]  = Education
+ *  r[10] = Gender
+ *  r[11] = Medium
+ *  r[12] = Board
+ *  r[13] = Stream
+ *  r[14] = Remark
+ *  r[15] = Parent Mobile  (new column P)
+ *  r[16] = Batch Timing   (new column Q)
  */
 
 import { useState } from 'react';
@@ -11,33 +30,37 @@ import Modal from '../../components/ui/Modal';
 import { saveInquiry, updateInquiry, deleteInquiry, registerStudent } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
-const BLANK_FORM = {
-    name: '', mobile: '', parentMobile: '', branch: '', course: '', batch: '', village: '',
+const blankForm = (userBranch) => ({
+    name: '', mobile: '', parentMobile: '',
+    branch: userBranch || '',
+    course: '', batch: '', village: '',
     edu: '', gender: 'Male', medium: 'English', board: 'State',
     stream: 'Arts', remark: '', status: 'New'
+});
+
+const getStatusVariant = (status) => {
+    if (status === 'Confirmed') return 'green';
+    if (status === 'Cancelled') return 'red';
+    if (status === 'Postponed') return 'yellow';
+    return 'blue';
 };
 
-const COLUMNS = [
-    { key: 'sr', label: '#' },
-    { key: 'name', label: 'Name' },
-    { key: 'mobile', label: 'Mobile' },
-    { key: 'course', label: 'Course' },
-    { key: 'village', label: 'Village' },
-    { key: 'status', label: 'Status' },
-    { key: 'action', label: 'Actions' },
-];
-
 export default function Inquiries({ adminData, user, onReload }) {
+    const isAdmin = user?.role === 'admin';
+    const userBranch = user?.branch || '';
+    // If user has a specific branch (not 'All') auto-fill it
+    const fixedBranch = (!isAdmin && userBranch && userBranch.toLowerCase() !== 'all') ? userBranch : null;
+
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [editId, setEditId] = useState(null);    // null = new, otherwise row[0]
-    const [form, setForm] = useState(BLANK_FORM);
+    const [editId, setEditId] = useState(null);
+    const [form, setForm] = useState(blankForm(fixedBranch));
 
     const [showRegModal, setShowRegModal] = useState(false);
     const [regSaving, setRegSaving] = useState(false);
     const [regForm, setRegForm] = useState({ inquiryId: '', aadhar: '', dob: '', photo: '' });
 
-    const [confirmDelete, setConfirmDelete] = useState(null); // { id, name }
+    const [confirmDelete, setConfirmDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
     const inquiries = adminData?.inquiries || [];
@@ -45,10 +68,22 @@ export default function Inquiries({ adminData, user, onReload }) {
 
     const handleChange = (field, value) => setForm(p => ({ ...p, [field]: value }));
 
+    // Only show branch column to admin users
+    const COLUMNS = [
+        { key: 'sr', label: '#' },
+        { key: 'name', label: 'Name' },
+        { key: 'mobile', label: 'Mobile' },
+        ...(isAdmin ? [{ key: 'branch', label: 'Branch' }] : []),
+        { key: 'course', label: 'Course' },
+        { key: 'village', label: 'Village' },
+        { key: 'status', label: 'Status' },
+        { key: 'action', label: 'Actions' },
+    ];
+
     // ── Open New Inquiry ───────────────────────────────────────
     const openNew = () => {
         setEditId(null);
-        setForm(BLANK_FORM);
+        setForm(blankForm(fixedBranch));
         setShowModal(true);
     };
 
@@ -58,10 +93,9 @@ export default function Inquiries({ adminData, user, onReload }) {
         setForm({
             name: r[3] || '',
             mobile: r[4] || '',
-            parentMobile: r[15] || '', // mapping new field to end of array
-            branch: r[5] || '',
+            branch: fixedBranch || r[5] || '',
             course: r[6] || '',
-            batch: r[16] || '',
+            status: r[7] || 'New',
             village: r[8] || '',
             edu: r[9] || '',
             gender: r[10] || 'Male',
@@ -69,7 +103,8 @@ export default function Inquiries({ adminData, user, onReload }) {
             board: r[12] || 'State',
             stream: r[13] || 'Arts',
             remark: r[14] || '',
-            status: r[7] || 'New'
+            parentMobile: r[15] || '',
+            batch: r[16] || '',
         });
         setShowModal(true);
     };
@@ -77,18 +112,23 @@ export default function Inquiries({ adminData, user, onReload }) {
     // ── Save (new or edit) ─────────────────────────────────────
     const handleSave = async () => {
         if (!form.name || !form.mobile) { alert('Please fill Name and Mobile'); return; }
+        // Ensure branch is always set
+        const payload = { ...form, branch: fixedBranch || form.branch };
         setSaving(true);
-        const result = editId
-            ? await updateInquiry(editId, form)
-            : await saveInquiry(form);
+        let result;
+        if (editId) {
+            result = await updateInquiry(editId, payload);
+        } else {
+            result = await saveInquiry(payload);
+        }
+        setSaving(false);
         if (result?.success) {
             showToast(editId ? 'Inquiry Updated ✅' : 'Inquiry Saved ✅');
             setShowModal(false);
             onReload?.();
         } else {
-            alert(result?.error || 'Save failed');
+            alert(result?.error || 'Save failed — check that updateInq/saveInq handler in Code.gs supports parentMobile and batch fields');
         }
-        setSaving(false);
     };
 
     // ── Delete ─────────────────────────────────────────────────
@@ -101,7 +141,7 @@ export default function Inquiries({ adminData, user, onReload }) {
             setConfirmDelete(null);
             onReload?.();
         } else {
-            alert(result?.error || 'Delete failed. Ensure "deleteInq" is implemented in Code.gs');
+            alert(result?.error || 'Delete failed — ensure "deleteInq" is in Code.gs');
         }
         setDeleting(false);
     };
@@ -127,21 +167,11 @@ export default function Inquiries({ adminData, user, onReload }) {
         if (result?.success) {
             showToast('Student Registered Successfully! 🎉');
             setShowRegModal(false);
-
-            // Auto Update status to Confirmed locally so it reflects on UI immediately
-            // Optionally, you can just rely on onReload, but this is faster.
             onReload?.();
         } else {
             alert(result?.error || 'Registration failed');
         }
         setRegSaving(false);
-    };
-
-    const getStatusVariant = (status) => {
-        if (status === 'Confirmed') return 'green';
-        if (status === 'Cancelled') return 'red';
-        if (status === 'Postponed') return 'yellow';
-        return 'blue';
     };
 
     return (
@@ -157,8 +187,9 @@ export default function Inquiries({ adminData, user, onReload }) {
                 renderRow={(r, i) => (
                     <tr key={i} className="t-row">
                         <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                        <td><div className="font-bold text-gray-700">{r[3]}</div></td>
+                        <td><div className="font-bold">{r[3]}</div><div className="text-xs opacity-50">{r[4]}</div></td>
                         <td>{r[4]}</td>
+                        {isAdmin && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[5]}</span></td>}
                         <td>{r[6]}</td>
                         <td>{r[8]}</td>
                         <td><Badge text={r[7] || 'New'} variant={getStatusVariant(r[7])} /></td>
@@ -174,7 +205,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                                 </button>
 
                                 {/* Delete — admin only */}
-                                {user?.role === 'admin' && (
+                                {isAdmin && (
                                     <button
                                         onClick={() => setConfirmDelete({ id: r[0], name: r[3] })}
                                         title="Delete Inquiry"
@@ -188,7 +219,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                                 {r[7] !== 'Confirmed' && (
                                     <button
                                         onClick={() => openRegModal(r[0])}
-                                        className="btn py-1 px-3 text-xs ml-2"
+                                        className="btn py-1 px-3 text-xs"
                                     >
                                         Register
                                     </button>
@@ -207,6 +238,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                 width="w-[800px]"
             >
                 <div className="grid grid-cols-3 gap-4">
+                    {/* Row 1: Student Name, Mobile, Parent Mobile */}
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Student Name *</label>
                         <input className="inp" placeholder="Student Name" value={form.name} onChange={(e) => handleChange('name', e.target.value)} />
@@ -220,13 +252,16 @@ export default function Inquiries({ adminData, user, onReload }) {
                         <input className="inp" placeholder="Parent Mobile" value={form.parentMobile} onChange={(e) => handleChange('parentMobile', e.target.value)} />
                     </div>
 
-                    <div>
-                        <label className="text-xs font-bold opacity-50 mb-1 block">Branch</label>
-                        <select className="inp" value={form.branch} onChange={(e) => handleChange('branch', e.target.value)}>
-                            <option value="">Select Branch</option>
-                            {(dropdowns.branches || []).map((b) => <option key={b}>{b}</option>)}
-                        </select>
-                    </div>
+                    {/* Row 2: Branch (admin only), Course, Batch */}
+                    {isAdmin && (
+                        <div>
+                            <label className="text-xs font-bold opacity-50 mb-1 block">Branch</label>
+                            <select className="inp" value={form.branch} onChange={(e) => handleChange('branch', e.target.value)}>
+                                <option value="">Select Branch</option>
+                                {(dropdowns.branches || []).map((b) => <option key={b}>{b}</option>)}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Course</label>
                         <select className="inp" value={form.course} onChange={(e) => handleChange('course', e.target.value)}>
@@ -242,6 +277,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                         </select>
                     </div>
 
+                    {/* Row 3: Village, Education, Gender */}
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Village</label>
                         <select className="inp" value={form.village} onChange={(e) => handleChange('village', e.target.value)}>
@@ -263,6 +299,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                         </select>
                     </div>
 
+                    {/* Row 4: Medium, Board, Stream */}
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Medium</label>
                         <select className="inp" value={form.medium} onChange={(e) => handleChange('medium', e.target.value)}>
@@ -282,7 +319,8 @@ export default function Inquiries({ adminData, user, onReload }) {
                         </select>
                     </div>
 
-                    <div className="col-span-2">
+                    {/* Row 5: Remarks, Status */}
+                    <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Remarks</label>
                         <textarea className="inp" placeholder="Remarks" value={form.remark} onChange={(e) => handleChange('remark', e.target.value)} />
                     </div>
@@ -296,7 +334,18 @@ export default function Inquiries({ adminData, user, onReload }) {
                             <option>Confirmed</option>
                         </select>
                     </div>
+
+                    {/* Show fixed branch info for non-admin */}
+                    {fixedBranch && (
+                        <div className="col-span-3">
+                            <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.06)', color: '#6366f1' }}>
+                                <span>🏢</span>
+                                <span>Branch: <strong>{fixedBranch}</strong> (auto-filled from your login)</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
+
                 <div className="flex justify-end gap-2 mt-4">
                     <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowModal(false)}>
                         Cancel
@@ -309,8 +358,10 @@ export default function Inquiries({ adminData, user, onReload }) {
 
             {/* ── Register Student Modal ── */}
             <Modal isOpen={showRegModal} onClose={() => setShowRegModal(false)} title="Register Student">
+                <label className="text-xs font-bold opacity-50 mb-1 block">Aadhar No</label>
                 <input className="inp" placeholder="Aadhar No" value={regForm.aadhar}
                     onChange={(e) => setRegForm(p => ({ ...p, aadhar: e.target.value }))} />
+                <label className="text-xs font-bold opacity-50 mb-1 block">Date of Birth</label>
                 <input className="inp" type="date" value={regForm.dob}
                     onChange={(e) => setRegForm(p => ({ ...p, dob: e.target.value }))} />
                 <div className="mb-4">
@@ -318,9 +369,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <input className="text-sm block mt-1 w-full" type="file" accept="image/*" onChange={handlePhotoChange} />
                 </div>
                 <div className="flex justify-end gap-2">
-                    <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowRegModal(false)}>
-                        Cancel
-                    </button>
+                    <button className="px-4 py-2 rounded text-gray-500 font-bold hover:bg-gray-100" onClick={() => setShowRegModal(false)}>Cancel</button>
                     <button className="btn" onClick={handleRegister} disabled={regSaving}>
                         {regSaving ? 'Registering...' : 'Confirm Registration'}
                     </button>
@@ -343,11 +392,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <button
                         disabled={deleting}
                         onClick={handleDelete}
-                        style={{
-                            padding: '8px 24px', borderRadius: 12, border: 'none',
-                            background: '#e11d48', color: 'white',
-                            fontWeight: 800, fontSize: 14, cursor: 'pointer',
-                        }}
+                        style={{ padding: '8px 24px', borderRadius: 12, border: 'none', background: '#e11d48', color: 'white', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
                     >
                         {deleting ? 'Deleting...' : 'Yes, Delete'}
                     </button>
