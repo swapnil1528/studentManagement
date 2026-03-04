@@ -4,12 +4,14 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import { saveCourseAdmission, getCourseFees, updateRegistration, deleteRegistration } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
 const COLUMNS = [
+    { key: 'sr', label: '#' },
     { key: 'photo', label: 'Photo' },
     { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name' },
@@ -17,12 +19,6 @@ const COLUMNS = [
     { key: 'date', label: 'Date' },
     { key: 'action', label: 'Actions' },
 ];
-
-// Row indices for Registrations sheet:
-// r[0]=rowIndex, r[1]=?, r[2]=studentId, r[3]=date, r[4]=time,
-// r[5]=name, r[6]=?, r[7]=?, r[8]=?, r[9]=course,
-// r[10]=aadhar, r[11]=photo, r[12]=dob ...
-// (actual indices depend on sheet structure — using same as before)
 
 export default function Registrations({ adminData, onReload }) {
     const registrations = adminData?.registrations || [];
@@ -132,7 +128,6 @@ export default function Registrations({ adminData, onReload }) {
     };
 
     // ── Open Edit modal ────────────────────────────────────────
-    // r[2]=studentId, r[5]=name, r[4]=mobile?, r[10]=aadhar, r[3]=date/dob?, r[9]=course
     const openEdit = (r) => {
         setEditId(r[2]);
         setEditForm({
@@ -167,7 +162,7 @@ export default function Registrations({ adminData, onReload }) {
             showToast('Registration Deleted 🗑️');
             setConfirmDelete(null);
             onReload?.();
-        } else { alert(result?.error || 'Delete failed'); }
+        } else { alert(result?.error || 'Delete failed. Ensure "deleteReg" is in Code.gs'); }
         setDeleting(false);
     };
 
@@ -180,46 +175,39 @@ export default function Registrations({ adminData, onReload }) {
                 data={registrations}
                 renderRow={(r, i) => {
                     const img = r[11] && r[11].length > 10
-                        ? <img src={r[11]} className="w-8 h-8 rounded-full border" alt="" />
+                        ? <img src={r[11]} className="w-8 h-8 rounded-full border transform transition-all duration-200 hover:scale-[3] hover:z-50 relative shadow-sm" alt="" style={{ transformOrigin: 'left center' }} />
                         : <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">NA</div>;
                     return (
                         <tr key={i} className="t-row">
+                            <td className="font-mono text-sm opacity-50">{i + 1}</td>
                             <td>{img}</td>
                             <td>{r[2]}</td>
                             <td className="font-bold">{r[5]}</td>
                             <td>{r[9]}</td>
                             <td>{r[3]}</td>
                             <td>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <div className="flex items-center gap-2">
                                     {/* Edit */}
                                     <button
                                         onClick={() => openEdit(r)}
-                                        style={{
-                                            padding: '4px 10px', borderRadius: 8,
-                                            border: '1.5px solid #e0d9ff',
-                                            background: '#f5f3ff', color: '#7c3aed',
-                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                                        }}
+                                        title="Edit Registration"
+                                        className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                                     >
-                                        ✏️ Edit
+                                        <Edit size={16} />
                                     </button>
 
                                     {/* Delete */}
                                     <button
                                         onClick={() => setConfirmDelete({ id: r[2], name: r[5] })}
-                                        style={{
-                                            padding: '4px 10px', borderRadius: 8,
-                                            border: '1.5px solid #fecdd3',
-                                            background: '#fff1f2', color: '#e11d48',
-                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                                        }}
+                                        title="Delete Registration"
+                                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                                     >
-                                        🗑️ Delete
+                                        <Trash2 size={16} />
                                     </button>
 
                                     {/* Admit */}
                                     <button
-                                        className="btn py-1 px-3 text-xs"
+                                        className="btn py-1 px-3 text-xs ml-2"
                                         onClick={() => openAdmitModal(r[2], r[5])}
                                     >
                                         Admit

@@ -249,7 +249,18 @@ export default function Attendance({ adminData, onReload }) {
                                 <tbody>
                                     {attList.map((s, i) => (
                                         <tr key={s.id} className="t-row">
-                                            <td className="font-bold">{s.name}</td>
+                                            <td className="font-bold">
+                                                <div className="flex items-center gap-3">
+                                                    {s.photo && s.photo.length > 10 ? (
+                                                        <img src={s.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
+                                                            {s.name.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    {s.name}
+                                                </div>
+                                            </td>
                                             <td>
                                                 <label className="flex items-center gap-2 cursor-pointer">
                                                     <input type="checkbox" checked={s.present} onChange={() => toggleAtt(i)} className="w-5 h-5" />
@@ -305,10 +316,23 @@ export default function Attendance({ adminData, onReload }) {
                                                 }
                                             } catch { hours = '--'; }
                                         }
+                                        const studentObj = students.find(st => String(st.id) === String(r.id));
+
                                         return (
                                             <tr key={i} className="t-row">
                                                 <td>{r.id}</td>
-                                                <td className="font-bold">{r.name}</td>
+                                                <td className="font-bold">
+                                                    <div className="flex items-center gap-3">
+                                                        {studentObj?.photo && studentObj.photo.length > 10 ? (
+                                                            <img src={studentObj.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
+                                                                {r.name.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                        {r.name}
+                                                    </div>
+                                                </td>
                                                 <td style={{ color: '#10b981', fontWeight: 600 }}>{r.in}</td>
                                                 <td style={{ color: '#ef4444', fontWeight: 600 }}>{r.out}</td>
                                                 <td className="font-mono font-bold" style={{ color: '#6366f1' }}>{hours}</td>
@@ -418,53 +442,67 @@ export default function Attendance({ adminData, onReload }) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {analysisData.students.map((student, idx) => (
-                                            <tr key={student.id} className="t-row">
-                                                <td style={{ position: 'sticky', left: 0, zIndex: 1, fontSize: '12px', padding: '8px 4px' }} className="font-mono opacity-50">
-                                                    {idx + 1}
-                                                </td>
-                                                <td style={{ position: 'sticky', left: '40px', zIndex: 1, textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap' }} className="font-semibold text-sm">
-                                                    {student.name}
-                                                    <div className="text-[10px] opacity-40">{student.id}</div>
-                                                </td>
-                                                {Array.from({ length: analysisData.daysInMonth }, (_, i) => {
-                                                    const day = student.days[i + 1];
-                                                    if (!day) {
-                                                        return <td key={i + 1} style={{ padding: '8px 2px', fontSize: '11px' }} className="opacity-20">—</td>;
-                                                    }
-                                                    // Calculate hours for tooltip
-                                                    let hrs = '';
-                                                    if (day.checkIn && day.checkOut) {
-                                                        hrs = ((day.checkOut - day.checkIn) / (1000 * 60 * 60)).toFixed(1) + 'h';
-                                                    }
-                                                    return (
-                                                        <td key={i + 1}
-                                                            style={{ padding: '4px 2px', fontSize: '11px' }}
-                                                            title={hrs ? `${hrs}` : ''}
-                                                        >
-                                                            {day.isPresent ? (
-                                                                <span style={{
-                                                                    display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
-                                                                    borderRadius: '6px', fontSize: '10px', fontWeight: 700,
-                                                                    background: 'rgba(16,185,129,0.15)', color: '#10b981',
-                                                                }}>P</span>
+                                        {analysisData.students.map((student, idx) => {
+                                            const studentObj = students.find(st => String(st.id) === String(student.id));
+                                            return (
+                                                <tr key={student.id} className="t-row">
+                                                    <td style={{ position: 'sticky', left: 0, zIndex: 1, fontSize: '12px', padding: '8px 4px', background: 'var(--gz-card)' }} className="font-mono opacity-50">
+                                                        {idx + 1}
+                                                    </td>
+                                                    <td style={{ position: 'sticky', left: '40px', zIndex: 1, textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap', background: 'var(--gz-card)' }} className="font-semibold text-sm">
+                                                        <div className="flex items-center gap-3">
+                                                            {studentObj?.photo && studentObj.photo.length > 10 ? (
+                                                                <img src={studentObj.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                             ) : (
-                                                                <span style={{
-                                                                    display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
-                                                                    borderRadius: '6px', fontSize: '10px', fontWeight: 700,
-                                                                    background: 'rgba(239,68,68,0.15)', color: '#ef4444',
-                                                                }}>A</span>
+                                                                <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100 shrink-0">
+                                                                    {student.name.substring(0, 2).toUpperCase()}
+                                                                </div>
                                                             )}
-                                                        </td>
-                                                    );
-                                                })}
-                                                {/* Summary columns */}
-                                                <td className="font-bold text-sm" style={{ color: '#10b981', padding: '8px 4px' }}>{student.presentCount}</td>
-                                                <td className="font-bold text-sm" style={{ color: '#ef4444', padding: '8px 4px' }}>{student.absentCount}</td>
-                                                <td className="font-mono text-sm font-bold" style={{ color: '#6366f1', padding: '8px 4px' }}>{student.totalHours}h</td>
-                                                <td className="font-bold text-sm" style={{ color: getPercColor(student.percentage), padding: '8px 4px' }}>{student.percentage}%</td>
-                                            </tr>
-                                        ))}
+                                                            <div>
+                                                                {student.name}
+                                                                <div className="text-[10px] opacity-40">{student.id}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {Array.from({ length: analysisData.daysInMonth }, (_, i) => {
+                                                        const day = student.days[i + 1];
+                                                        if (!day) {
+                                                            return <td key={i + 1} style={{ padding: '8px 2px', fontSize: '11px' }} className="opacity-20">—</td>;
+                                                        }
+                                                        // Calculate hours for tooltip
+                                                        let hrs = '';
+                                                        if (day.checkIn && day.checkOut) {
+                                                            hrs = ((day.checkOut - day.checkIn) / (1000 * 60 * 60)).toFixed(1) + 'h';
+                                                        }
+                                                        return (
+                                                            <td key={i + 1}
+                                                                style={{ padding: '4px 2px', fontSize: '11px' }}
+                                                                title={hrs ? `${hrs}` : ''}
+                                                            >
+                                                                {day.isPresent ? (
+                                                                    <span style={{
+                                                                        display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
+                                                                        borderRadius: '6px', fontSize: '10px', fontWeight: 700,
+                                                                        background: 'rgba(16,185,129,0.15)', color: '#10b981',
+                                                                    }}>P</span>
+                                                                ) : (
+                                                                    <span style={{
+                                                                        display: 'inline-block', width: '24px', height: '24px', lineHeight: '24px',
+                                                                        borderRadius: '6px', fontSize: '10px', fontWeight: 700,
+                                                                        background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                                                                    }}>A</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                    {/* Summary columns */}
+                                                    <td className="font-bold text-sm" style={{ color: '#10b981', padding: '8px 4px' }}>{student.presentCount}</td>
+                                                    <td className="font-bold text-sm" style={{ color: '#ef4444', padding: '8px 4px' }}>{student.absentCount}</td>
+                                                    <td className="font-mono text-sm font-bold" style={{ color: '#6366f1', padding: '8px 4px' }}>{student.totalHours}h</td>
+                                                    <td className="font-bold text-sm" style={{ color: getPercColor(student.percentage), padding: '8px 4px' }}>{student.percentage}%</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             ) : (

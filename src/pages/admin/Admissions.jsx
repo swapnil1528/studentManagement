@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -11,6 +12,7 @@ import { updateAdmission, deleteAdmission } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 
 const COLUMNS = [
+    { key: 'sr', label: '#' },
     { key: 'photo', label: 'Photo' },
     { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name' },
@@ -19,11 +21,6 @@ const COLUMNS = [
     { key: 'status', label: 'Status' },
     { key: 'action', label: 'Actions' },
 ];
-
-// Admission row indices:
-// r[0]=rowIndex, r[1]=admId, r[2]=studentId, r[3]=name,
-// r[4]=date, r[5]=branch, r[6]=?, r[7]=course, r[8]=batch,
-// r[9]=fees, r[10]=discount, r[11]=status, r[12]=photo
 
 export default function Admissions({ adminData, onReload }) {
     const admissions = adminData?.admissions || [];
@@ -43,7 +40,7 @@ export default function Admissions({ adminData, onReload }) {
 
     // ── Open Edit modal ────────────────────────────────────────
     const openEdit = (r) => {
-        setEditId(r[1] || r[0]);   // prefer admId (r[1]), fallback rowIndex
+        setEditId(r[1] || r[0]);
         setEditForm({
             name: r[3] || '',
             course: r[7] || '',
@@ -79,7 +76,7 @@ export default function Admissions({ adminData, onReload }) {
             setConfirmDelete(null);
             onReload?.();
         } else {
-            alert(result?.error || 'Delete failed');
+            alert(result?.error || 'Delete failed. Ensure "deleteAdm" is in Code.gs');
         }
         setDeleting(false);
     };
@@ -93,10 +90,11 @@ export default function Admissions({ adminData, onReload }) {
                 data={admissions}
                 renderRow={(r, i) => {
                     const img = r[12] && r[12].length > 10
-                        ? <img src={r[12]} className="w-8 h-8 rounded-full border" alt="" />
+                        ? <img src={r[12]} className="w-8 h-8 rounded-full border transform transition-all duration-200 hover:scale-[3] hover:z-50 relative shadow-sm" alt="" style={{ transformOrigin: 'left center' }} />
                         : <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs">NA</div>;
                     return (
                         <tr key={i} className="t-row">
+                            <td className="font-mono text-sm opacity-50">{i + 1}</td>
                             <td>{img}</td>
                             <td>{r[1] || r[2]}</td>
                             <td className="font-bold">{r[3]}</td>
@@ -104,31 +102,23 @@ export default function Admissions({ adminData, onReload }) {
                             <td>{r[8]}</td>
                             <td><Badge text={r[11] || 'Active'} variant={r[11] === 'Inactive' ? 'red' : 'green'} /></td>
                             <td>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <div className="flex items-center gap-2">
                                     {/* Edit */}
                                     <button
                                         onClick={() => openEdit(r)}
-                                        style={{
-                                            padding: '4px 10px', borderRadius: 8,
-                                            border: '1.5px solid #e0d9ff',
-                                            background: '#f5f3ff', color: '#7c3aed',
-                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                                        }}
+                                        title="Edit Admission"
+                                        className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                                     >
-                                        ✏️ Edit
+                                        <Edit size={16} />
                                     </button>
 
                                     {/* Delete */}
                                     <button
                                         onClick={() => setConfirmDelete({ id: r[1] || r[0], name: r[3] })}
-                                        style={{
-                                            padding: '4px 10px', borderRadius: 8,
-                                            border: '1.5px solid #fecdd3',
-                                            background: '#fff1f2', color: '#e11d48',
-                                            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                                        }}
+                                        title="Delete Admission"
+                                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                                     >
-                                        🗑️ Delete
+                                        <Trash2 size={16} />
                                     </button>
                                 </div>
                             </td>
