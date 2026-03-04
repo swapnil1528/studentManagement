@@ -180,3 +180,33 @@ export const uploadAssignment = (form) =>
 /** Get assignment history for a student */
 export const getAssignments = (id) =>
     apiCall('getAssignments', { id });
+
+// ─── LMS Management ──────────────────────────────────────────
+/** Get all published LMS materials (optionally filtered by course) */
+export const getLMSMaterials = (course = '') =>
+    apiCall('getLMSMaterials', { course });
+
+/** Update an existing LMS material by ID */
+export const updateLMSContent = (id, form) =>
+    apiCall('updateLMS', { id, form });
+
+/** Delete an LMS material by ID */
+export const deleteLMSContent = (id) =>
+    apiCall('deleteLMS', { id });
+
+// ─── Quiz / Exam ──────────────────────────────────────────────
+/** Admin creates a new quiz */
+export const saveQuiz = (form) =>
+    apiCall('saveQuiz', { form });
+
+/** Get quizzes for given courses (array) */
+export const getQuizzes = (courses) =>
+    apiCall('getQuizzes', { courses });
+
+/** Student submits quiz result */
+export const submitQuizResult = (form) =>
+    apiCall('submitQuiz', { form });
+
+/** Admin gets all quiz results */
+export const getQuizResults = () =>
+    apiCall('getQuizResults', {});

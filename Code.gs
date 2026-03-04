@@ -70,6 +70,17 @@ function doPost(e) {
     else if(act==='getAllAssignments') res = getAllAssignments();
     else if(act==='saveAssignmentGrade') res = saveAssignmentGrade(d.id, d.grade);
 
+    // --- LMS MANAGEMENT ---
+    else if(act==='getLMSMaterials') res = getLMSMaterials(d.course);
+    else if(act==='updateLMS') res = updateLMSContent(d.id, d.form);
+    else if(act==='deleteLMS') res = deleteLMSContent(d.id);
+
+    // --- QUIZ / EXAM ---
+    else if(act==='saveQuiz') res = saveQuiz(d.form);
+    else if(act==='getQuizzes') res = getQuizzes(d.courses);
+    else if(act==='submitQuiz') res = submitQuizResult(d.form);
+    else if(act==='getQuizResults') res = getQuizResults();
+
     // --- SETTINGS ---
     else if(act==='getSettings') res = getSettings();
     else if(act==='saveSetting') res = saveSetting(d.key, d.value);
@@ -642,9 +653,82 @@ function saveAttendance(r) {
 }
 
 function saveLMSContent(f) {
-  ensureSheet("LMS Content", ["Date", "Course", "Topic", "Type", "Link", "Desc"]).appendRow([new Date(), f.course, f.topic, f.type, f.link, f.desc]);
-  return { success: true };
+  const id = 'LMS-' + Date.now();
+  ensureSheet("LMS Content", ["ID", "Date", "Course", "Topic", "Type", "Link", "Desc"]).appendRow([id, new Date(), f.course, f.topic, f.type, f.link, f.desc || '']);
+  return { success: true, id: id };
 }
+
+// NOTE: Old LMS Content sheets (without ID column) will still work — we handle missing ID gracefully.
+function getLMSMaterials(course) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("LMS Content");
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, materials: [] };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const hasId = headers[0] === 'ID'; // new format
+  const rows = data.slice(1);
+  let materials = rows
+    .filter(r => !course || String(r[hasId ? 2 : 1]).toLowerCase() === String(course).toLowerCase())
+    .map((r, idx) => ({
+      rowNum: idx + 2, // actual sheet row (1-indexed header + 1)
+      id: hasId ? String(r[0]) : ('row-' + (idx + 2)),
+      date: hasId ? r[1] : r[0],
+      course: hasId ? r[2] : r[1],
+      topic: hasId ? r[3] : r[2],
+      type: hasId ? r[4] : r[3],
+      link: hasId ? r[5] : r[4],
+      desc: hasId ? r[6] : r[5],
+    }));
+  return { success: true, materials: materials };
+}
+
+function updateLMSContent(id, f) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("LMS Content");
+  if (!sheet) return { error: "LMS Content sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const hasId = headers[0] === 'ID';
+  for (let i = 1; i < data.length; i++) {
+    const rowId = hasId ? String(data[i][0]) : ('row-' + (i + 1));
+    if (rowId === String(id)) {
+      if (hasId) {
+        if (f.course) sheet.getRange(i + 1, 3).setValue(f.course);
+        if (f.topic)  sheet.getRange(i + 1, 4).setValue(f.topic);
+        if (f.type)   sheet.getRange(i + 1, 5).setValue(f.type);
+        if (f.link)   sheet.getRange(i + 1, 6).setValue(f.link);
+        sheet.getRange(i + 1, 7).setValue(f.desc !== undefined ? f.desc : data[i][6]);
+      } else {
+        if (f.course) sheet.getRange(i + 1, 2).setValue(f.course);
+        if (f.topic)  sheet.getRange(i + 1, 3).setValue(f.topic);
+        if (f.type)   sheet.getRange(i + 1, 4).setValue(f.type);
+        if (f.link)   sheet.getRange(i + 1, 5).setValue(f.link);
+        sheet.getRange(i + 1, 6).setValue(f.desc !== undefined ? f.desc : data[i][5]);
+      }
+      return { success: true };
+    }
+  }
+  return { error: "Material not found" };
+}
+
+function deleteLMSContent(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("LMS Content");
+  if (!sheet) return { error: "LMS Content sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const hasId = headers[0] === 'ID';
+  for (let i = 1; i < data.length; i++) {
+    const rowId = hasId ? String(data[i][0]) : ('row-' + (i + 1));
+    if (rowId === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { error: "Material not found" };
+}
+
+
 
 function saveExamResult(f) {
   ensureSheet("Exam Results", ["Date", "StudID", "Name", "Exam", "Course", "Marks", "Total", "Grade"]).appendRow([f.date, f.studId, f.name, f.examName, f.course, f.marks, f.total, f.grade]);
@@ -940,6 +1024,71 @@ function saveAssignmentGrade(id, grade) {
   }
   return { success: false, error: "Assignment not found" };
 }
+
+// ============================================
+// QUIZ / EXAM FUNCTIONS
+// ============================================
+function saveQuiz(f) {
+  // Sheet columns: ID, Date, Course, Title, DueDate, Questions(JSON), TotalMarks
+  const sheet = ensureSheet("Quizzes", ["ID", "Date", "Course", "Title", "DueDate", "Questions", "TotalMarks"]);
+  const id = "QZ-" + Date.now();
+  const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+  const questions = typeof f.questions === 'string' ? f.questions : JSON.stringify(f.questions || []);
+  sheet.appendRow([id, dateStr, f.course, f.title, f.dueDate || '', questions, f.totalMarks || 0]);
+  return { success: true, id: id };
+}
+
+function getQuizzes(courses) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Quizzes");
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, quizzes: [] };
+  const data = sheet.getDataRange().getValues().slice(1);
+  const courseList = Array.isArray(courses) ? courses.map(c => String(c).toLowerCase()) : [];
+  const quizzes = data
+    .filter(r => courseList.length === 0 || courseList.includes(String(r[2]).toLowerCase()))
+    .map(r => ({
+      id: String(r[0]),
+      date: r[1],
+      course: String(r[2]),
+      title: String(r[3]),
+      dueDate: r[4],
+      questions: (() => { try { return JSON.parse(r[5]); } catch(e) { return []; } })(),
+      totalMarks: r[6] || 0,
+    }));
+  return { success: true, quizzes: quizzes };
+}
+
+function submitQuizResult(f) {
+  // Sheet: ID, Date, StudentID, StudentName, QuizID, QuizTitle, Course, Score, Total, Percentage
+  const sheet = ensureSheet("Quiz Results", ["ID", "Date", "StudentID", "StudentName", "QuizID", "QuizTitle", "Course", "Score", "Total", "Percentage"]);
+  const id = "QR-" + Date.now();
+  const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+  const pct = f.total > 0 ? Math.round((f.score / f.total) * 100) : 0;
+  sheet.appendRow([id, dateStr, f.studentId, f.studentName, f.quizId, f.quizTitle, f.course, f.score, f.total, pct]);
+  return { success: true, id: id };
+}
+
+function getQuizResults() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Quiz Results");
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, results: [] };
+  const data = sheet.getDataRange().getValues().slice(1);
+  const results = data.map(r => ({
+    id: String(r[0]),
+    date: r[1],
+    studentId: String(r[2]),
+    studentName: String(r[3]),
+    quizId: String(r[4]),
+    quizTitle: String(r[5]),
+    course: String(r[6]),
+    score: r[7],
+    total: r[8],
+    percentage: r[9],
+  })).reverse();
+  return { success: true, results: results };
+}
+
+
 
 // ============================================
 // SETTINGS
