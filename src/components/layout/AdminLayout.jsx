@@ -16,9 +16,8 @@ import Receipts from '../../pages/admin/Receipts';
 import Attendance from '../../pages/admin/Attendance';
 import Notices from '../../pages/admin/Notices';
 import HRManagement from '../../pages/admin/HRManagement';
-import LMSUpload from '../../pages/admin/LMSUpload';
 import ExamResults from '../../pages/admin/ExamResults';
-import AssignmentAnalysis from '../../pages/admin/AssignmentAnalysis';
+import ClassroomAdmin from '../../pages/admin/ClassroomAdmin';
 
 // Map URL paths to components
 const PAGE_MAP = {
@@ -31,9 +30,8 @@ const PAGE_MAP = {
     'fees': FeeCollection,
     'receipts': Receipts,
     'hr': HRManagement,
-    'lms': LMSUpload,
     'exams': ExamResults,
-    'assignments': AssignmentAnalysis,
+    'classroom': ClassroomAdmin,
 };
 
 // Map old tab IDs to new URL slugs (for Sidebar compatibility)
@@ -47,9 +45,8 @@ export const TAB_TO_SLUG = {
     fee: 'fees',
     rec: 'receipts',
     hr: 'hr',
-    lms: 'lms',
     exam: 'exams',
-    asn: 'assignments',
+    classroom: 'classroom',
 };
 
 export const SLUG_TO_TAB = Object.fromEntries(

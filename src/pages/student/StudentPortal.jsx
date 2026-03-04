@@ -26,11 +26,10 @@ const isMobileDevice = () =>
 const TABS = [
     { id: 'overview', label: 'Home', emoji: '🏠' },
     { id: 'attendance', label: 'Attend', emoji: '📍' },
-    { id: 'assignments', label: 'Work', emoji: '📎' },
+    { id: 'classroom', label: 'Classroom', emoji: '📚' },
     { id: 'results', label: 'Results', emoji: '🏆' },
     { id: 'schedule', label: 'Schedule', emoji: '🗓️' },
     { id: 'grades', label: 'Grades', emoji: '📊' },
-    { id: 'lms', label: 'LMS', emoji: '📚' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
     { id: 'logs', label: 'Logs', emoji: '📋' },
 ];
@@ -92,7 +91,7 @@ export default function StudentPortal() {
     const { data: assignmentsData, isLoading: asnLoading } = useQuery({
         queryKey: ['assignments', user?.studentId || user?.userId],
         queryFn: () => getAssignments(user?.studentId || user?.userId),
-        enabled: !!user && activeTab === 'assignments',
+        enabled: !!user && activeTab === 'classroom',
     });
 
     const data = { ...resultBasic, ...resultExtra };
@@ -370,10 +369,66 @@ export default function StudentPortal() {
                         </Modal>
                     )}
 
-                    {/* ── Assignments ── */}
-                    {activeTab === 'assignments' && (
+                    {/* ── CLASSROOM MODULE ── */}
+                    {activeTab === 'classroom' && (
                         <div>
-                            {/* Upload Card */}
+                            {/* Class Materials / Schedule */}
+                            <div style={cardS}>
+                                {sectionTitle('📚', 'Classwork & Materials')}
+                                {data?.lms && data.lms.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        {data.lms.map((l, i) => (
+                                            <motion.a
+                                                key={i}
+                                                href={l.link} target="_blank" rel="noopener noreferrer"
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                style={{
+                                                    display: 'block', textDecoration: 'none',
+                                                    padding: '16px', borderRadius: 16,
+                                                    background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+                                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0'}`,
+                                                    transition: 'all 0.2s',
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = isDark ? '0 10px 20px rgba(0,0,0,0.3)' : '0 10px 20px rgba(0,0,0,0.05)';
+                                                    e.currentTarget.style.borderColor = isDark ? 'rgba(124,58,237,0.4)' : '#c4b5fd';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = '';
+                                                    e.currentTarget.style.boxShadow = '';
+                                                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0';
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', gap: 14 }}>
+                                                    <div style={{
+                                                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                                                        background: 'linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.1))',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+                                                    }}>
+                                                        {l.type?.toLowerCase().includes('video') ? '🎬'
+                                                            : l.type?.toLowerCase().includes('pdf') ? '📕'
+                                                                : l.type?.toLowerCase().includes('quiz') ? '📝'
+                                                                    : '📌'}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: 14, color: isDark ? '#ede9fe' : '#1e293b', marginBottom: 4 }}>
+                                                            {l.title}
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                                                            {l.type} {l.desc && <span style={{ fontWeight: 'normal' }}>— {l.desc}</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.a>
+                                        ))}
+                                    </div>
+                                ) : emptyState('📚', 'No classwork assigned yet', 'Learning materials and schedules will appear here.')}
+                            </div>
+
+                            {/* Assignment Upload */}
                             <div style={cardS}>
                                 {sectionTitle('📤', 'Submit Assignment')}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -410,58 +465,40 @@ export default function StudentPortal() {
                                     </div>
                                 </div>
 
-                                {/* Drop zone */}
                                 <div style={{
                                     border: `2px dashed ${isDark ? 'rgba(139,92,246,0.3)' : 'rgba(124,58,237,0.2)'}`,
-                                    borderRadius: 16, padding: '20px', textAlign: 'center', marginBottom: 14,
+                                    borderRadius: 16, padding: '24px', textAlign: 'center', marginBottom: 14,
                                     background: isDark ? 'rgba(124,58,237,0.04)' : 'rgba(124,58,237,0.02)',
-                                    cursor: 'pointer',
-                                    position: 'relative',
+                                    cursor: 'pointer', transition: 'all 0.2s'
                                 }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.05)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = isDark ? 'rgba(124,58,237,0.04)' : 'rgba(124,58,237,0.02)'; }}
                                     onClick={() => document.getElementById('asnFileInput').click()}
                                 >
                                     <input
-                                        id="asnFileInput"
-                                        type="file" multiple
-                                        onChange={handleFileSelect}
-                                        style={{ display: 'none' }}
+                                        id="asnFileInput" type="file" multiple
+                                        onChange={handleFileSelect} style={{ display: 'none' }}
                                     />
-                                    <div style={{ fontSize: 28, marginBottom: 8 }}>📁</div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#c4b5fd' : '#7c3aed' }}>
-                                        Click to select files
+                                    <div style={{ fontSize: 32, marginBottom: 10 }}>☁️</div>
+                                    <div style={{ fontSize: 14, fontWeight: 800, color: isDark ? '#c4b5fd' : '#7c3aed' }}>
+                                        Click to Upload Work
                                     </div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>All file types supported</div>
+                                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>PDF, Images, Zip files supported</div>
                                 </div>
 
                                 {asnForm.files.length > 0 && (
-                                    <div style={{
-                                        background: isDark ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.04)',
-                                        borderRadius: 14, padding: '12px 14px', marginBottom: 14,
-                                    }}>
+                                    <div style={{ background: isDark ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.04)', borderRadius: 14, padding: '12px 14px', marginBottom: 14 }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase' }}>
-                                            {asnForm.files.length} file(s) selected
+                                            {asnForm.files.length} file(s) ready
                                         </div>
                                         {asnForm.files.map((f, i) => (
-                                            <div key={i} style={{
-                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                padding: '7px 10px', marginBottom: 6, borderRadius: 10,
-                                                background: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
-                                                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}`,
-                                                fontSize: 13,
-                                            }}>
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', marginBottom: 6, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}`, fontSize: 13 }}>
                                                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                     <span>{getFileIcon(f.type, f.name)}</span>
-                                                    <span style={{
-                                                        maxWidth: 160, overflow: 'hidden',
-                                                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                                        color: isDark ? '#e2e8f0' : '#1a1035',
-                                                    }}>{f.name}</span>
+                                                    <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isDark ? '#e2e8f0' : '#1a1035', fontWeight: 600 }}>{f.name}</span>
                                                     <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatSize(f.size)}</span>
                                                 </span>
-                                                <button onClick={() => removeFile(i)} style={{
-                                                    border: 'none', background: 'transparent',
-                                                    cursor: 'pointer', color: '#f43f5e', fontWeight: 700, fontSize: 13,
-                                                }}>✕</button>
+                                                <button onClick={() => removeFile(i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#f43f5e', fontWeight: 700 }}>✕</button>
                                             </div>
                                         ))}
                                     </div>
@@ -473,92 +510,50 @@ export default function StudentPortal() {
                                     onClick={handleUploadAssignment}
                                     disabled={uploading || asnForm.files.length === 0}
                                     style={{
-                                        width: '100%', padding: '14px',
-                                        borderRadius: 16, border: 'none',
-                                        background: uploading || asnForm.files.length === 0
-                                            ? '#94a3b8'
-                                            : 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                        width: '100%', padding: '14px', borderRadius: 16, border: 'none',
+                                        background: uploading || asnForm.files.length === 0 ? '#94a3b8' : 'linear-gradient(135deg, #7c3aed, #06b6d4)',
                                         color: 'white', fontSize: 14, fontWeight: 800,
                                         cursor: uploading || asnForm.files.length === 0 ? 'not-allowed' : 'pointer',
                                         boxShadow: asnForm.files.length > 0 ? '0 6px 20px rgba(124,58,237,0.3)' : 'none',
-                                        fontFamily: 'inherit',
                                     }}
                                 >
-                                    {uploading ? '⏳ Uploading...' : `📤 Upload${asnForm.files.length > 0 ? ` (${asnForm.files.length})` : ''}`}
+                                    {uploading ? '⏳ Submitting to Teacher...' : `📤 Hand In${asnForm.files.length > 0 ? ` (${asnForm.files.length})` : ''}`}
                                 </motion.button>
                             </div>
 
-                            {/* History */}
+                            {/* Submissions History */}
                             <div style={cardS}>
-                                {sectionTitle('📋', 'Submission History')}
+                                {sectionTitle('📋', 'My Submissions')}
                                 {asnLoading ? (
                                     <div style={{ textAlign: 'center', padding: '30px 0' }}>
-                                        <div style={{
-                                            width: 32, height: 32, margin: '0 auto 12px',
-                                            border: '3px solid rgba(124,58,237,0.2)',
-                                            borderTopColor: '#7c3aed', borderRadius: '50%',
-                                            animation: 'spin 0.7s linear infinite',
-                                        }} />
-                                        <p style={{ color: '#94a3b8', fontSize: 13 }}>Loading...</p>
+                                        <div style={{ width: 32, height: 32, margin: '0 auto 12px', border: '3px solid rgba(124,58,237,0.2)', borderTopColor: '#7c3aed', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                                     </div>
                                 ) : assignmentList.length > 0 ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {assignmentList.map((a, i) => (
-                                            <motion.div
-                                                key={i}
-                                                initial={{ opacity: 0, y: 8 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: i * 0.05 }}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: 12,
-                                                    padding: '12px 14px', borderRadius: 14,
-                                                    background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
-                                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.07)'}`,
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: 38, height: 38, borderRadius: 12, flexShrink: 0,
-                                                    background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15))',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: 18,
-                                                }}>
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.07)'}` }}>
+                                                <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
                                                     {getFileIcon(a.mimeType, a.fileName)}
                                                 </div>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{
-                                                        fontWeight: 700, fontSize: 13,
-                                                        color: isDark ? '#ede9fe' : '#1a1035',
-                                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                                    }}>
+                                                    <div style={{ fontWeight: 800, fontSize: 13, color: isDark ? '#ede9fe' : '#1a1035', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                         {a.topic || '—'}
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                                                        {a.course && (
-                                                            <span style={{
-                                                                fontSize: 10, fontWeight: 700, padding: '2px 7px',
-                                                                borderRadius: 20, background: 'rgba(124,58,237,0.1)', color: '#7c3aed',
-                                                            }}>{a.course}</span>
-                                                        )}
-                                                        <span style={{ fontSize: 10, color: '#94a3b8' }}>
-                                                            {a.date ? new Date(a.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}
-                                                        </span>
+                                                        <span style={{ fontSize: 10, color: '#94a3b8' }}>{a.date ? new Date(a.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
                                                         <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatSize(a.fileSize)}</span>
                                                     </div>
                                                 </div>
                                                 <a
                                                     href={a.fileUrl} target="_blank" rel="noopener noreferrer"
-                                                    style={{
-                                                        fontSize: 11, fontWeight: 700, padding: '6px 10px',
-                                                        borderRadius: 10, background: 'rgba(124,58,237,0.1)',
-                                                        color: '#7c3aed', textDecoration: 'none', flexShrink: 0,
-                                                    }}
+                                                    style={{ fontSize: 11, fontWeight: 800, padding: '6px 12px', borderRadius: 10, background: 'rgba(16, 185, 129, 0.1)', color: '#059669', textDecoration: 'none' }}
                                                 >
-                                                    📥 Get
+                                                    View
                                                 </a>
-                                            </motion.div>
+                                            </div>
                                         ))}
                                     </div>
-                                ) : emptyState('📎', 'No submissions yet', 'Upload your first assignment above!')}
+                                ) : emptyState('📎', 'No submissions yet', 'Your assignments will appear here.')}
                             </div>
                         </div>
                     )}
@@ -622,53 +617,7 @@ export default function StudentPortal() {
                         <GradesTab results={data?.results || []} isDark={isDark} />
                     )}
 
-                    {/* ── LMS ── */}
-                    {activeTab === 'lms' && (
-                        <div style={cardS}>
-                            {sectionTitle('📚', 'Learning Resources')}
-                            {data?.lms && data.lms.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-                                    {data.lms.map((l, i) => (
-                                        <motion.a
-                                            key={i}
-                                            href={l.link} target="_blank" rel="noopener noreferrer"
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: i * 0.05 }}
-                                            style={{
-                                                display: 'block', padding: '14px 16px', borderRadius: 16,
-                                                background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
-                                                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.08)'}`,
-                                                textDecoration: 'none',
-                                                transition: 'all 0.2s',
-                                            }}
-                                            onMouseEnter={e => {
-                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                                e.currentTarget.style.boxShadow = '0 6px 20px rgba(124,58,237,0.12)';
-                                            }}
-                                            onMouseLeave={e => {
-                                                e.currentTarget.style.transform = '';
-                                                e.currentTarget.style.boxShadow = '';
-                                            }}
-                                        >
-                                            <div style={{ fontSize: 22, marginBottom: 8 }}>
-                                                {l.type?.toLowerCase().includes('video') ? '🎬'
-                                                    : l.type?.toLowerCase().includes('pdf') ? '📕'
-                                                        : l.type?.toLowerCase().includes('quiz') ? '📝'
-                                                            : '📌'}
-                                            </div>
-                                            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#c4b5fd' : '#7c3aed', marginBottom: 4 }}>
-                                                {l.title}
-                                            </div>
-                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                {l.type}{l.desc ? ` — ${l.desc}` : ''}
-                                            </div>
-                                        </motion.a>
-                                    ))}
-                                </div>
-                            ) : emptyState('📚', 'No resources yet', 'Learning materials will appear here.')}
-                        </div>
-                    )}
+
 
                     {/* ── Notices ── */}
                     {activeTab === 'notices' && (

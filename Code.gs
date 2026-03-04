@@ -68,6 +68,7 @@ function doPost(e) {
     else if(act==='uploadAssignment') res = uploadAssignment(d.form);
     else if(act==='getAssignments') res = getAssignments(d.id);
     else if(act==='getAllAssignments') res = getAllAssignments();
+    else if(act==='saveAssignmentGrade') res = saveAssignmentGrade(d.id, d.grade);
 
     // --- SETTINGS ---
     else if(act==='getSettings') res = getSettings();
@@ -126,9 +127,18 @@ function fetchAllAdminData(b) {
   const getD = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : []; 
   const check = (v, t) => String(t).toLowerCase() === "all" ? true : String(v).trim().toLowerCase() === String(t).trim().toLowerCase(); 
   
-  const inq = getD("Inquiries").filter(r => check(r[2], b)); 
-  const adm = getD("Admission Data").filter(r => check(r[6], b));
-  const activeStudents = adm.filter(r => r[11] === "Active"); 
+  // Overlay actual sheet row number on index 0 (which is the empty ID column)
+  // This row number is used by update/delete to target the exact row
+  const inqRaw = getD("Inquiries");
+  const inq = inqRaw
+    .map((r, i) => { r[0] = i + 2; return r; })
+    .filter(r => check(r[2], b));   // r[2] = Branch
+
+  const admRaw = getD("Admission Data");
+  const adm = admRaw
+    .map((r, i) => { r[0] = i + 2; return r; })
+    .filter(r => check(r[6], b));   // r[6] = Branch
+  const activeStudents = adm.filter(r => r[11] === "Active");  // r[11] = Status
   
   // Attendance Stats
   const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd"); 
@@ -174,7 +184,9 @@ function fetchAllAdminData(b) {
 
   return { 
     inquiries: inq, 
-    registrations: getD("Registration Data").filter(r => check(r[8], b)), 
+    registrations: getD("Registration Data")
+      .map((r, i) => { r[0] = i + 2; return r; })
+      .filter(r => check(r[8], b)),  // r[8] = Branch
     admissions: adm, 
     fees: getD("FEE MANAGEMENT"), 
     employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5] })),
@@ -190,7 +202,7 @@ function fetchAllAdminData(b) {
       employees: employees.map(e => e[2]), 
       education: getL("Education", 2) 
     }, 
-    activeStudents: activeStudents.map(r => ({ id: r[2], name: r[3], course: r[7], batch: r[8] })), 
+    activeStudents: activeStudents.map(r => ({ id: r[2], name: r[3], course: r[7], batch: r[8], photo: r[12] })), 
     stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) },
     _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] })),
     empAttendance: empAtt.map(r => ({ time: r[0], empId: String(r[1]), name: r[2], status: r[3], loc: r[4], dist: r[5], date: r[6] }))
@@ -512,113 +524,88 @@ function saveInquiry(f) {
   return { success: true };
 }
 
-function updateInquiry(id, f) {
+// id here is the actual spreadsheet row number (1-indexed, including header row)
+function updateInquiry(rowNum, f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Inquiries");
   if (!sheet) return { error: "Inquiries sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
-      const row = i + 1;
-      sheet.getRange(row, 3).setValue(f.branch  || data[i][2]);  // C=Branch
-      sheet.getRange(row, 4).setValue(f.name    || data[i][3]);  // D=Name
-      sheet.getRange(row, 5).setValue(f.mobile  || data[i][4]);  // E=Mobile
-      sheet.getRange(row, 6).setValue(f.village || data[i][5]);  // F=Village
-      sheet.getRange(row, 7).setValue(f.course  || data[i][6]);  // G=Course
-      sheet.getRange(row, 8).setValue(f.status  || data[i][7]);  // H=Status
-      sheet.getRange(row, 9).setValue(f.remark  !== undefined ? f.remark  : data[i][8]);  // I=Remark
-      sheet.getRange(row, 10).setValue(f.edu    || data[i][9]);  // J=Education
-      sheet.getRange(row, 11).setValue(f.gender || data[i][10]); // K=Gender
-      sheet.getRange(row, 12).setValue(f.medium || data[i][11]); // L=Medium
-      sheet.getRange(row, 13).setValue(f.board  || data[i][12]); // M=Board
-      sheet.getRange(row, 14).setValue(f.stream || data[i][13]); // N=Stream
-      // P=Parent Mobile (col 16), Q=Batch Timing (col 17)
-      sheet.getRange(row, 16).setValue(f.parentMobile !== undefined ? f.parentMobile : data[i][15]);
-      sheet.getRange(row, 17).setValue(f.batch !== undefined ? f.batch : data[i][16]);
-      return { success: true };
-    }
-  }
-  return { error: "Inquiry not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  // Read existing row for fallback values
+  const existingRange = sheet.getRange(rn, 1, 1, sheet.getLastColumn());
+  const existing = existingRange.getValues()[0];
+  sheet.getRange(rn, 3).setValue(f.branch        || existing[2]);  // C=Branch
+  sheet.getRange(rn, 4).setValue(f.name          || existing[3]);  // D=Name
+  sheet.getRange(rn, 5).setValue(f.mobile        || existing[4]);  // E=Mobile
+  sheet.getRange(rn, 6).setValue(f.village       || existing[5]);  // F=Village
+  sheet.getRange(rn, 7).setValue(f.course        || existing[6]);  // G=Course
+  sheet.getRange(rn, 8).setValue(f.status        || existing[7]);  // H=Status
+  sheet.getRange(rn, 9).setValue(f.remark        !== undefined ? f.remark : existing[8]); // I=Remark
+  sheet.getRange(rn, 10).setValue(f.edu          || existing[9]);  // J=Edu
+  sheet.getRange(rn, 11).setValue(f.gender       || existing[10]); // K=Gender
+  sheet.getRange(rn, 12).setValue(f.medium       || existing[11]); // L=Medium
+  sheet.getRange(rn, 13).setValue(f.board        || existing[12]); // M=Board
+  sheet.getRange(rn, 14).setValue(f.stream       || existing[13]); // N=Stream
+  sheet.getRange(rn, 16).setValue(f.parentMobile !== undefined ? f.parentMobile : existing[15]); // P
+  sheet.getRange(rn, 17).setValue(f.batch        !== undefined ? f.batch        : existing[16]); // Q
+  return { success: true };
 }
 
-function deleteInquiry(id) {
+function deleteInquiry(rowNum) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Inquiries");
   if (!sheet) return { error: "Inquiries sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
-      sheet.deleteRow(i + 1);
-      return { success: true };
-    }
-  }
-  return { error: "Inquiry not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  sheet.deleteRow(rn);
+  return { success: true };
 }
 
-function updateRegistration(id, f) {
+function updateRegistration(rowNum, f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Registration Data");
   if (!sheet) return { error: "Sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  // r[2]=InqNo or r[3]=StudId — try StudId first
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][3]) === String(id) || String(data[i][2]) === String(id)) {
-      const row = i + 1;
-      if (f.name)   sheet.getRange(row, 7).setValue(f.name);   // F=Name
-      if (f.mobile) sheet.getRange(row, 8).setValue(f.mobile); // G=Mobile
-      if (f.aadhar) sheet.getRange(row, 12).setValue(f.aadhar);// K=Aadhar
-      if (f.course) sheet.getRange(row, 11).setValue(f.course);// J=Course
-      if (f.branch) sheet.getRange(row, 10).setValue(f.branch);// I=Branch
-      return { success: true };
-    }
-  }
-  return { error: "Registration not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  if (f.name)   sheet.getRange(rn, 7).setValue(f.name);
+  if (f.mobile) sheet.getRange(rn, 8).setValue(f.mobile);
+  if (f.aadhar) sheet.getRange(rn, 12).setValue(f.aadhar);
+  if (f.course) sheet.getRange(rn, 11).setValue(f.course);
+  if (f.branch) sheet.getRange(rn, 10).setValue(f.branch);
+  return { success: true };
 }
 
-function deleteRegistration(id) {
+function deleteRegistration(rowNum) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Registration Data");
   if (!sheet) return { error: "Sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][3]) === String(id) || String(data[i][2]) === String(id)) {
-      sheet.deleteRow(i + 1);
-      return { success: true };
-    }
-  }
-  return { error: "Registration not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  sheet.deleteRow(rn);
+  return { success: true };
 }
 
-function updateAdmission(id, f) {
+function updateAdmission(rowNum, f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Admission Data");
   if (!sheet) return { error: "Sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][2]) === String(id)) {
-      const row = i + 1;
-      if (f.name)   sheet.getRange(row, 4).setValue(f.name);
-      if (f.course) sheet.getRange(row, 8).setValue(f.course);
-      if (f.batch)  sheet.getRange(row, 9).setValue(f.batch);
-      if (f.status) sheet.getRange(row, 12).setValue(f.status);
-      return { success: true };
-    }
-  }
-  return { error: "Admission not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  if (f.name)   sheet.getRange(rn, 4).setValue(f.name);
+  if (f.course) sheet.getRange(rn, 8).setValue(f.course);
+  if (f.batch)  sheet.getRange(rn, 9).setValue(f.batch);
+  if (f.status) sheet.getRange(rn, 12).setValue(f.status);
+  return { success: true };
 }
 
-function deleteAdmission(id) {
+function deleteAdmission(rowNum) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Admission Data");
   if (!sheet) return { error: "Sheet not found" };
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][2]) === String(id)) {
-      sheet.deleteRow(i + 1);
-      return { success: true };
-    }
-  }
-  return { error: "Admission not found: " + id };
+  const rn = parseInt(rowNum);
+  if (isNaN(rn) || rn < 2) return { error: "Invalid row number: " + rowNum };
+  sheet.deleteRow(rn);
+  return { success: true };
 }
 
 function registerStudent(f) {
@@ -925,9 +912,33 @@ function getAllAssignments() {
     fileName: r[6],
     fileUrl: r[7],
     fileSize: r[8],
-    mimeType: r[9]
+    mimeType: r[9],
+    grade: r[10] || '' // Return the grade if it exists
   }));
   return { success: true, assignments: assignments };
+}
+
+// Save grade for an assignment submission
+function saveAssignmentGrade(id, grade) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Assignments");
+  if (!sheet) return { success: false, error: "Assignments sheet missing" };
+  
+  const data = sheet.getDataRange().getValues();
+  // Ensure the 11th column (index 10) has a header if not present
+  if (data[0].length < 11) {
+    sheet.getRange(1, 11).setValue("Grade");
+  }
+
+  // Find the row with the matching ID
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      // ID matches; add grade to column 11 (K)
+      sheet.getRange(i + 1, 11).setValue(grade);
+      return { success: true };
+    }
+  }
+  return { success: false, error: "Assignment not found" };
 }
 
 // ============================================

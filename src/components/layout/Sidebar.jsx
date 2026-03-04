@@ -21,9 +21,8 @@ const NAV_ITEMS = [
     { id: 'rec', icon: 'fas fa-receipt', label: 'Receipts' },
     { id: 'hr', icon: 'fas fa-users-cog', label: 'HR & Payroll' },
     { id: 'divider' },
-    { id: 'lms', icon: 'fas fa-cloud-upload-alt', label: 'LMS Upload' },
     { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results' },
-    { id: 'asn', icon: 'fas fa-paperclip', label: 'Assignments' },
+    { id: 'classroom', icon: 'fas fa-chalkboard-teacher', label: 'Classroom' },
 ];
 
 export default function Sidebar({ activeTab }) {
