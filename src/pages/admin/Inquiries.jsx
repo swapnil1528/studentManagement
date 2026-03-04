@@ -27,7 +27,7 @@ const COLUMNS = [
     { key: 'action', label: 'Actions' },
 ];
 
-export default function Inquiries({ adminData, onReload }) {
+export default function Inquiries({ adminData, user, onReload }) {
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editId, setEditId] = useState(null);    // null = new, otherwise row[0]
@@ -173,14 +173,16 @@ export default function Inquiries({ adminData, onReload }) {
                                     <Edit size={16} />
                                 </button>
 
-                                {/* Delete */}
-                                <button
-                                    onClick={() => setConfirmDelete({ id: r[0], name: r[3] })}
-                                    title="Delete Inquiry"
-                                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                {/* Delete — admin only */}
+                                {user?.role === 'admin' && (
+                                    <button
+                                        onClick={() => setConfirmDelete({ id: r[0], name: r[3] })}
+                                        title="Delete Inquiry"
+                                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
 
                                 {/* Register */}
                                 {r[7] !== 'Confirmed' && (

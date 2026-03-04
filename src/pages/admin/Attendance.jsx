@@ -11,11 +11,37 @@ import Badge from '../../components/ui/Badge';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export default function Attendance({ adminData, onReload }) {
+export default function Attendance({ adminData, user, onReload }) {
     const [subTab, setSubTab] = useState('mark');
     const [saving, setSaving] = useState(false);
     const students = adminData?.activeStudents || [];
     const dropdowns = adminData?.dropdowns || {};
+
+    // Build a photo map: studentId -> photoUrl
+    // Admissions data reliably contains photos (index 12)
+    // activeStudents may also have a photo property
+    const photoMap = useMemo(() => {
+        const map = {};
+        // From activeStudents
+        (adminData?.activeStudents || []).forEach(s => {
+            const id = s.id || s.studentId || s[0];
+            const photo = s.photo || s.photoUrl || s.profilePic || '';
+            if (id && photo && photo.length > 10) map[String(id)] = photo;
+        });
+        // From admissions (index 2=studId, 12=photo)
+        (adminData?.admissions || []).forEach(r => {
+            const id = String(r[2] || '');
+            const photo = r[12] || '';
+            if (id && photo && photo.length > 10) map[id] = photo;
+        });
+        // From registrations (index 2=studId, 11=photo)
+        (adminData?.registrations || []).forEach(r => {
+            const id = String(r[2] || '');
+            const photo = r[11] || '';
+            if (id && photo && photo.length > 10) map[id] = photo;
+        });
+        return map;
+    }, [adminData]);
 
     // --- Mark Attendance State ---
     const [attCourse, setAttCourse] = useState('');
@@ -251,8 +277,8 @@ export default function Attendance({ adminData, onReload }) {
                                         <tr key={s.id} className="t-row">
                                             <td className="font-bold">
                                                 <div className="flex items-center gap-3">
-                                                    {s.photo && s.photo.length > 10 ? (
-                                                        <img src={s.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
+                                                    {photoMap[String(s.id)] ? (
+                                                        <img src={photoMap[String(s.id)]} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                     ) : (
                                                         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
                                                             {s.name.substring(0, 2).toUpperCase()}
@@ -316,15 +342,15 @@ export default function Attendance({ adminData, onReload }) {
                                                 }
                                             } catch { hours = '--'; }
                                         }
-                                        const studentObj = students.find(st => String(st.id) === String(r.id));
+                                        const studentPhoto = photoMap[String(r.id)] || '';
 
                                         return (
                                             <tr key={i} className="t-row">
                                                 <td>{r.id}</td>
                                                 <td className="font-bold">
                                                     <div className="flex items-center gap-3">
-                                                        {studentObj?.photo && studentObj.photo.length > 10 ? (
-                                                            <img src={studentObj.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
+                                                        {studentPhoto ? (
+                                                            <img src={studentPhoto} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                         ) : (
                                                             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
                                                                 {r.name.substring(0, 2).toUpperCase()}
@@ -443,7 +469,7 @@ export default function Attendance({ adminData, onReload }) {
                                     </thead>
                                     <tbody>
                                         {analysisData.students.map((student, idx) => {
-                                            const studentObj = students.find(st => String(st.id) === String(student.id));
+                                            const studentPhoto = photoMap[String(student.id)] || '';
                                             return (
                                                 <tr key={student.id} className="t-row">
                                                     <td style={{ position: 'sticky', left: 0, zIndex: 1, fontSize: '12px', padding: '8px 4px', background: 'var(--gz-card)' }} className="font-mono opacity-50">
@@ -451,8 +477,8 @@ export default function Attendance({ adminData, onReload }) {
                                                     </td>
                                                     <td style={{ position: 'sticky', left: '40px', zIndex: 1, textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap', background: 'var(--gz-card)' }} className="font-semibold text-sm">
                                                         <div className="flex items-center gap-3">
-                                                            {studentObj?.photo && studentObj.photo.length > 10 ? (
-                                                                <img src={studentObj.photo} className="w-8 h-8 rounded-full border object-cover" alt="" />
+                                                            {studentPhoto ? (
+                                                                <img src={studentPhoto} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                             ) : (
                                                                 <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100 shrink-0">
                                                                     {student.name.substring(0, 2).toUpperCase()}

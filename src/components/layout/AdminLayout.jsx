@@ -5,6 +5,7 @@
  */
 
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import Sidebar from './Sidebar';
 import Dashboard from '../../pages/admin/Dashboard';
 import Inquiries from '../../pages/admin/Inquiries';
@@ -57,6 +58,7 @@ export const SLUG_TO_TAB = Object.fromEntries(
 
 export default function AdminLayout({ adminData, onReload }) {
     const location = useLocation();
+    const { user } = useAuth();
 
     // Extract page slug from URL: /admin/attendance → "attendance"
     const pathParts = location.pathname.split('/').filter(Boolean);
@@ -81,7 +83,7 @@ export default function AdminLayout({ adminData, onReload }) {
         <div>
             <Sidebar activeTab={activeTab} />
             <main className="main-content">
-                <ActiveComponent adminData={safeData} onReload={onReload} />
+                <ActiveComponent adminData={safeData} user={user} onReload={onReload} />
             </main>
         </div>
     );

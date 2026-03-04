@@ -10,8 +10,8 @@ import { fetchAdminData } from '../services/api';
 import { setLoading } from '../components/ui/LoadingBar';
 import AdminLayout from '../components/layout/AdminLayout';
 
-const CACHE_KEY = 'erp_admin_cache';
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
+const getCacheKey = (branch) => `erp_admin_cache_${(branch || 'all').toLowerCase()}`;
 
 // Empty defaults for safe rendering
 const EMPTY_DATA = {
@@ -24,9 +24,9 @@ const EMPTY_DATA = {
 };
 
 /** Read cached admin data from localStorage */
-function getCachedData() {
+function getCachedData(branch) {
     try {
-        const raw = localStorage.getItem(CACHE_KEY);
+        const raw = localStorage.getItem(getCacheKey(branch));
         if (!raw) return null;
         const { data, timestamp } = JSON.parse(raw);
         // Return cached data if within expiry
@@ -36,15 +36,16 @@ function getCachedData() {
 }
 
 /** Save admin data to localStorage */
-function setCachedData(data) {
+function setCachedData(data, branch) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+        localStorage.setItem(getCacheKey(branch), JSON.stringify({ data, timestamp: Date.now() }));
     } catch { /* localStorage might be full, ignore */ }
 }
 
 export default function AdminPage() {
     const { user } = useAuth();
-    const cached = getCachedData();
+    const branch = user?.branch || 'All';
+    const cached = getCachedData(branch);
 
     // Always start with data — cached or empty defaults (NO loading spinner)
     const [adminData, setAdminData] = useState(cached || EMPTY_DATA);
@@ -75,11 +76,11 @@ export default function AdminPage() {
         setError(null);
         setLoading(true);
         try {
-            const result = await fetchAdminData(user?.branch || 'All');
+            const result = await fetchAdminData(branch);
             if (result && !result.error) {
                 const normalized = processData(result);
                 setAdminData(normalized);
-                setCachedData(normalized);
+                setCachedData(normalized, branch);
             } else {
                 setError(result?.error || 'Failed to load data');
             }

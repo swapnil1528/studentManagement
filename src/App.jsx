@@ -62,7 +62,7 @@ class ErrorBoundary extends React.Component {
  * ProtectedRoute — Wraps routes that require authentication.
  * Optionally checks for a specific role.
  */
-function ProtectedRoute({ children, allowedRole }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, user, loading } = useAuth();
 
   // Wait for session restore
@@ -81,9 +81,10 @@ function ProtectedRoute({ children, allowedRole }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   // Wrong role → redirect to correct dashboard
-  if (allowedRole && user?.role !== allowedRole) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  if (allowedRoles && !roles.includes(user?.role)) {
     if (user?.role === 'student') return <Navigate to="/student" replace />;
-    if (user?.role === 'employee') return <Navigate to="/employee" replace />;
+    if (user?.role === 'employee') return <Navigate to="/admin" replace />;
     return <Navigate to="/admin" replace />;
   }
 
@@ -120,7 +121,7 @@ export default function App() {
           <Route
             path="/admin/*"
             element={
-              <ProtectedRoute allowedRole="admin">
+              <ProtectedRoute allowedRoles={['admin', 'employee']}>
                 <AdminPage />
               </ProtectedRoute>
             }
@@ -140,7 +141,7 @@ export default function App() {
           <Route
             path="/employee"
             element={
-              <ProtectedRoute allowedRole="employee">
+              <ProtectedRoute allowedRoles={['employee']}>
                 <EmployeePortal />
               </ProtectedRoute>
             }
