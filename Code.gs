@@ -33,8 +33,14 @@ function doPost(e) {
     
     // --- SAVING DATA ---
     else if(act==='saveInq') res = saveInquiry(d.form);
+    else if(act==='updateInq') res = updateInquiry(d.id, d.form);
+    else if(act==='deleteInq') res = deleteInquiry(d.id);
     else if(act==='regStudent') res = registerStudent(d.form);
     else if(act==='saveAdm') res = saveCourseAdmission(d.form);
+    else if(act==='updateReg') res = updateRegistration(d.id, d.form);
+    else if(act==='deleteReg') res = deleteRegistration(d.id);
+    else if(act==='updateAdm') res = updateAdmission(d.id, d.form);
+    else if(act==='deleteAdm') res = deleteAdmission(d.id);
     else if(act==='saveFee') res = saveFeeCollection(d.form);
     else if(act==='saveAtt') res = saveAttendance(d.records);
     else if(act==='saveLMS') res = saveLMSContent(d.form);
@@ -480,9 +486,139 @@ function savePayroll(f) {
 // DATA SAVING FUNCTIONS
 // ============================================
 function saveInquiry(f) {
-  const s = ensureSheet("Inquiries", ["ID", "Date", "Branch", "Name", "Mobile", "Village", "Course", "Status", "Remark", "Edu", "Gender", "Medium", "Board", "Stream", ""]);
-  s.appendRow([s.getLastRow() + 1, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.branch, f.name, f.mobile, f.village, f.course, "New", f.remark || "", f.edu || "", f.gender || "", f.medium || "", f.board || "", f.stream || "", ""]);
+  // Sheet columns: A=ID, B=Date, C=Branch, D=Name, E=Mobile, F=Village,
+  //   G=Course, H=Status, I=Remark, J=Edu, K=Gender, L=Medium, M=Board,
+  //   N=Stream, O=Reception, P=ParentMobile, Q=BatchTiming
+  const s = ensureSheet("Inquiries", ["ID","Date","Branch","Name","Mobile","Village","Course","Status","Remark","Education","Gender","Medium","Board","Stream","Reception","Parent Mobile","Batch Timing"]);
+  s.appendRow([
+    s.getLastRow(),
+    Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"),
+    f.branch || "",
+    f.name || "",
+    f.mobile || "",
+    f.village || "",
+    f.course || "",
+    f.status || "New",
+    f.remark || "",
+    f.edu || "",
+    f.gender || "",
+    f.medium || "",
+    f.board || "",
+    f.stream || "",
+    "",                    // Reception (col O)
+    f.parentMobile || "", // Col P
+    f.batch || ""          // Col Q
+  ]);
   return { success: true };
+}
+
+function updateInquiry(id, f) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Inquiries");
+  if (!sheet) return { error: "Inquiries sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      const row = i + 1;
+      sheet.getRange(row, 3).setValue(f.branch  || data[i][2]);  // C=Branch
+      sheet.getRange(row, 4).setValue(f.name    || data[i][3]);  // D=Name
+      sheet.getRange(row, 5).setValue(f.mobile  || data[i][4]);  // E=Mobile
+      sheet.getRange(row, 6).setValue(f.village || data[i][5]);  // F=Village
+      sheet.getRange(row, 7).setValue(f.course  || data[i][6]);  // G=Course
+      sheet.getRange(row, 8).setValue(f.status  || data[i][7]);  // H=Status
+      sheet.getRange(row, 9).setValue(f.remark  !== undefined ? f.remark  : data[i][8]);  // I=Remark
+      sheet.getRange(row, 10).setValue(f.edu    || data[i][9]);  // J=Education
+      sheet.getRange(row, 11).setValue(f.gender || data[i][10]); // K=Gender
+      sheet.getRange(row, 12).setValue(f.medium || data[i][11]); // L=Medium
+      sheet.getRange(row, 13).setValue(f.board  || data[i][12]); // M=Board
+      sheet.getRange(row, 14).setValue(f.stream || data[i][13]); // N=Stream
+      // P=Parent Mobile (col 16), Q=Batch Timing (col 17)
+      sheet.getRange(row, 16).setValue(f.parentMobile !== undefined ? f.parentMobile : data[i][15]);
+      sheet.getRange(row, 17).setValue(f.batch !== undefined ? f.batch : data[i][16]);
+      return { success: true };
+    }
+  }
+  return { error: "Inquiry not found: " + id };
+}
+
+function deleteInquiry(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Inquiries");
+  if (!sheet) return { error: "Inquiries sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { error: "Inquiry not found: " + id };
+}
+
+function updateRegistration(id, f) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Registration Data");
+  if (!sheet) return { error: "Sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  // r[2]=InqNo or r[3]=StudId — try StudId first
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][3]) === String(id) || String(data[i][2]) === String(id)) {
+      const row = i + 1;
+      if (f.name)   sheet.getRange(row, 7).setValue(f.name);   // F=Name
+      if (f.mobile) sheet.getRange(row, 8).setValue(f.mobile); // G=Mobile
+      if (f.aadhar) sheet.getRange(row, 12).setValue(f.aadhar);// K=Aadhar
+      if (f.course) sheet.getRange(row, 11).setValue(f.course);// J=Course
+      if (f.branch) sheet.getRange(row, 10).setValue(f.branch);// I=Branch
+      return { success: true };
+    }
+  }
+  return { error: "Registration not found: " + id };
+}
+
+function deleteRegistration(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Registration Data");
+  if (!sheet) return { error: "Sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][3]) === String(id) || String(data[i][2]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { error: "Registration not found: " + id };
+}
+
+function updateAdmission(id, f) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Admission Data");
+  if (!sheet) return { error: "Sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][2]) === String(id)) {
+      const row = i + 1;
+      if (f.name)   sheet.getRange(row, 4).setValue(f.name);
+      if (f.course) sheet.getRange(row, 8).setValue(f.course);
+      if (f.batch)  sheet.getRange(row, 9).setValue(f.batch);
+      if (f.status) sheet.getRange(row, 12).setValue(f.status);
+      return { success: true };
+    }
+  }
+  return { error: "Admission not found: " + id };
+}
+
+function deleteAdmission(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Admission Data");
+  if (!sheet) return { error: "Sheet not found" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][2]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { error: "Admission not found: " + id };
 }
 
 function registerStudent(f) {
