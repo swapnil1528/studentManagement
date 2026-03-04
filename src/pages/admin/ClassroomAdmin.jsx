@@ -10,6 +10,7 @@ import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, Chevro
 
 // ─── Helper: get YouTube embed URL ───────────────────────────────────────────
 function getYouTubeEmbed(url) {
+    if (!url || typeof url !== 'string') return null;
     const patterns = [
         /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
         /youtube\.com\/embed\/([^&\n?#]+)/,
@@ -22,6 +23,7 @@ function getYouTubeEmbed(url) {
 }
 
 function getDriveEmbed(url) {
+    if (!url || typeof url !== 'string') return null;
     const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
     if (m) return `https://drive.google.com/file/d/${m[1]}/preview`;
     return null;
