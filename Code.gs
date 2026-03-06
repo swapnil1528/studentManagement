@@ -193,6 +193,20 @@ function fetchAllAdminData(b) {
     batches = batchSheet.getRange(2, 2, batchSheet.getLastRow() - 1).getValues().flat().filter(String);
   }
 
+  // Master Franchise Data
+  const franchiseSheet = ss.getSheetByName("Master Franchise Data");
+  let franchises = [];
+  if (franchiseSheet && franchiseSheet.getLastRow() > 1) {
+    const fData = franchiseSheet.getDataRange().getValues().slice(1);
+    franchises = fData.map(r => ({
+      branch: String(r[1] || '').trim(),
+      centerCode: String(r[2] || ''),
+      centerName: String(r[3] || ''),
+      address: String(r[4] || ''),
+      mobile: String(r[5] || '')
+    })).filter(f => f.branch);
+  }
+
   return { 
     inquiries: inq, 
     registrations: getD("Registration Data")
@@ -200,6 +214,7 @@ function fetchAllAdminData(b) {
       .filter(r => check(r[8], b)),  // r[8] = Branch
     admissions: adm, 
     fees: getD("FEE MANAGEMENT"), 
+    franchises: franchises,
     employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5] })),
     leaves: leaves.map(l => ({ id: l[0], empId: l[2], name: l[3], type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), to: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "dd-MMM"), reason: l[7] })),
     approvedLeaves: approvedLeaves.map(l => ({ id: l[0], empId: l[2], type: l[4], fromDate: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "yyyy-MM-dd"), toDate: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "yyyy-MM-dd") })),

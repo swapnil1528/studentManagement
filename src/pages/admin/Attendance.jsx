@@ -281,7 +281,7 @@ export default function Attendance({ adminData, user, onReload }) {
                                                         <img src={photoMap[String(s.id)]} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                     ) : (
                                                         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
-                                                            {s.name.substring(0, 2).toUpperCase()}
+                                                            {String(s.name || '--').substring(0, 2).toUpperCase()}
                                                         </div>
                                                     )}
                                                     {s.name}
@@ -353,7 +353,7 @@ export default function Attendance({ adminData, user, onReload }) {
                                                             <img src={studentPhoto} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                         ) : (
                                                             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
-                                                                {r.name.substring(0, 2).toUpperCase()}
+                                                                {String(r.name || '--').substring(0, 2).toUpperCase()}
                                                             </div>
                                                         )}
                                                         {r.name}
@@ -481,7 +481,7 @@ export default function Attendance({ adminData, user, onReload }) {
                                                                 <img src={studentPhoto} className="w-8 h-8 rounded-full border object-cover" alt="" />
                                                             ) : (
                                                                 <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100 shrink-0">
-                                                                    {student.name.substring(0, 2).toUpperCase()}
+                                                                    {String(student.name || '--').substring(0, 2).toUpperCase()}
                                                                 </div>
                                                             )}
                                                             <div>
