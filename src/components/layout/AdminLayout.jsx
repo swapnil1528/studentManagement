@@ -69,7 +69,7 @@ export default function AdminLayout({ adminData, onReload }) {
 
     // Safety check
     const safeData = adminData || {
-        inquiries: [], registrations: [], admissions: [], fees: [],
+        inquiries: [], registrations: [], admissions: [], fees: [], franchises: [],
         activeStudents: [], employees: [], leaves: [], payroll: [],
         dropdowns: { branches: [], courses: [], villages: [], employees: [], education: [] },
         stats: { todayPresent: 0, todayAbsent: 0 },

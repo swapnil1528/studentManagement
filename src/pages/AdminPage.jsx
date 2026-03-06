@@ -15,7 +15,7 @@ const getCacheKey = (branch) => `erp_admin_cache_${(branch || 'all').toLowerCase
 
 // Empty defaults for safe rendering
 const EMPTY_DATA = {
-    inquiries: [], registrations: [], admissions: [], fees: [],
+    inquiries: [], registrations: [], admissions: [], fees: [], franchises: [],
     activeStudents: [], employees: [], leaves: [], payroll: [],
     dropdowns: { branches: [], courses: [], villages: [], employees: [], education: [] },
     stats: { todayPresent: 0, todayAbsent: 0 },
@@ -59,6 +59,7 @@ export default function AdminPage() {
             registrations: result.registrations || [],
             admissions: result.admissions || [],
             fees: result.fees || [],
+            franchises: result.franchises || [],
             activeStudents: result.activeStudents || [],
             employees: result.employees || [],
             leaves: result.leaves || [],
