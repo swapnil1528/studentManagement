@@ -22,10 +22,11 @@ export default function Receipts({ adminData }) {
 
     // Helper to find franchise data based on the student's branch
     const getFranchiseData = (studId) => {
-        if (!studId || !adminData?.franchises) return null;
+        if (!adminData?.franchises || adminData.franchises.length === 0) return null;
         const adm = (adminData.admissions || []).find(a => String(a[2] || a[3]) === String(studId));
         const branch = adm ? (adm[6] || adm[5]) : ''; // r[6] Branch
-        return adminData.franchises.find(f => String(f.branch).toLowerCase() === String(branch).toLowerCase());
+        const match = adminData.franchises.find(f => String(f.branch).toLowerCase() === String(branch).toLowerCase());
+        return match || adminData.franchises[0]; // fallback to first franchise
     };
 
     // Trigger print when printTx state is fully set and rendered

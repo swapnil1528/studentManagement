@@ -28,11 +28,12 @@ export default function FeeCollection({ adminData, onReload }) {
 
     // Determine franchise data recursively
     const franchiseData = useMemo(() => {
-        if (!successTx || !adminData?.franchises) return null;
+        if (!successTx || !adminData?.franchises || adminData.franchises.length === 0) return null;
         // Find the student's branch
         const adm = (adminData.admissions || []).find(a => String(a[2] || a[3]) === String(successTx.id));
         const branch = adm ? (adm[6] || adm[5]) : ''; // r[6] Branch
-        return adminData.franchises.find(f => String(f.branch).toLowerCase() === String(branch).toLowerCase());
+        const match = adminData.franchises.find(f => String(f.branch).toLowerCase() === String(branch).toLowerCase());
+        return match || adminData.franchises[0]; // fallback to first franchise
     }, [successTx, adminData]);
 
     const filtered = search.length >= 2
