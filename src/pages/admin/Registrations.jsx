@@ -243,7 +243,7 @@ export default function Registrations({ adminData, user, onReload }) {
                     const photo = r[12] && r[12].length > 10 ? r[12] : null;
                     const img = photo
                         ? <img src={photo} className="w-8 h-8 rounded-full border object-cover transform transition-all duration-200 hover:scale-[3] hover:z-50 relative shadow-sm" alt="" style={{ transformOrigin: 'left center' }} />
-                        : <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">{(r[6] || '--').substring(0, 2).toUpperCase()}</div>;
+                        : <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">{String(r[6] || '--').substring(0, 2).toUpperCase()}</div>;
                     return (
                         <tr key={i} className="t-row">
                             <td className="font-mono text-sm opacity-50">{i + 1}</td>
