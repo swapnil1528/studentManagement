@@ -19,18 +19,19 @@ import { exportCsv, exportPdf } from '../../utils/exportUtils';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Helper: try to find the best index for column based on data patterns
-// Returns the name value from the row (tries multiple common indices)
-const getAdmName = r => r[4] || r[3] || '';
-const getAdmStudId = r => r[2] || r[1] || '';
-const getAdmBranch = r => r[6] || r[5] || '';
+// Exact column mapping after r[0]=rowNum overlay on Admission Data sheet
+// r[1]=AdmNo, r[2]=StudID, r[3]=Name, r[4]=Mobile, r[5]=DOB, r[6]=Branch
+// r[7]=Course, r[8]=Batch, r[9]=Date, r[10]=Fees, r[11]=Status, r[12]=Photo, r[13]=MotherName
+const getAdmName = r => r[3] || '';
+const getAdmStudId = r => r[2] || '';
+const getAdmBranch = r => r[6] || '';
 const getAdmCourse = r => r[7] || '';
 const getAdmBatch = r => r[8] || '';
-const getAdmFees = r => r[9] || '';
-const getAdmDisc = r => r[10] || 0;
-const getAdmStatus = r => r[12] || r[11] || 'Active';
-const getAdmPhoto = r => r[13] || r[12] || '';
-const getAdmDate = r => r[5] || r[4] || '';
+const getAdmFees = r => r[10] || '';
+const getAdmDisc = r => 0; // Discount column was removed from sheet structure
+const getAdmStatus = r => r[11] || 'Active';
+const getAdmPhoto = r => r[12] || '';
+const getAdmDate = r => r[9] || '';
 
 export default function Admissions({ adminData, user, onReload }) {
     const userBranch = user?.branch || '';
