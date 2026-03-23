@@ -162,7 +162,8 @@ function fetchAllAdminData(b) {
   const uniquePresent = [...new Set(todayAtt.map(r => r[1]))]; 
   
   // HR Data
-  const employees = getD("Employee");
+  const employeesRaw = getD("Employee");
+  const employees = employeesRaw.filter(e => check(e[6], b)); // r[6] = Branch
   const leaves = getD("Leave Requests").filter(r => r[8] === "Pending");
   const approvedLeaves = getD("Leave Requests").filter(r => r[8] === "Approved");
   const payroll = getD("Payroll");
@@ -215,7 +216,7 @@ function fetchAllAdminData(b) {
     admissions: adm, 
     fees: getD("FEE MANAGEMENT"), 
     franchises: franchises,
-    employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5] })),
+    employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5], branch: String(e[6] || '') })),
     leaves: leaves.map(l => ({ id: l[0], empId: l[2], name: l[3], type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), to: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "dd-MMM"), reason: l[7] })),
     approvedLeaves: approvedLeaves.map(l => ({ id: l[0], empId: l[2], type: l[4], fromDate: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "yyyy-MM-dd"), toDate: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "yyyy-MM-dd") })),
     payroll: payroll,

@@ -28,8 +28,10 @@ export default function HRManagement({ adminData, onReload }) {
     });
 
     const handleAddEmployee = async () => {
+        const finalBranch = user?.branch === 'All' ? empForm.branch : user?.branch;
+        if (!finalBranch) return alert("Please select a branch for the employee");
         setSavingEmp(true);
-        const result = await addEmployee({ ...empForm, branch: user?.branch });
+        const result = await addEmployee({ ...empForm, branch: finalBranch });
         if (result?.error) alert(result.error);
         else if (result?.success) {
             showToast('Employee Added');
@@ -139,7 +141,7 @@ export default function HRManagement({ adminData, onReload }) {
                     <div className="card p-0 overflow-x-auto">
                         <table className="w-full text-left min-w-[600px]">
                             <thead className="t-head">
-                                <tr><th>ID</th><th>Name</th><th>Role</th><th>Mobile</th><th>Salary</th></tr>
+                                <tr><th>ID</th><th>Name</th><th>Role</th><th>Mobile</th><th>Branch</th><th>Salary</th></tr>
                             </thead>
                             <tbody>
                                 {employees.length > 0 ? employees.map((e, i) => (
@@ -148,6 +150,7 @@ export default function HRManagement({ adminData, onReload }) {
                                         <td className="font-bold">{e.name}</td>
                                         <td>{e.role}</td>
                                         <td>{e.mobile}</td>
+                                        <td><Badge text={e.branch || '—'} variant="blue" /></td>
                                         <td>₹{e.salary}</td>
                                     </tr>
                                 )) : (
@@ -166,6 +169,12 @@ export default function HRManagement({ adminData, onReload }) {
                         <input className="inp" placeholder="Username for Login" value={empForm.username} onChange={(e) => setEmpForm((p) => ({ ...p, username: e.target.value }))} />
                         <input className="inp" placeholder="Password" value={empForm.password} onChange={(e) => setEmpForm((p) => ({ ...p, password: e.target.value }))} />
                         <input className="inp" type="number" placeholder="Monthly Salary" value={empForm.salary} onChange={(e) => setEmpForm((p) => ({ ...p, salary: e.target.value }))} />
+                        {user?.branch === 'All' && (
+                            <select className="inp" value={empForm.branch || ''} onChange={(e) => setEmpForm((p) => ({ ...p, branch: e.target.value }))}>
+                                <option value="">Select Branch...</option>
+                                {(adminData?.dropdowns?.branches || []).map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                        )}
                         <div className="flex justify-end gap-2 mt-2">
                             <button className="text-gray-500 font-bold px-4" onClick={() => setShowEmpModal(false)}>Cancel</button>
                             <button className="btn" onClick={handleAddEmployee} disabled={savingEmp}>{savingEmp ? 'Creating...' : 'Create Employee'}</button>
