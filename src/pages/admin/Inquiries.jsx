@@ -85,12 +85,30 @@ export default function Inquiries({ adminData, user, onReload }) {
 
     const handleChange = (field, val) => setForm(p => ({ ...p, [field]: val }));
 
+    // Format date helper — handles ISO strings, Date objects, and strings
+    const fmtDate = (raw) => {
+        if (!raw) return '';
+        if (raw instanceof Date) {
+            const d = raw;
+            return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+        }
+        const s = String(raw);
+        // ISO format: 2026-03-31T...
+        if (s.includes('T') && s.length > 10) {
+            const d = new Date(s);
+            if (!isNaN(d)) return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+        }
+        return s; // already formatted (dd-MM-yyyy format or other)
+    };
+
     // Build year list from data
     const years = useMemo(() => {
         const yearSet = new Set();
         inquiries.forEach(r => {
-            const d = r[1]; // r[1] = Date
-            if (d) { const yr = String(d).split('-')[0] || String(d).split('/')[2]; if (yr && yr.length === 4) yearSet.add(yr); }
+            const raw = r[1]; // r[1] = Date
+            const d = raw instanceof Date ? raw.toISOString() : String(raw || '');
+            const yr = d.substring(0, 4);
+            if (yr && yr.length === 4 && !isNaN(yr)) yearSet.add(yr);
         });
         return [...yearSet].sort((a, b) => b - a);
     }, [inquiries]);
@@ -119,6 +137,7 @@ export default function Inquiries({ adminData, user, onReload }) {
         { key: 'date', label: 'Date' },
         { key: 'name', label: 'Name' },
         { key: 'mobile', label: 'Mobile' },
+        { key: 'parentMobile', label: 'Parent Mobile' }, // Added parent mobile
         ...(showBranchCol ? [{ key: 'branch', label: 'Branch' }] : []),
         { key: 'village', label: 'Village' },
         { key: 'course', label: 'Course' },
@@ -297,9 +316,10 @@ export default function Inquiries({ adminData, user, onReload }) {
                 renderRow={(r, i) => (
                     <tr key={i} className="t-row">
                         <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                        <td className="text-xs opacity-60 whitespace-nowrap">{r[1]}</td>
+                        <td className="text-xs opacity-60 whitespace-nowrap">{fmtDate(r[1])}</td>
                         <td><div className="font-bold">{r[3]}</div></td>
                         <td>{r[4]}</td>
+                        <td>{r[15] || '—'}</td>
                         {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[2]}</span></td>}
                         <td>{r[5]}</td>
                         <td>{r[6]}</td>
