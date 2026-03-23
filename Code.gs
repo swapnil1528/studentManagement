@@ -1194,3 +1194,95 @@ function saveToDriveBase64(fileData, parentFolderName, fileName) {
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return "https://drive.google.com/file/d/" + file.getId() + "/view";
 }
+
+// ============================================
+// AUTOMATED REPORTING — WhatsApp + Email
+// ============================================
+var REPORT_WA_API_KEY = 'JBJxA7CJbTNejUar7gzdc0QInQ3gLh';
+var REPORT_WA_SENDER  = '917666440573';
+var REPORT_WA_FOOTER  = 'Durge Computer Classes';
+var REPORT_WA_BASE    = 'https://wa.bulkmessenger.shop/public/send-message';
+var REPORT_MOBILE     = '919820645281';
+var REPORT_EMAIL      = 'swapnil1528@gmail.com';
+
+function sendWhatsApp(mobile, message) {
+  try {
+    var payload = { 'api_key': REPORT_WA_API_KEY, 'sender': REPORT_WA_SENDER, 'number': mobile, 'message': message + '\n\n— ' + REPORT_WA_FOOTER };
+    UrlFetchApp.fetch(REPORT_WA_BASE, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+  } catch(e) { Logger.log('WA error: ' + e.message); }
+}
+
+function sendInquiryReport(from, to, label) {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Inquiries');
+  if (!sheet) return;
+  var rows = sheet.getDataRange().getValues().slice(1);
+  var fromMs = new Date(from).setHours(0,0,0,0);
+  var toMs   = new Date(to).setHours(23,59,59,999);
+  var filtered = rows.filter(function(r) {
+    var d = r[1];
+    var ms = (d instanceof Date) ? d.getTime() : new Date(d).getTime();
+    return ms >= fromMs && ms <= toMs;
+  });
+  var today = Utilities.formatDate(new Date(), 'GMT+5:30', 'dd-MM-yyyy');
+  var header = '📋 *' + label + ' Inquiry Report*\n📅 ' + today + '\nTotal: *' + filtered.length + ' inquiries*\n\n';
+  var lines = filtered.map(function(r, i) {
+    var date = (r[1] instanceof Date) ? Utilities.formatDate(r[1], 'GMT+5:30', 'dd-MM') : String(r[1]).substring(0,10);
+    return (i+1) + '. ' + (r[3]||'—') + ' | ' + (r[4]||'—') + ' | ' + (r[6]||'—') + ' | ' + (r[2]||'—') + ' | ' + date;
+  }).join('\n');
+  sendWhatsApp(REPORT_MOBILE, header + (lines || 'No inquiries found.'));
+  var html = '<h2>' + label + ' Inquiry Report — ' + today + '</h2>'
+    + '<p><strong>Total: ' + filtered.length + '</strong></p>'
+    + '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif">'
+    + '<tr style="background:#4f46e5;color:#fff"><th>#</th><th>Name</th><th>Mobile</th><th>Course</th><th>Branch</th><th>Date</th></tr>'
+    + filtered.map(function(r,i){
+        var d=(r[1] instanceof Date)?Utilities.formatDate(r[1],'GMT+5:30','dd-MM-yyyy'):String(r[1]).substring(0,10);
+        return '<tr><td>'+(i+1)+'</td><td>'+(r[3]||'')+'</td><td>'+(r[4]||'')+'</td><td>'+(r[6]||'')+'</td><td>'+(r[2]||'')+'</td><td>'+d+'</td></tr>';
+      }).join('')
+    + '</table>';
+  MailApp.sendEmail({ to: REPORT_EMAIL, subject: label + ' Inquiry Report — Durge Computer Classes', htmlBody: html });
+}
+
+function sendEmployeeAttendanceReport() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var eaSheet = ss.getSheetByName('Employee Attendance');
+  var empSheet = ss.getSheetByName('Employee');
+  if (!eaSheet || !empSheet) return;
+  var today = new Date();
+  var todayStr = Utilities.formatDate(today, 'GMT+5:30', 'yyyy-MM-dd');
+  var todayFmt = Utilities.formatDate(today, 'GMT+5:30', 'dd-MM-yyyy');
+  var empMap = {};
+  empSheet.getDataRange().getValues().slice(1).forEach(function(e){ empMap[String(e[1])] = { name: String(e[2]), branch: String(e[6]||'—') }; });
+  var logs = eaSheet.getDataRange().getValues().slice(1).filter(function(r){
+    var d = r[6]; var ds = (d instanceof Date)?Utilities.formatDate(d,'GMT+5:30','yyyy-MM-dd'):String(d).substring(0,10); return ds===todayStr;
+  });
+  var empLogs = {};
+  logs.forEach(function(r){
+    var id=String(r[1]); var time=(r[0] instanceof Date)?Utilities.formatDate(r[0],'GMT+5:30','hh:mm a'):String(r[0]); var status=String(r[3]||'').toLowerCase();
+    if(!empLogs[id]) empLogs[id]={checkIn:'—',checkOut:'—'};
+    if(status.includes('check-in')||status.includes('present')){ if(empLogs[id].checkIn==='—'||time<empLogs[id].checkIn) empLogs[id].checkIn=time; }
+    if(status.includes('check-out')){ if(empLogs[id].checkOut==='—'||time>empLogs[id].checkOut) empLogs[id].checkOut=time; }
+  });
+  var keys=Object.keys(empLogs);
+  var header='👥 *Employee Attendance — '+todayFmt+'*\nTotal Present: *'+keys.length+'*\n\n';
+  var lines=keys.map(function(id,i){ var emp=empMap[id]||{name:id,branch:'—'}; var log=empLogs[id]; return (i+1)+'. '+emp.name+' ('+emp.branch+')\n   ✅ In: '+log.checkIn+'   🔚 Out: '+log.checkOut; }).join('\n');
+  sendWhatsApp(REPORT_MOBILE, header+(lines||'No check-ins today.'));
+  var html='<h2>Employee Attendance — '+todayFmt+'</h2><p><strong>Present: '+keys.length+'</strong></p>'
+    +'<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif">'
+    +'<tr style="background:#4f46e5;color:#fff"><th>#</th><th>Name</th><th>Branch</th><th>Check-In</th><th>Check-Out</th></tr>'
+    +keys.map(function(id,i){ var emp=empMap[id]||{name:id,branch:'—'}; var log=empLogs[id]; return '<tr><td>'+(i+1)+'</td><td>'+emp.name+'</td><td>'+emp.branch+'</td><td>'+log.checkIn+'</td><td>'+log.checkOut+'</td></tr>'; }).join('')
+    +'</table>';
+  MailApp.sendEmail({ to: REPORT_EMAIL, subject: 'Employee Attendance — Durge Computer Classes — '+todayFmt, htmlBody: html });
+}
+
+function triggerDailyReport()   { sendInquiryReport(new Date(), new Date(), 'Daily'); sendEmployeeAttendanceReport(); }
+function triggerWeeklyReport()  { var to=new Date(); var from=new Date(); from.setDate(from.getDate()-6); sendInquiryReport(from,to,'Weekly'); }
+function triggerMonthlyReport() { var to=new Date(); var from=new Date(); from.setDate(1); sendInquiryReport(from,to,'Monthly'); }
+
+function setupReportTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function(t){ var fn=t.getHandlerFunction(); if(['triggerDailyReport','triggerWeeklyReport','triggerMonthlyReport'].includes(fn)) ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('triggerDailyReport').timeBased().atHour(20).everyDays(1).inTimezone('Asia/Kolkata').create();
+  ScriptApp.newTrigger('triggerWeeklyReport').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('Asia/Kolkata').create();
+  ScriptApp.newTrigger('triggerMonthlyReport').timeBased().onMonthDay(1).atHour(8).inTimezone('Asia/Kolkata').create();
+  Logger.log('✅ Report triggers created.');
+}
