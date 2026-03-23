@@ -526,8 +526,8 @@ function savePayroll(f) {
 function saveInquiry(f) {
   // Sheet columns: A=ID, B=Date, C=Branch, D=Name, E=Mobile, F=Village,
   //   G=Course, H=Status, I=Remark, J=Edu, K=Gender, L=Medium, M=Board,
-  //   N=Stream, O=Reception, P=ParentMobile, Q=BatchTiming
-  const s = ensureSheet("Inquiries", ["ID","Date","Branch","Name","Mobile","Village","Course","Status","Remark","Education","Gender","Medium","Board","Stream","Reception","Parent Mobile","Batch Timing"]);
+  //   N=Stream, O=Reception, P=ParentMobile, Q=BatchTiming, R=MotherName
+  const s = ensureSheet("Inquiries", ["ID","Date","Branch","Name","Mobile","Village","Course","Status","Remark","Education","Gender","Medium","Board","Stream","Reception","Parent Mobile","Batch Timing","Mother Name"]);
   s.appendRow([
     s.getLastRow(),
     Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"),
@@ -543,9 +543,10 @@ function saveInquiry(f) {
     f.medium || "",
     f.board || "",
     f.stream || "",
-    "",                    // Reception (col O)
-    f.parentMobile || "", // Col P
-    f.batch || ""          // Col Q
+    "",                       // Reception (col O)
+    f.parentMobile || "",     // Col P
+    f.batch || "",             // Col Q
+    f.motherName || ""         // Col R - Mother Name
   ]);
   return { success: true };
 }
@@ -574,6 +575,7 @@ function updateInquiry(rowNum, f) {
   sheet.getRange(rn, 14).setValue(f.stream       || existing[13]); // N=Stream
   sheet.getRange(rn, 16).setValue(f.parentMobile !== undefined ? f.parentMobile : existing[15]); // P
   sheet.getRange(rn, 17).setValue(f.batch        !== undefined ? f.batch        : existing[16]); // Q
+  sheet.getRange(rn, 18).setValue(f.motherName   !== undefined ? f.motherName   : (existing[17] || '')); // R=MotherName
   return { success: true };
 }
 
@@ -636,23 +638,42 @@ function deleteAdmission(rowNum) {
 
 function registerStudent(f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const inq = ss.getSheetByName("Inquiries").getDataRange().getValues().find(r => r[0] == f.inquiryId);
-  if (!inq) return { success: false };
+  
+  // Find inquiry row — r[0] is the row-index ID stored in col A
+  const allInqData = ss.getSheetByName("Inquiries").getDataRange().getValues();
+  const inq = allInqData.find(r => String(r[0]) == String(f.inquiryId));
+  if (!inq) return { success: false, error: "Inquiry not found" };
+  
+  // ── Duplicate prevention: check if this inquiry was already registered ──
+  const rs = ensureSheet("Registration Data", ["ID", "InqId", "StudID", "Date", "Status", "Name", "Mobile", "Village", "Branch", "Course", "Aadhar", "Photo", "DOB", "Mother Name"]);
+  const existingRegs = rs.getDataRange().getValues();
+  const alreadyRegistered = existingRegs.slice(1).find(r => 
+    String(r[1]) == String(f.inquiryId) || // same InqId
+    (String(r[5]).toLowerCase().trim() === String(inq[3]).toLowerCase().trim() && // same name
+     String(r[6]).trim() === String(inq[4]).trim()) // same mobile
+  );
+  if (alreadyRegistered) return { success: false, error: "Student '" + inq[3] + "' is already registered (ID: " + alreadyRegistered[2] + ")" };
+  
   const photoUrl = saveImage(f.photo, "ST_" + f.inquiryId);
-  const rs = ensureSheet("Registration Data", ["ID", "InqId", "StudID", "Date", "Status", "Name", "Mobile", "Village", "Branch", "Course", "Aadhar", "Photo", "DOB"]);
   const sid = "ST-2026-" + (1000 + rs.getLastRow());
-  rs.appendRow([rs.getLastRow(), f.inquiryId, sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob]);
+  // inq cols (0-indexed): [0]=ID, [1]=Date, [2]=Branch, [3]=Name, [4]=Mobile, [5]=Village, [6]=Course, ..., [17]=MotherName
+  rs.appendRow([rs.getLastRow(), f.inquiryId, sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob, inq[17] || ""]);
+  
+  // Mark inquiry as Confirmed
   const inqSheet = ss.getSheetByName("Inquiries");
-  const allInq = inqSheet.getDataRange().getValues();
-  for (let i = 0; i < allInq.length; i++) if (allInq[i][0] == f.inquiryId) { inqSheet.getRange(i + 1, 8).setValue("Confirmed"); break; }
+  for (let i = 0; i < allInqData.length; i++) {
+    if (String(allInqData[i][0]) == String(f.inquiryId)) { inqSheet.getRange(i + 1, 8).setValue("Confirmed"); break; }
+  }
   return { success: true };
 }
 
 function saveCourseAdmission(f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const s = ss.getSheetByName("Registration Data").getDataRange().getValues().find(r => r[2] == f.admStudId);
-  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo"]);
-  as.appendRow([as.getLastRow(), "ADM-" + as.getLastRow(), f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11]]);
+  if (!s) return { error: "Student not found in Registration Data" };
+  // Registration Data cols: [0]=ID,[1]=InqId,[2]=StudID,[3]=Date,[4]=Status,[5]=Name,[6]=Mobile,[7]=Village,[8]=Branch,[9]=Course,[10]=Aadhar,[11]=Photo,[12]=DOB,[13]=MotherName
+  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name"]);
+  as.appendRow([as.getLastRow(), "ADM-" + as.getLastRow(), f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || ""]);
   return { success: true };
 }
 

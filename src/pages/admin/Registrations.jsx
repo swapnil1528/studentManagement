@@ -159,12 +159,12 @@ export default function Registrations({ adminData, user, onReload }) {
 
     // Edit
     const openEdit = (r) => {
-        setEditId(r[3]);   // StudId at r[3]
+        setEditId(r[0]);   // row index for updateRegistration
         setEditForm({
             name: r[6] || '',
             mobile: r[7] || '',
             aadhar: r[11] || '',
-            dob: r[4] || '',
+            dob: r[12] || '',  // r[12] = DOB (M column), not r[4] which is Date of Registration
             course: r[10] || '',
             branch: r[9] || '',
         });

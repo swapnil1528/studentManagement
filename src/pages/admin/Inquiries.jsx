@@ -1,28 +1,31 @@
 /**
  * Inquiries — Admin inquiry management page.
  *
- * Sheet column mapping (0-indexed, r[0]=rowIndex):
- *  r[0]  = Row Index (internal)
- *  r[1]  = Inquiry ID
- *  r[2]  = Date
- *  r[3]  = Name
- *  r[4]  = Mobile
- *  r[5]  = Village
- *  r[6]  = Course
- *  r[7]  = Status
- *  r[8]  = Branch
- *  r[9]  = Education
- *  r[10] = Gender
- *  r[11] = Medium
- *  r[12] = Board
- *  r[13] = Stream
- *  r[14] = Remark
- *  r[15] = Parent Mobile
- *  r[16] = Batch Timing
+ * Sheet column mapping (after r[0] = rowIndex overlay):
+ *  r[0]  = Row Index (internal, overlaid by frontend)
+ *  r[1]  = A = ID (SrNo)
+ *  r[2]  = B = Date
+ *  r[3]  = C = Branch
+ *  r[4]  = D = Name
+ *  r[5]  = E = Mobile
+ *  r[6]  = F = Village
+ *  r[7]  = G = Course
+ *  r[8]  = H = Status
+ *  r[9]  = I = Remark
+ *  r[10] = J = Education
+ *  r[11] = K = Gender
+ *  r[12] = L = Medium
+ *  r[13] = M = Board
+ *  r[14] = N = Stream
+ *  r[15] = O = Reception
+ *  r[16] = P = Parent Mobile
+ *  r[17] = Q = Batch Timing
+ *  r[18] = R = Mother Name  (new column)
  */
 
-import { useState, useMemo } from 'react';
-import { Edit, Trash2, FileSpreadsheet, FileText } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Edit, Trash2, FileSpreadsheet, FileText, Printer } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -31,28 +34,32 @@ import { showToast } from '../../components/ui/Toast';
 import { exportCsv, exportPdf } from '../../utils/exportUtils';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const STATUS_OPTIONS = ['New', 'Follow Up', 'Postponed', 'Cancelled', 'Confirmed'];
 
 const getStatusVariant = (s) => {
     if (s === 'Confirmed') return 'green';
     if (s === 'Cancelled') return 'red';
     if (s === 'Postponed') return 'yellow';
+    if (s === 'Follow Up') return 'blue';
     return 'blue';
 };
 
 const blankForm = (branch) => ({
-    name: '', mobile: '', parentMobile: '',
+    name: '', mobile: '', parentMobile: '', motherName: '',
     branch: branch || '',
     course: '', batch: '', village: '',
     edu: '', gender: 'Male', medium: 'English', board: 'State',
     stream: 'Arts', remark: '', status: 'New'
 });
 
+// ── Inquiry Print Form ──────────────────────────────────────────
+const InquiryPrintForm = ({ inquiry, franchiseData, ref: _ref }) => null;
+
 export default function Inquiries({ adminData, user, onReload }) {
     const isAdmin = user?.role === 'admin';
     const userBranch = user?.branch || '';
-    // Auto-fill branch if user has a specific branch (not 'All')
     const fixedBranch = (userBranch && userBranch.toLowerCase() !== 'all') ? userBranch : null;
-    const showBranchCol = !fixedBranch; // Show branch column only when viewing all branches
+    const showBranchCol = !fixedBranch;
 
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -64,10 +71,15 @@ export default function Inquiries({ adminData, user, onReload }) {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
+    // Print state
+    const [printInquiry, setPrintInquiry] = useState(null);
+    const printRef = useRef();
+
     // Filters
     const [filterMonth, setFilterMonth] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
 
     const inquiries = adminData?.inquiries || [];
     const dropdowns = adminData?.dropdowns || {};
@@ -87,7 +99,8 @@ export default function Inquiries({ adminData, user, onReload }) {
     // Filtered data
     const filtered = useMemo(() => {
         return inquiries.filter(r => {
-            if (filterBranch && r[8] !== filterBranch) return false;
+            if (filterBranch && r[3] !== filterBranch) return false;
+            if (filterStatus && r[8] !== filterStatus) return false;
             if (filterMonth || filterYear) {
                 const d = String(r[2] || '');
                 if (filterYear && !d.includes(filterYear)) return false;
@@ -100,10 +113,11 @@ export default function Inquiries({ adminData, user, onReload }) {
             }
             return true;
         });
-    }, [inquiries, filterBranch, filterMonth, filterYear]);
+    }, [inquiries, filterBranch, filterStatus, filterMonth, filterYear]);
 
     const COLUMNS = [
         { key: 'sr', label: '#' },
+        { key: 'date', label: 'Date' },
         { key: 'name', label: 'Name' },
         { key: 'mobile', label: 'Mobile' },
         ...(showBranchCol ? [{ key: 'branch', label: 'Branch' }] : []),
@@ -113,6 +127,35 @@ export default function Inquiries({ adminData, user, onReload }) {
         { key: 'action', label: 'Actions' },
     ];
 
+    // ── Franchise lookup for print ────────────────────────────
+    const getFranchiseData = (branch) => {
+        if (!adminData?.franchises || adminData.franchises.length === 0) return null;
+        const match = adminData.franchises.find(f =>
+            String(f.branch).toLowerCase() === String(branch).toLowerCase()
+        );
+        return match || adminData.franchises[0];
+    };
+
+    // ── Print handler ──────────────────────────────────────────
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: `Inquiry_${printInquiry?.name || 'Form'}`,
+        onAfterPrint: () => setPrintInquiry(null),
+    });
+
+    const openPrint = (r) => {
+        const branch = fixedBranch || r[3];
+        const fd = getFranchiseData(branch);
+        setPrintInquiry({
+            name: r[4], mobile: r[5], parentMobile: r[16], motherName: r[18] || '',
+            village: r[6], course: r[7], status: r[8], remark: r[9],
+            edu: r[10], gender: r[11], medium: r[12], board: r[13],
+            stream: r[14], batch: r[17], date: r[2], branch,
+            franchiseData: fd || { centerName: 'Institute', address: '', mobile: '' },
+        });
+        setTimeout(() => handlePrint(), 100);
+    };
+
     // ── Open New ──────────────────────────────────────────────
     const openNew = () => { setEditId(null); setForm(blankForm(fixedBranch)); setShowModal(true); };
 
@@ -120,20 +163,21 @@ export default function Inquiries({ adminData, user, onReload }) {
     const openEdit = (r) => {
         setEditId(r[0]);
         setForm({
-            name: r[3] || '',
-            mobile: r[4] || '',
-            village: r[5] || '',
-            course: r[6] || '',
-            status: r[7] || 'New',
-            branch: fixedBranch || r[8] || '',
-            edu: r[9] || '',
-            gender: r[10] || 'Male',
-            medium: r[11] || 'English',
-            board: r[12] || 'State',
-            stream: r[13] || 'Arts',
-            remark: r[14] || '',
-            parentMobile: r[15] || '',
-            batch: r[16] || '',
+            name: r[4] || '',
+            mobile: r[5] || '',
+            village: r[6] || '',
+            course: r[7] || '',
+            status: r[8] || 'New',
+            remark: r[9] || '',
+            edu: r[10] || '',
+            gender: r[11] || 'Male',
+            medium: r[12] || 'English',
+            board: r[13] || 'State',
+            stream: r[14] || 'Arts',
+            parentMobile: r[16] || '',
+            batch: r[17] || '',
+            motherName: r[18] || '',
+            branch: fixedBranch || r[3] || '',
         });
         setShowModal(true);
     };
@@ -150,7 +194,7 @@ export default function Inquiries({ adminData, user, onReload }) {
             setShowModal(false);
             onReload?.();
         } else {
-            alert(result?.error || 'Save failed — ensure saveInq/updateInq in Code.gs handles parentMobile + batch fields');
+            alert(result?.error || 'Save failed');
         }
     };
 
@@ -183,28 +227,31 @@ export default function Inquiries({ adminData, user, onReload }) {
 
     // ── Export ────────────────────────────────────────────────
     const doExportCsv = () => {
-        const headers = ['#', 'Name', 'Mobile', 'Parent Mobile', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Batch', 'Status', 'Education', 'Gender', 'Date'];
+        const headers = ['#', 'Date', 'Name', 'Mobile', 'Parent Mobile', 'Mother Name', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Batch', 'Status', 'Education', 'Gender', 'Remark'];
         const rows = filtered.map((r, i) => [
-            i + 1, r[3], r[4], r[15], ...(showBranchCol ? [r[8]] : []),
-            r[5], r[6], r[16], r[7], r[9], r[10], r[2]
+            i + 1, r[2], r[4], r[5], r[16], r[18] || '', ...(showBranchCol ? [r[3]] : []),
+            r[6], r[7], r[17], r[8], r[10], r[11], r[9]
         ]);
         exportCsv('Inquiries_' + new Date().toISOString().slice(0, 10), headers, rows);
     };
 
     const doExportPdf = () => {
-        const headers = ['#', 'Name', 'Mobile', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Status', 'Date'];
+        const headers = ['#', 'Date', 'Name', 'Mobile', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Status'];
         const rows = filtered.map((r, i) => [
-            i + 1, r[3], r[4], ...(showBranchCol ? [r[8]] : []),
-            r[5], r[6], r[7], r[2]
+            i + 1, r[2], r[4], r[5], ...(showBranchCol ? [r[3]] : []),
+            r[6], r[7], r[8]
         ]);
         exportPdf('Inquiries Report', headers, rows);
     };
+
+    const hasFilters = filterBranch || filterMonth || filterYear || filterStatus;
+    const clearFilters = () => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); setFilterStatus(''); };
 
     return (
         <div>
             {/* Header */}
             <div className="flex justify-between mb-4 flex-wrap gap-2">
-                <h1 className="text-2xl font-bold">Inquiries</h1>
+                <h1 className="text-2xl font-bold">Inquiry</h1>
                 <div className="flex gap-2 flex-wrap items-center">
                     <button className="btn" onClick={openNew}>+ New Inquiry</button>
                     <button onClick={doExportCsv} title="Export Excel/CSV"
@@ -218,29 +265,32 @@ export default function Inquiries({ adminData, user, onReload }) {
                 </div>
             </div>
 
-            {/* Filters — only show for all-branch users */}
-            {showBranchCol && (
-                <div className="card mb-4 flex gap-3 flex-wrap items-center p-3">
-                    <span className="text-xs font-bold opacity-50">Filter:</span>
-                    <select className="inp" style={{ width: 170, marginBottom: 0 }} value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
+            {/* Filters — always visible */}
+            <div className="card mb-4 flex gap-3 flex-wrap items-center p-3">
+                <span className="text-xs font-bold opacity-50">Filter:</span>
+                {showBranchCol && (
+                    <select className="inp" style={{ width: 160, marginBottom: 0 }} value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
                         <option value="">All Branches</option>
                         {(dropdowns.branches || []).map(b => <option key={b}>{b}</option>)}
                     </select>
-                    <select className="inp" style={{ width: 110, marginBottom: 0 }} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
-                        <option value="">All Months</option>
-                        {MONTHS.map(m => <option key={m}>{m}</option>)}
-                    </select>
-                    <select className="inp" style={{ width: 100, marginBottom: 0 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
-                        <option value="">All Years</option>
-                        {years.map(y => <option key={y}>{y}</option>)}
-                    </select>
-                    {(filterBranch || filterMonth || filterYear) && (
-                        <button onClick={() => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); }}
-                            className="text-xs text-indigo-600 underline font-semibold">Clear</button>
-                    )}
-                    <span className="text-xs opacity-40 ml-auto">{filtered.length} of {inquiries.length} records</span>
-                </div>
-            )}
+                )}
+                <select className="inp" style={{ width: 130, marginBottom: 0 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                    <option value="">All Status</option>
+                    {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+                </select>
+                <select className="inp" style={{ width: 110, marginBottom: 0 }} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+                    <option value="">All Months</option>
+                    {MONTHS.map(m => <option key={m}>{m}</option>)}
+                </select>
+                <select className="inp" style={{ width: 100, marginBottom: 0 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+                    <option value="">All Years</option>
+                    {years.map(y => <option key={y}>{y}</option>)}
+                </select>
+                {hasFilters && (
+                    <button onClick={clearFilters} className="text-xs text-indigo-600 underline font-semibold">Clear</button>
+                )}
+                <span className="text-xs opacity-40 ml-auto">{filtered.length} of {inquiries.length} records</span>
+            </div>
 
             <DataTable
                 columns={COLUMNS}
@@ -248,25 +298,30 @@ export default function Inquiries({ adminData, user, onReload }) {
                 renderRow={(r, i) => (
                     <tr key={i} className="t-row">
                         <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                        <td><div className="font-bold">{r[3]}</div><div className="text-xs opacity-50">{r[2]}</div></td>
-                        <td>{r[4]}</td>
-                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[8]}</span></td>}
+                        <td className="text-xs opacity-60 whitespace-nowrap">{r[2]}</td>
+                        <td><div className="font-bold">{r[4]}</div></td>
                         <td>{r[5]}</td>
+                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[3]}</span></td>}
                         <td>{r[6]}</td>
-                        <td><Badge text={r[7] || 'New'} variant={getStatusVariant(r[7])} /></td>
+                        <td>{r[7]}</td>
+                        <td><Badge text={r[8] || 'New'} variant={getStatusVariant(r[8])} /></td>
                         <td>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => openEdit(r)} title="Edit"
                                     className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
                                     <Edit size={16} />
                                 </button>
+                                <button onClick={() => openPrint(r)} title="Print Inquiry Form"
+                                    className="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors">
+                                    <Printer size={16} />
+                                </button>
                                 {isAdmin && (
-                                    <button onClick={() => setConfirmDelete({ id: r[0], name: r[3] })} title="Delete"
+                                    <button onClick={() => setConfirmDelete({ id: r[0], name: r[4] })} title="Delete"
                                         className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors">
                                         <Trash2 size={16} />
                                     </button>
                                 )}
-                                {r[7] !== 'Confirmed' && (
+                                {r[8] !== 'Confirmed' && (
                                     <button onClick={() => openRegModal(r[0])} className="btn py-1 px-3 text-xs">Register</button>
                                 )}
                             </div>
@@ -275,9 +330,70 @@ export default function Inquiries({ adminData, user, onReload }) {
                 )}
             />
 
+            {/* Hidden print template */}
+            <div style={{ display: 'none' }}>
+                {printInquiry && (
+                    <div ref={printRef} style={{ fontFamily: 'Arial, sans-serif', padding: 32, maxWidth: 800, margin: '0 auto', color: '#111' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #4f46e5', paddingBottom: 12, marginBottom: 20 }}>
+                            <div>
+                                <h1 style={{ fontSize: 22, fontWeight: 900, color: '#3730a3', margin: 0 }}>{printInquiry.franchiseData.centerName}</h1>
+                                <p style={{ fontSize: 12, color: '#555', margin: '4px 0 0' }}>{printInquiry.franchiseData.address}</p>
+                                {printInquiry.franchiseData.mobile && <p style={{ fontSize: 12, color: '#555', margin: '2px 0 0' }}>📞 {printInquiry.franchiseData.mobile}</p>}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <h2 style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', margin: 0 }}>INQUIRY FORM</h2>
+                                <p style={{ fontSize: 12, color: '#777', margin: '4px 0 0' }}>Date: {printInquiry.date}</p>
+                            </div>
+                        </div>
+                        {/* Student Details */}
+                        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Student Details</h3>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                            <tbody>
+                                {[
+                                    ['Student Name', printInquiry.name], ['Mobile', printInquiry.mobile],
+                                    ['Parent Mobile', printInquiry.parentMobile], ['Mother Name', printInquiry.motherName],
+                                    ['Village', printInquiry.village], ['Gender', printInquiry.gender],
+                                    ['Education', printInquiry.edu], ['Board', printInquiry.board],
+                                    ['Stream', printInquiry.stream], ['Medium', printInquiry.medium],
+                                ].map(([label, val]) => (
+                                    <tr key={label}>
+                                        <td style={{ padding: '5px 8px', fontWeight: 600, fontSize: 12, color: '#374151', width: '35%', background: '#f8f9ff', border: '1px solid #e5e7eb' }}>{label}</td>
+                                        <td style={{ padding: '5px 8px', fontSize: 12, border: '1px solid #e5e7eb' }}>{val || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Course Details</h3>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                            <tbody>
+                                {[
+                                    ['Branch', printInquiry.branch], ['Course', printInquiry.course],
+                                    ['Batch Timing', printInquiry.batch], ['Status', printInquiry.status],
+                                    ['Remarks', printInquiry.remark],
+                                ].map(([label, val]) => (
+                                    <tr key={label}>
+                                        <td style={{ padding: '5px 8px', fontWeight: 600, fontSize: 12, color: '#374151', width: '35%', background: '#f8f9ff', border: '1px solid #e5e7eb' }}>{label}</td>
+                                        <td style={{ padding: '5px 8px', fontSize: 12, border: '1px solid #e5e7eb' }}>{val || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 48 }}>
+                            <div style={{ textAlign: 'center', width: 180 }}>
+                                <div style={{ borderTop: '1px solid #999', paddingTop: 6, fontSize: 11, color: '#555', fontWeight: 600 }}>Student Signature</div>
+                            </div>
+                            <div style={{ textAlign: 'center', width: 180 }}>
+                                <div style={{ borderTop: '1px solid #999', paddingTop: 6, fontSize: 11, color: '#555', fontWeight: 600 }}>Authorized Signatory</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* ── New / Edit Modal ── */}
             <Modal isOpen={showModal} onClose={() => setShowModal(false)}
-                title={editId ? '✏️ Edit Inquiry' : '+ New Inquiry'} width="w-[820px]">
+                title={editId ? '✏️ Edit Inquiry' : '+ New Inquiry'} width="w-[860px]">
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Student Name *</label>
@@ -290,6 +406,10 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <div>
                         <label className="text-xs font-bold opacity-50 mb-1 block">Parent Mobile</label>
                         <input className="inp" placeholder="Parent Mobile" value={form.parentMobile} onChange={e => handleChange('parentMobile', e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold opacity-50 mb-1 block">Mother Name</label>
+                        <input className="inp" placeholder="Mother Name" value={form.motherName || ''} onChange={e => handleChange('motherName', e.target.value)} />
                     </div>
 
                     {/* Branch — admin with all-access only */}
@@ -362,7 +482,7 @@ export default function Inquiries({ adminData, user, onReload }) {
                             <option>Postponed</option><option>Cancelled</option><option>Confirmed</option>
                         </select>
                     </div>
-                    <div className={fixedBranch ? 'col-span-3' : 'col-span-2'}>
+                    <div className="col-span-3">
                         <label className="text-xs font-bold opacity-50 mb-1 block">Remarks</label>
                         <textarea className="inp" placeholder="Remarks" value={form.remark} onChange={e => handleChange('remark', e.target.value)} />
                     </div>

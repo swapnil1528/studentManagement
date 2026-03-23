@@ -14,7 +14,7 @@ const NAV_ITEMS = [
     { id: 'dash', icon: 'fas fa-home', label: 'Dashboard' },
     { id: 'att', icon: 'fas fa-calendar-check', label: 'Attendance' },
     { id: 'notices', icon: 'fas fa-bullhorn', label: 'Notices' },
-    { id: 'inq', icon: 'fas fa-user-plus', label: 'Inquiries' },
+    { id: 'inq', icon: 'fas fa-user-plus', label: 'Inquiry' },
     { id: 'reg', icon: 'fas fa-id-card', label: 'Registrations' },
     { id: 'adm', icon: 'fas fa-user-graduate', label: 'Admissions' },
     { id: 'fee', icon: 'fas fa-wallet', label: 'Fee Collection' },
