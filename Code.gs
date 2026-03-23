@@ -489,8 +489,8 @@ function addNewEmployee(f) {
   const empId = "EMP-" + (100 + uSheet.getLastRow());
   uSheet.appendRow([f.username, f.password, "employee", f.branch, empId]);
   
-  const eSheet = ensureSheet("Employee", ["Timestamp", "ID", "Name", "Role", "Mobile", "Salary"]);
-  eSheet.appendRow([new Date(), empId, f.name, f.role, f.mobile, f.salary]);
+  const eSheet = ensureSheet("Employee", ["Timestamp", "ID", "Name", "Role", "Mobile", "Salary", "Branch"]);
+  eSheet.appendRow([new Date(), empId, f.name, f.role, f.mobile, f.salary, f.branch || ""]);
   
   return { success: true };
 }
