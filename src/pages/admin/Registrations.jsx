@@ -1,10 +1,12 @@
 /**
  * Registrations — Admin student registration list.
  *
- * Registration Data sheet column mapping (r[0]=rowIndex):
- *  r[1]=SrNo  r[2]=InqNo  r[3]=StudId  r[4]=DateOfReg  r[5]=Status
- *  r[6]=Name  r[7]=Mobile  r[8]=Village  r[9]=Branch  r[10]=Course
- *  r[11]=AadharNo  r[12]=Photo
+ * Registration Data sheet column mapping (after r[0] = rowIndex overlay):
+ *  Sheet cols: [ID, InqId, StudID, Date, Status, Name, Mobile, Village, Branch, Course, Aadhar, Photo, DOB, MotherName]
+ *  r[0]=RowNum(overlaid from ID col)
+ *  r[1]=InqId   r[2]=StudID  r[3]=Date     r[4]=Status  r[5]=Name
+ *  r[6]=Mobile  r[7]=Village r[8]=Branch   r[9]=Course  r[10]=Aadhar
+ *  r[11]=Photo  r[12]=DOB    r[13]=MotherName
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -30,7 +32,7 @@ export default function Registrations({ adminData, user, onReload }) {
         { key: 'name', label: 'Name' },
         ...(showBranchCol ? [{ key: 'branch', label: 'Branch' }] : []),
         { key: 'course', label: 'Course' },
-        { key: 'date', label: 'Date' },
+        { key: 'date', label: 'Reg. Date' },
         { key: 'action', label: 'Actions' },
     ];
 
@@ -46,21 +48,24 @@ export default function Registrations({ adminData, user, onReload }) {
     const years = useMemo(() => {
         const s = new Set();
         registrations.forEach(r => {
-            const d = String(r[4] || '');
-            const yr = d.split('-')[0] || d.split('/')[2];
-            if (yr && yr.length === 4) s.add(yr);
+            const raw = r[3]; // r[3] = Date
+            const d = raw instanceof Date ? raw.toISOString() : String(raw || '');
+            const yr = d.substring(0, 4);
+            if (yr && yr.length === 4 && !isNaN(yr)) s.add(yr);
         });
         return [...s].sort((a, b) => b - a);
     }, [registrations]);
 
     const filtered = useMemo(() => registrations.filter(r => {
-        if (filterBranch && r[9] !== filterBranch) return false;
+        if (filterBranch && r[8] !== filterBranch) return false; // r[8] = Branch
         if (filterMonth || filterYear) {
-            const d = String(r[4] || '');
+            const raw = r[3]; // r[3] = Date
+            const d = raw instanceof Date ? raw.toISOString() : String(raw || '');
             if (filterYear && !d.includes(filterYear)) return false;
             if (filterMonth) {
                 const mi = MONTHS.indexOf(filterMonth);
                 const p = String(mi + 1).padStart(2, '0');
+                // ISO format: YYYY-MM-DD; also handle dd-MM-yyyy
                 if (!d.includes('-' + p + '-') && !d.includes('/' + p + '/') && !d.includes('-' + p)) return false;
             }
         }
@@ -161,12 +166,12 @@ export default function Registrations({ adminData, user, onReload }) {
     const openEdit = (r) => {
         setEditId(r[0]);   // row index for updateRegistration
         setEditForm({
-            name: r[6] || '',
-            mobile: r[7] || '',
-            aadhar: r[11] || '',
-            dob: r[12] || '',  // r[12] = DOB (M column), not r[4] which is Date of Registration
-            course: r[10] || '',
-            branch: r[9] || '',
+            name: r[5] || '',      // r[5]  = Name
+            mobile: r[6] || '',    // r[6]  = Mobile
+            aadhar: r[10] || '',   // r[10] = Aadhar
+            dob: r[12] || '',      // r[12] = DOB
+            course: r[9] || '',    // r[9]  = Course
+            branch: r[8] || '',    // r[8]  = Branch
         });
         setShowEditModal(true);
     };
@@ -188,15 +193,31 @@ export default function Registrations({ adminData, user, onReload }) {
         setDeleting(false);
     };
 
+    // Format date helper — handles ISO strings, Date objects, and dd-MM-yyyy strings
+    const fmtDate = (raw) => {
+        if (!raw) return '';
+        if (raw instanceof Date) {
+            const d = raw;
+            return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+        }
+        const s = String(raw);
+        // ISO format: 2026-03-31T...
+        if (s.includes('T') && s.length > 10) {
+            const d = new Date(s);
+            if (!isNaN(d)) return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+        }
+        return s; // already formatted (dd-MM-yyyy)
+    };
+
     // Export
     const doExportCsv = () => {
         const headers = ['#', 'Student ID', 'Name', 'Mobile', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Aadhar', 'Date'];
-        const rows = filtered.map((r, i) => [i + 1, r[3], r[6], r[7], ...(showBranchCol ? [r[9]] : []), r[8], r[10], r[11], r[4]]);
+        const rows = filtered.map((r, i) => [i + 1, r[2], r[5], r[6], ...(showBranchCol ? [r[8]] : []), r[7], r[9], r[10], fmtDate(r[3])]);
         exportCsv('Registrations_' + new Date().toISOString().slice(0, 10), headers, rows);
     };
     const doExportPdf = () => {
         const headers = ['#', 'Student ID', 'Name', ...(showBranchCol ? ['Branch'] : []), 'Course', 'Date'];
-        const rows = filtered.map((r, i) => [i + 1, r[3], r[6], ...(showBranchCol ? [r[9]] : []), r[10], r[4]]);
+        const rows = filtered.map((r, i) => [i + 1, r[2], r[5], ...(showBranchCol ? [r[8]] : []), r[9], fmtDate(r[3])]);
         exportPdf('Registrations Report', headers, rows);
     };
 
@@ -240,19 +261,22 @@ export default function Registrations({ adminData, user, onReload }) {
                 columns={COLUMNS}
                 data={filtered}
                 renderRow={(r, i) => {
-                    const photo = r[12] && r[12].length > 10 ? r[12] : null;
+                    // Correct indices: r[2]=StudID, r[3]=Date, r[4]=Status
+                    // r[5]=Name, r[6]=Mobile, r[7]=Village, r[8]=Branch
+                    // r[9]=Course, r[10]=Aadhar, r[11]=Photo, r[12]=DOB
+                    const photo = r[11] && String(r[11]).length > 10 ? r[11] : null;
                     const img = photo
                         ? <img src={photo} className="w-8 h-8 rounded-full border object-cover transform transition-all duration-200 hover:scale-[3] hover:z-50 relative shadow-sm" alt="" style={{ transformOrigin: 'left center' }} />
-                        : <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">{String(r[6] || '--').substring(0, 2).toUpperCase()}</div>;
+                        : <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">{String(r[5] || '--').substring(0, 2).toUpperCase()}</div>;
                     return (
                         <tr key={i} className="t-row">
                             <td className="font-mono text-sm opacity-50">{i + 1}</td>
                             <td>{img}</td>
-                            <td className="font-mono text-xs">{r[3]}</td>
-                            <td className="font-bold">{r[6]}</td>
-                            {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[9]}</span></td>}
-                            <td>{r[10]}</td>
-                            <td className="text-xs opacity-60">{r[4]}</td>
+                            <td className="font-mono text-xs">{r[2]}</td>
+                            <td className="font-bold">{r[5]}</td>
+                            {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[8]}</span></td>}
+                            <td>{r[9]}</td>
+                            <td className="text-xs opacity-60">{fmtDate(r[3])}</td>
                             <td>
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => openEdit(r)} title="Edit"
@@ -260,12 +284,12 @@ export default function Registrations({ adminData, user, onReload }) {
                                         <Edit size={16} />
                                     </button>
                                     {isAdmin && (
-                                        <button onClick={() => setConfirmDelete({ id: r[3], name: r[6] })} title="Delete"
+                                        <button onClick={() => setConfirmDelete({ id: r[2], name: r[5] })} title="Delete"
                                             className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors">
                                             <Trash2 size={16} />
                                         </button>
                                     )}
-                                    <button className="btn py-1 px-3 text-xs ml-2" onClick={() => openAdmitModal(r[3], r[6])}>Admit</button>
+                                    <button className="btn py-1 px-3 text-xs ml-2" onClick={() => openAdmitModal(r[2], r[5])}>Admit</button>
                                 </div>
                             </td>
                         </tr>

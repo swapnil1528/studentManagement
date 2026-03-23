@@ -2,25 +2,24 @@
  * Inquiries — Admin inquiry management page.
  *
  * Sheet column mapping (after r[0] = rowIndex overlay):
- *  r[0]  = Row Index (internal, overlaid by frontend)
- *  r[1]  = A = ID (SrNo)
- *  r[2]  = B = Date
- *  r[3]  = C = Branch
- *  r[4]  = D = Name
- *  r[5]  = E = Mobile
- *  r[6]  = F = Village
- *  r[7]  = G = Course
- *  r[8]  = H = Status
- *  r[9]  = I = Remark
- *  r[10] = J = Education
- *  r[11] = K = Gender
- *  r[12] = L = Medium
- *  r[13] = M = Board
- *  r[14] = N = Stream
- *  r[15] = O = Reception
- *  r[16] = P = Parent Mobile
- *  r[17] = Q = Batch Timing
- *  r[18] = R = Mother Name  (new column)
+ *  r[0]  = Row Index (overlaid, replaces Col A=ID)
+ *  r[1]  = B = Date
+ *  r[2]  = C = Branch
+ *  r[3]  = D = Name
+ *  r[4]  = E = Mobile
+ *  r[5]  = F = Village
+ *  r[6]  = G = Course
+ *  r[7]  = H = Status
+ *  r[8]  = I = Remark
+ *  r[9]  = J = Education
+ *  r[10] = K = Gender
+ *  r[11] = L = Medium
+ *  r[12] = M = Board
+ *  r[13] = N = Stream
+ *  r[14] = O = Reception
+ *  r[15] = P = Parent Mobile
+ *  r[16] = Q = Batch Timing
+ *  r[17] = R = Mother Name  (new column)
  */
 
 import { useState, useMemo, useRef } from 'react';
@@ -90,7 +89,7 @@ export default function Inquiries({ adminData, user, onReload }) {
     const years = useMemo(() => {
         const yearSet = new Set();
         inquiries.forEach(r => {
-            const d = r[2]; // Date column
+            const d = r[1]; // r[1] = Date
             if (d) { const yr = String(d).split('-')[0] || String(d).split('/')[2]; if (yr && yr.length === 4) yearSet.add(yr); }
         });
         return [...yearSet].sort((a, b) => b - a);
@@ -99,10 +98,10 @@ export default function Inquiries({ adminData, user, onReload }) {
     // Filtered data
     const filtered = useMemo(() => {
         return inquiries.filter(r => {
-            if (filterBranch && r[3] !== filterBranch) return false;
-            if (filterStatus && r[8] !== filterStatus) return false;
+            if (filterBranch && r[2] !== filterBranch) return false;  // r[2] = Branch
+            if (filterStatus && r[7] !== filterStatus) return false;  // r[7] = Status
             if (filterMonth || filterYear) {
-                const d = String(r[2] || '');
+                const d = String(r[1] || '');  // r[1] = Date
                 if (filterYear && !d.includes(filterYear)) return false;
                 if (filterMonth) {
                     const monthIdx = MONTHS.indexOf(filterMonth);
@@ -144,13 +143,13 @@ export default function Inquiries({ adminData, user, onReload }) {
     });
 
     const openPrint = (r) => {
-        const branch = fixedBranch || r[3];
+        const branch = fixedBranch || r[2];  // r[2] = Branch
         const fd = getFranchiseData(branch);
         setPrintInquiry({
-            name: r[4], mobile: r[5], parentMobile: r[16], motherName: r[18] || '',
-            village: r[6], course: r[7], status: r[8], remark: r[9],
-            edu: r[10], gender: r[11], medium: r[12], board: r[13],
-            stream: r[14], batch: r[17], date: r[2], branch,
+            name: r[3], mobile: r[4], parentMobile: r[15], motherName: r[17] || '',
+            village: r[5], course: r[6], status: r[7], remark: r[8],
+            edu: r[9], gender: r[10], medium: r[11], board: r[12],
+            stream: r[13], batch: r[16], date: r[1], branch,
             franchiseData: fd || { centerName: 'Institute', address: '', mobile: '' },
         });
         setTimeout(() => handlePrint(), 100);
@@ -163,21 +162,21 @@ export default function Inquiries({ adminData, user, onReload }) {
     const openEdit = (r) => {
         setEditId(r[0]);
         setForm({
-            name: r[4] || '',
-            mobile: r[5] || '',
-            village: r[6] || '',
-            course: r[7] || '',
-            status: r[8] || 'New',
-            remark: r[9] || '',
-            edu: r[10] || '',
-            gender: r[11] || 'Male',
-            medium: r[12] || 'English',
-            board: r[13] || 'State',
-            stream: r[14] || 'Arts',
-            parentMobile: r[16] || '',
-            batch: r[17] || '',
-            motherName: r[18] || '',
-            branch: fixedBranch || r[3] || '',
+            name: r[3] || '',         // r[3]  = Name
+            mobile: r[4] || '',       // r[4]  = Mobile
+            village: r[5] || '',      // r[5]  = Village
+            course: r[6] || '',       // r[6]  = Course
+            status: r[7] || 'New',    // r[7]  = Status
+            remark: r[8] || '',       // r[8]  = Remark
+            edu: r[9] || '',          // r[9]  = Education
+            gender: r[10] || 'Male',  // r[10] = Gender
+            medium: r[11] || 'English', // r[11] = Medium
+            board: r[12] || 'State',  // r[12] = Board
+            stream: r[13] || 'Arts',  // r[13] = Stream
+            parentMobile: r[15] || '', // r[15] = Parent Mobile
+            batch: r[16] || '',       // r[16] = Batch Timing
+            motherName: r[17] || '',  // r[17] = Mother Name
+            branch: fixedBranch || r[2] || '', // r[2] = Branch
         });
         setShowModal(true);
     };
@@ -229,8 +228,8 @@ export default function Inquiries({ adminData, user, onReload }) {
     const doExportCsv = () => {
         const headers = ['#', 'Date', 'Name', 'Mobile', 'Parent Mobile', 'Mother Name', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Batch', 'Status', 'Education', 'Gender', 'Remark'];
         const rows = filtered.map((r, i) => [
-            i + 1, r[2], r[4], r[5], r[16], r[18] || '', ...(showBranchCol ? [r[3]] : []),
-            r[6], r[7], r[17], r[8], r[10], r[11], r[9]
+            i + 1, r[1], r[3], r[4], r[15], r[17] || '', ...(showBranchCol ? [r[2]] : []),
+            r[5], r[6], r[16], r[7], r[9], r[10], r[8]
         ]);
         exportCsv('Inquiries_' + new Date().toISOString().slice(0, 10), headers, rows);
     };
@@ -238,8 +237,8 @@ export default function Inquiries({ adminData, user, onReload }) {
     const doExportPdf = () => {
         const headers = ['#', 'Date', 'Name', 'Mobile', ...(showBranchCol ? ['Branch'] : []), 'Village', 'Course', 'Status'];
         const rows = filtered.map((r, i) => [
-            i + 1, r[2], r[4], r[5], ...(showBranchCol ? [r[3]] : []),
-            r[6], r[7], r[8]
+            i + 1, r[1], r[3], r[4], ...(showBranchCol ? [r[2]] : []),
+            r[5], r[6], r[7]
         ]);
         exportPdf('Inquiries Report', headers, rows);
     };
@@ -298,13 +297,13 @@ export default function Inquiries({ adminData, user, onReload }) {
                 renderRow={(r, i) => (
                     <tr key={i} className="t-row">
                         <td className="font-mono text-sm opacity-50">{i + 1}</td>
-                        <td className="text-xs opacity-60 whitespace-nowrap">{r[2]}</td>
-                        <td><div className="font-bold">{r[4]}</div></td>
+                        <td className="text-xs opacity-60 whitespace-nowrap">{r[1]}</td>
+                        <td><div className="font-bold">{r[3]}</div></td>
+                        <td>{r[4]}</td>
+                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[2]}</span></td>}
                         <td>{r[5]}</td>
-                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[3]}</span></td>}
                         <td>{r[6]}</td>
-                        <td>{r[7]}</td>
-                        <td><Badge text={r[8] || 'New'} variant={getStatusVariant(r[8])} /></td>
+                        <td><Badge text={r[7] || 'New'} variant={getStatusVariant(r[7])} /></td>
                         <td>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => openEdit(r)} title="Edit"
@@ -316,12 +315,12 @@ export default function Inquiries({ adminData, user, onReload }) {
                                     <Printer size={16} />
                                 </button>
                                 {isAdmin && (
-                                    <button onClick={() => setConfirmDelete({ id: r[0], name: r[4] })} title="Delete"
+                                    <button onClick={() => setConfirmDelete({ id: r[0], name: r[3] })} title="Delete"
                                         className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors">
                                         <Trash2 size={16} />
                                     </button>
                                 )}
-                                {r[8] !== 'Confirmed' && (
+                                {r[7] !== 'Confirmed' && (
                                     <button onClick={() => openRegModal(r[0])} className="btn py-1 px-3 text-xs">Register</button>
                                 )}
                             </div>
