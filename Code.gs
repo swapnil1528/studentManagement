@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Student Management System — Google Apps Script Backend
 // ============================================
 // Face detection & location checking REMOVED from attendance.
@@ -1212,35 +1212,70 @@ function sendWhatsApp(mobile, message) {
   } catch(e) { Logger.log('WA error: ' + e.message); }
 }
 
+// Helper: parse a date value from the sheet (handles Date object or dd-MM-yyyy / yyyy-MM-dd strings)
+function parseSheetDate(d) {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  var s = String(d).trim();
+  var m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m) return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
+  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m2) return new Date(parseInt(m2[1]), parseInt(m2[2])-1, parseInt(m2[3]));
+  var fallback = new Date(s);
+  return isNaN(fallback) ? null : fallback;
+}
+
 function sendInquiryReport(from, to, label) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName('Inquiries');
   if (!sheet) return;
   var rows = sheet.getDataRange().getValues().slice(1);
-  var fromMs = new Date(from).setHours(0,0,0,0);
-  var toMs   = new Date(to).setHours(23,59,59,999);
+  var fromDate = new Date(from); fromDate.setHours(0,0,0,0);
+  var toDate   = new Date(to);   toDate.setHours(23,59,59,999);
   var filtered = rows.filter(function(r) {
-    var d = r[1];
-    var ms = (d instanceof Date) ? d.getTime() : new Date(d).getTime();
-    return ms >= fromMs && ms <= toMs;
+    var d = parseSheetDate(r[1]);
+    return d && d >= fromDate && d <= toDate;
   });
   var today = Utilities.formatDate(new Date(), 'GMT+5:30', 'dd-MM-yyyy');
-  var header = '📋 *' + label + ' Inquiry Report*\n📅 ' + today + '\nTotal: *' + filtered.length + ' inquiries*\n\n';
-  var lines = filtered.map(function(r, i) {
-    var date = (r[1] instanceof Date) ? Utilities.formatDate(r[1], 'GMT+5:30', 'dd-MM') : String(r[1]).substring(0,10);
-    return (i+1) + '. ' + (r[3]||'—') + ' | ' + (r[4]||'—') + ' | ' + (r[6]||'—') + ' | ' + (r[2]||'—') + ' | ' + date;
-  }).join('\n');
-  sendWhatsApp(REPORT_MOBILE, header + (lines || 'No inquiries found.'));
-  var html = '<h2>' + label + ' Inquiry Report — ' + today + '</h2>'
-    + '<p><strong>Total: ' + filtered.length + '</strong></p>'
-    + '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif">'
-    + '<tr style="background:#4f46e5;color:#fff"><th>#</th><th>Name</th><th>Mobile</th><th>Course</th><th>Branch</th><th>Date</th></tr>'
-    + filtered.map(function(r,i){
-        var d=(r[1] instanceof Date)?Utilities.formatDate(r[1],'GMT+5:30','dd-MM-yyyy'):String(r[1]).substring(0,10);
-        return '<tr><td>'+(i+1)+'</td><td>'+(r[3]||'')+'</td><td>'+(r[4]||'')+'</td><td>'+(r[6]||'')+'</td><td>'+(r[2]||'')+'</td><td>'+d+'</td></tr>';
-      }).join('')
-    + '</table>';
-  MailApp.sendEmail({ to: REPORT_EMAIL, subject: label + ' Inquiry Report — Durge Computer Classes', htmlBody: html });
+  // Group by branch
+  var branches = {};
+  filtered.forEach(function(r) {
+    var b = String(r[2] || 'Unknown').trim();
+    if (!branches[b]) branches[b] = [];
+    branches[b].push(r);
+  });
+  var branchNames = Object.keys(branches).sort();
+  // WhatsApp
+  var waMsg = 'Inquiry Report (' + label + ')\nDate: ' + today + '\nTotal: ' + filtered.length + ' inquiries\n';
+  branchNames.forEach(function(b) {
+    var list = branches[b];
+    waMsg += '\n[' + b + '] - ' + list.length + ' inquiries\n';
+    list.forEach(function(r, i) {
+      var date = (r[1] instanceof Date) ? Utilities.formatDate(r[1],'GMT+5:30','dd-MM') : String(r[1]).substring(0,10);
+      waMsg += (i+1) + '. ' + (r[3]||'-') + ' | ' + (r[4]||'-') + ' | ' + (r[6]||'-') + ' | ' + date + '\n';
+    });
+  });
+  if (filtered.length === 0) waMsg += '\nNo inquiries found for this period.';
+  sendWhatsApp(REPORT_MOBILE, waMsg);
+  // Email
+  var html = '<h2 style="font-family:sans-serif">' + label + ' Inquiry Report - ' + today + '</h2>'
+    + '<p style="font-family:sans-serif"><strong>Total: ' + filtered.length + ' inquiries</strong></p>';
+  if (filtered.length === 0) {
+    html += '<p style="color:#888;font-family:sans-serif">No inquiries found for this period.</p>';
+  } else {
+    branchNames.forEach(function(b) {
+      var list = branches[b];
+      html += '<h3 style="font-family:sans-serif;color:#4f46e5">' + b + ' (' + list.length + ')</h3>'
+        + '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;margin-bottom:16px">'
+        + '<tr style="background:#4f46e5;color:#fff"><th>#</th><th>Name</th><th>Mobile</th><th>Course</th><th>Date</th></tr>'
+        + list.map(function(r,i){
+            var d=(r[1] instanceof Date)?Utilities.formatDate(r[1],'GMT+5:30','dd-MM-yyyy'):String(r[1]).substring(0,10);
+            return '<tr><td>'+(i+1)+'</td><td>'+(r[3]||'')+'</td><td>'+(r[4]||'')+'</td><td>'+(r[6]||'')+'</td><td>'+d+'</td></tr>';
+          }).join('')
+        + '</table>';
+    });
+  }
+  MailApp.sendEmail({ to: REPORT_EMAIL, subject: label + ' Inquiry Report - Durge Computer Classes - ' + today, htmlBody: html });
 }
 
 function sendEmployeeAttendanceReport() {
