@@ -651,7 +651,6 @@ function registerStudent(f) {
   const rs = ensureSheet("Registration Data", ["ID", "InqId", "StudID", "Date", "Status", "Name", "Mobile", "Village", "Branch", "Course", "Aadhar", "Photo", "DOB", "Mother Name"]);
   const existingRegs = rs.getDataRange().getValues();
   const alreadyRegistered = existingRegs.slice(1).find(r => 
-    String(r[1]) == String(f.inquiryId) || // same InqId
     (String(r[5]).toLowerCase().trim() === String(inq[3]).toLowerCase().trim() && // same name
      String(r[6]).trim() === String(inq[4]).trim()) // same mobile
   );
@@ -660,7 +659,8 @@ function registerStudent(f) {
   const photoUrl = saveImage(f.photo, "ST_" + f.inquiryId);
   const sid = "ST-2026-" + (1000 + rs.getLastRow());
   // inq cols (0-indexed): [0]=ID, [1]=Date, [2]=Branch, [3]=Name, [4]=Mobile, [5]=Village, [6]=Course, ..., [17]=MotherName
-  rs.appendRow([rs.getLastRow(), f.inquiryId, sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob, inq[17] || ""]);
+  // We save inq[0] (stable Col A ID from Inquiries config) instead of f.inquiryId (unstable row index) to Registration Data
+  rs.appendRow([rs.getLastRow(), inq[0], sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob, inq[17] || ""]);
   
   // Mark inquiry as Confirmed
   const inqSheet = ss.getSheetByName("Inquiries");
