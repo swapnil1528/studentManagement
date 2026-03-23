@@ -10,26 +10,28 @@
 export default function DataTable({ columns, data, renderRow, emptyText = 'No Data' }) {
     return (
         <div className="card p-0 overflow-hidden">
-            <table className="w-full text-left">
-                <thead className="t-head">
-                    <tr>
-                        {columns.map((col) => (
-                            <th key={col.key}>{col.label}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {data && data.length > 0 ? (
-                        data.map((row, i) => renderRow(row, i))
-                    ) : (
+            <div className="overflow-x-auto w-full">
+                <table className="w-full text-left">
+                    <thead className="t-head">
                         <tr>
-                            <td colSpan={columns.length} className="p-4 text-center text-gray-400">
-                                {emptyText}
-                            </td>
+                            {columns.map((col) => (
+                                <th key={col.key} className="whitespace-nowrap px-4 py-3">{col.label}</th>
+                            ))}
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {data && data.length > 0 ? (
+                            data.map((row, i) => renderRow(row, i))
+                        ) : (
+                            <tr>
+                                <td colSpan={columns.length} className="p-4 text-center text-gray-400">
+                                    {emptyText}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

@@ -639,9 +639,12 @@ function deleteAdmission(rowNum) {
 function registerStudent(f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   
-  // Find inquiry row — r[0] is the row-index ID stored in col A
+  // Find inquiry row — f.inquiryId is the row-index (e.g. 18 for row 18)
   const allInqData = ss.getSheetByName("Inquiries").getDataRange().getValues();
-  const inq = allInqData.find(r => String(r[0]) == String(f.inquiryId));
+  const rowIndex = parseInt(f.inquiryId);
+  if (isNaN(rowIndex) || rowIndex < 2 || rowIndex > allInqData.length) return { success: false, error: "Invalid inquiry row: " + f.inquiryId };
+  
+  const inq = allInqData[rowIndex - 1];
   if (!inq) return { success: false, error: "Inquiry not found" };
   
   // ── Duplicate prevention: check if this inquiry was already registered ──
@@ -661,9 +664,7 @@ function registerStudent(f) {
   
   // Mark inquiry as Confirmed
   const inqSheet = ss.getSheetByName("Inquiries");
-  for (let i = 0; i < allInqData.length; i++) {
-    if (String(allInqData[i][0]) == String(f.inquiryId)) { inqSheet.getRange(i + 1, 8).setValue("Confirmed"); break; }
-  }
+  inqSheet.getRange(rowIndex, 8).setValue("Confirmed");
   return { success: true };
 }
 

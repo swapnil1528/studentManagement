@@ -317,10 +317,10 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <tr key={i} className="t-row">
                         <td className="font-mono text-sm opacity-50">{i + 1}</td>
                         <td className="text-xs opacity-60 whitespace-nowrap">{fmtDate(r[1])}</td>
-                        <td><div className="font-bold">{r[3]}</div></td>
-                        <td>{r[4]}</td>
-                        <td>{r[15] || '—'}</td>
-                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold">{r[2]}</span></td>}
+                        <td className="whitespace-nowrap"><div className="font-bold">{r[3]}</div></td>
+                        <td className="whitespace-nowrap">{r[4]}</td>
+                        <td className="whitespace-nowrap">{r[15] || '—'}</td>
+                        {showBranchCol && <td><span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 font-semibold whitespace-nowrap">{r[2]}</span></td>}
                         <td>{r[5]}</td>
                         <td>{r[6]}</td>
                         <td><Badge text={r[7] || 'New'} variant={getStatusVariant(r[7])} /></td>
