@@ -102,6 +102,7 @@ function RootRedirect() {
 
   if (user?.role === 'student') return <Navigate to="/student" replace />;
   if (user?.role === 'employee') return <Navigate to="/employee" replace />;
+  // admin and teacher both go to /admin
   return <Navigate to="/admin" replace />;
 }
 
@@ -121,7 +122,7 @@ export default function App() {
           <Route
             path="/admin/*"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'employee']}>
+              <ProtectedRoute allowedRoles={['admin', 'employee', 'teacher']}>
                 <AdminPage />
               </ProtectedRoute>
             }

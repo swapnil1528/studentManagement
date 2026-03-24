@@ -120,6 +120,7 @@ export function AuthProvider({ children }) {
         logout,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'admin',
+        isTeacher: user?.role === 'teacher',
         isStudent: user?.role === 'student',
         isEmployee: user?.role === 'employee',
     };

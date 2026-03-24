@@ -658,7 +658,9 @@ function registerStudent(f) {
   if (alreadyRegistered) return { success: false, error: "Student '" + inq[3] + "' is already registered (ID: " + alreadyRegistered[2] + ")" };
   
   const photoUrl = saveImage(f.photo, "ST_" + f.inquiryId);
-  const sid = "ST-2026-" + (1000 + rs.getLastRow());
+  const year = new Date().getFullYear();
+  const seqReg = String(rs.getLastRow()).padStart(3, '0');
+  const sid = 'DCC/REG/' + year + '/' + seqReg;
   // inq cols (0-indexed): [0]=ID, [1]=Date, [2]=Branch, [3]=Name, [4]=Mobile, [5]=Village, [6]=Course, ..., [17]=MotherName
   // We save inq[0] (stable Col A ID from Inquiries config) instead of f.inquiryId (unstable row index) to Registration Data
   rs.appendRow([rs.getLastRow(), inq[0], sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob, inq[17] || ""]);
@@ -674,13 +676,19 @@ function saveCourseAdmission(f) {
   const s = ss.getSheetByName("Registration Data").getDataRange().getValues().find(r => r[2] == f.admStudId);
   if (!s) return { error: "Student not found in Registration Data" };
   // Registration Data cols: [0]=ID,[1]=InqId,[2]=StudID,[3]=Date,[4]=Status,[5]=Name,[6]=Mobile,[7]=Village,[8]=Branch,[9]=Course,[10]=Aadhar,[11]=Photo,[12]=DOB,[13]=MotherName
-  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name"]);
-  as.appendRow([as.getLastRow(), "ADM-" + as.getLastRow(), f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || ""]);
+  const year = new Date().getFullYear();
+  const seqAdm = String(as.getLastRow()).padStart(3, '0');
+  const admNo = 'DCC/ADM/' + year + '/' + seqAdm;
+  as.appendRow([as.getLastRow(), admNo, f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || ""]);
   return { success: true };
 }
 
 function saveFeeCollection(f) {
-  ensureSheet("FEE MANAGEMENT", ["RecNo", "Date", "StudID", "Name", "Course", "Amount", "Balance", "Mode", "Collector", "Rem"]).appendRow(["REC-" + Date.now(), Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.studId, f.name, f.course, f.amount, 0, f.mode, f.collector, ""]);
+  const feeSheet = ensureSheet("FEE MANAGEMENT", ["RecNo", "Date", "StudID", "Name", "Course", "Amount", "Balance", "Mode", "Collector", "Rem"]);
+  const yr = new Date().getFullYear();
+  const seqFee = String(feeSheet.getLastRow()).padStart(3, '0');
+  const recNo = 'DCC/REC/' + yr + '/' + seqFee;
+  feeSheet.appendRow([recNo, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.studId, f.name, f.course, f.amount, 0, f.mode, f.collector, ""]);
   return { success: true };
 }
 
