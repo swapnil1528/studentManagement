@@ -637,6 +637,28 @@ function deleteAdmission(rowNum) {
   return { success: true };
 }
 
+// Helper to safely get the next ID sequence from a specific column in a sheet
+function getNextSequenceId(sheet, idColIndex, prefix) {
+  var data = sheet.getDataRange().getValues();
+  var maxSeq = 0;
+  for (var i = 1; i < data.length; i++) {
+    var val = String(data[i][idColIndex] || '');
+    if (val.startsWith(prefix)) {
+      var parts = val.split('/');
+      if (parts.length > 0) {
+        var num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
+  }
+  if (maxSeq === 0) {
+    maxSeq = sheet.getLastRow() > 1 ? sheet.getLastRow() - 1 : 0;
+  }
+  return prefix + String(maxSeq + 1).padStart(3, '0');
+}
+
 function registerStudent(f) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   
@@ -659,8 +681,8 @@ function registerStudent(f) {
   
   const photoUrl = saveImage(f.photo, "ST_" + f.inquiryId);
   const year = new Date().getFullYear();
-  const seqReg = String(rs.getLastRow()).padStart(3, '0');
-  const sid = 'DCC/REG/' + year + '/' + seqReg;
+  const prefix = 'DCC/REG/' + year + '/';
+  const sid = getNextSequenceId(rs, 2, prefix); // StudID is in col index 2
   // inq cols (0-indexed): [0]=ID, [1]=Date, [2]=Branch, [3]=Name, [4]=Mobile, [5]=Village, [6]=Course, ..., [17]=MotherName
   // We save inq[0] (stable Col A ID from Inquiries config) instead of f.inquiryId (unstable row index) to Registration Data
   rs.appendRow([rs.getLastRow(), inq[0], sid, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), "Enrolled", inq[3], inq[4], inq[5], inq[2], inq[6], f.aadhar, photoUrl, f.dob, inq[17] || ""]);
@@ -678,8 +700,8 @@ function saveCourseAdmission(f) {
   // Registration Data cols: [0]=ID,[1]=InqId,[2]=StudID,[3]=Date,[4]=Status,[5]=Name,[6]=Mobile,[7]=Village,[8]=Branch,[9]=Course,[10]=Aadhar,[11]=Photo,[12]=DOB,[13]=MotherName
   const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name"]);
   const year = new Date().getFullYear();
-  const seqAdm = String(as.getLastRow()).padStart(3, '0');
-  const admNo = 'DCC/ADM/' + year + '/' + seqAdm;
+  const prefix = 'DCC/ADM/' + year + '/';
+  const admNo = getNextSequenceId(as, 1, prefix); // AdmNo is in col index 1
   as.appendRow([as.getLastRow(), admNo, f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || ""]);
   return { success: true };
 }
@@ -687,8 +709,8 @@ function saveCourseAdmission(f) {
 function saveFeeCollection(f) {
   const feeSheet = ensureSheet("FEE MANAGEMENT", ["RecNo", "Date", "StudID", "Name", "Course", "Amount", "Balance", "Mode", "Collector", "Rem"]);
   const yr = new Date().getFullYear();
-  const seqFee = String(feeSheet.getLastRow()).padStart(3, '0');
-  const recNo = 'DCC/REC/' + yr + '/' + seqFee;
+  const prefix = 'DCC/REC/' + yr + '/';
+  const recNo = getNextSequenceId(feeSheet, 0, prefix); // RecNo is in col index 0
   feeSheet.appendRow([recNo, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.studId, f.name, f.course, f.amount, 0, f.mode, f.collector, ""]);
   return { success: true };
 }
