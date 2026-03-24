@@ -22,7 +22,7 @@
  *  r[17] = R = Mother Name  (new column)
  */
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Edit, Trash2, FileSpreadsheet, FileText, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import DataTable from '../../components/ui/DataTable';
@@ -78,8 +78,21 @@ export default function Inquiries({ adminData, user, onReload }) {
     const [filterMonth, setFilterMonth] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [showConfirmed, setShowConfirmed] = useState(false);
+
+    // Status multi-select logic
+    const [statusOpen, setStatusOpen] = useState(false);
+    const [filterStatuses, setFilterStatuses] = useState(['New', 'Follow Up', 'Postponed', 'Cancelled']);
+    const statusRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (statusRef.current && !statusRef.current.contains(event.target)) {
+                setStatusOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const inquiries = adminData?.inquiries || [];
     const dropdowns = adminData?.dropdowns || {};
@@ -118,8 +131,10 @@ export default function Inquiries({ adminData, user, onReload }) {
     const filtered = useMemo(() => {
         return inquiries.filter(r => {
             if (filterBranch && r[2] !== filterBranch) return false;  // r[2] = Branch
-            if (filterStatus && r[7] !== filterStatus) return false;  // r[7] = Status
-            if (!showConfirmed && r[7] === 'Confirmed') return false; // Hide confirmed by default
+            // If filterStatuses is empty, show nothing (or show all? let's show all if empty, but logic says uncheck to hide so if empty show none. Wait, better yet, just use filterStatuses.includes)
+            if (filterStatuses.length > 0 && !filterStatuses.includes(r[7] || 'New')) return false;
+            if (filterStatuses.length === 0) return false; // if all boxes unchecked, show nothing
+
             if (filterMonth || filterYear) {
                 const d = String(r[1] || '');  // r[1] = Date
                 if (filterYear && !d.includes(filterYear)) return false;
@@ -132,7 +147,7 @@ export default function Inquiries({ adminData, user, onReload }) {
             }
             return true;
         });
-    }, [inquiries, filterBranch, filterStatus, filterMonth, filterYear, showConfirmed]);
+    }, [inquiries, filterBranch, filterStatuses, filterMonth, filterYear]);
 
     const COLUMNS = [
         { key: 'sr', label: '#' },
@@ -264,8 +279,8 @@ export default function Inquiries({ adminData, user, onReload }) {
         exportPdf('Inquiries Report', headers, rows);
     };
 
-    const hasFilters = filterBranch || filterMonth || filterYear || filterStatus || showConfirmed;
-    const clearFilters = () => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); setFilterStatus(''); setShowConfirmed(false); };
+    const hasFilters = filterBranch || filterMonth || filterYear || filterStatuses.length < STATUS_OPTIONS.length;
+    const clearFilters = () => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); setFilterStatuses(['New', 'Follow Up', 'Postponed', 'Cancelled']); };
 
     return (
         <div>
@@ -294,10 +309,38 @@ export default function Inquiries({ adminData, user, onReload }) {
                         {(dropdowns.branches || []).map(b => <option key={b}>{b}</option>)}
                     </select>
                 )}
-                <select className="inp" style={{ width: 130, marginBottom: 0 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="">All Status</option>
-                    {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-                </select>
+
+                {/* Custom Multi-Select Status Dropdown */}
+                <div className="relative" ref={statusRef}>
+                    <button
+                        className="inp text-left bg-white text-sm"
+                        style={{ width: 150, marginBottom: 0, paddingRight: '20px' }}
+                        onClick={() => setStatusOpen(!statusOpen)}
+                    >
+                        {filterStatuses.length === STATUS_OPTIONS.length ? 'All Status' :
+                            filterStatuses.length === 0 ? 'No Status' :
+                                filterStatuses.length + ' Selected'}
+                    </button>
+                    {statusOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
+                            {STATUS_OPTIONS.map(s => (
+                                <label key={s} className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm">
+                                    <input
+                                        type="checkbox"
+                                        className="mr-3 w-4 h-4 text-indigo-600 rounded"
+                                        checked={filterStatuses.includes(s)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) setFilterStatuses(prev => [...prev, s]);
+                                            else setFilterStatuses(prev => prev.filter(st => st !== s));
+                                        }}
+                                    />
+                                    {s}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <select className="inp" style={{ width: 110, marginBottom: 0 }} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
                     <option value="">All Months</option>
                     {MONTHS.map(m => <option key={m}>{m}</option>)}
@@ -306,13 +349,8 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <option value="">All Years</option>
                     {years.map(y => <option key={y}>{y}</option>)}
                 </select>
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        checked={showConfirmed} onChange={e => setShowConfirmed(e.target.checked)} />
-                    Show Confirmed
-                </label>
                 {hasFilters && (
-                    <button onClick={clearFilters} className="text-xs text-indigo-600 underline font-semibold">Clear</button>
+                    <button onClick={clearFilters} className="text-xs text-indigo-600 underline font-semibold mt-1">Clear</button>
                 )}
                 <span className="text-xs opacity-40 ml-auto">{filtered.length} of {inquiries.length} records</span>
             </div>
