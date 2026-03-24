@@ -301,7 +301,7 @@ export default function Inquiries({ adminData, user, onReload }) {
             </div>
 
             {/* Filters — always visible */}
-            <div className="card mb-4 flex gap-3 flex-wrap items-center p-3">
+            <div className="card mb-4 flex gap-3 flex-wrap items-center p-3 relative z-20">
                 <span className="text-xs font-bold opacity-50">Filter:</span>
                 {showBranchCol && (
                     <select className="inp" style={{ width: 160, marginBottom: 0 }} value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
