@@ -676,6 +676,7 @@ function saveCourseAdmission(f) {
   const s = ss.getSheetByName("Registration Data").getDataRange().getValues().find(r => r[2] == f.admStudId);
   if (!s) return { error: "Student not found in Registration Data" };
   // Registration Data cols: [0]=ID,[1]=InqId,[2]=StudID,[3]=Date,[4]=Status,[5]=Name,[6]=Mobile,[7]=Village,[8]=Branch,[9]=Course,[10]=Aadhar,[11]=Photo,[12]=DOB,[13]=MotherName
+  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name"]);
   const year = new Date().getFullYear();
   const seqAdm = String(as.getLastRow()).padStart(3, '0');
   const admNo = 'DCC/ADM/' + year + '/' + seqAdm;
