@@ -306,6 +306,11 @@ export default function Inquiries({ adminData, user, onReload }) {
                     <option value="">All Years</option>
                     {years.map(y => <option key={y}>{y}</option>)}
                 </select>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        checked={showConfirmed} onChange={e => setShowConfirmed(e.target.checked)} />
+                    Show Confirmed
+                </label>
                 {hasFilters && (
                     <button onClick={clearFilters} className="text-xs text-indigo-600 underline font-semibold">Clear</button>
                 )}
