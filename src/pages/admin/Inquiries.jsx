@@ -79,6 +79,7 @@ export default function Inquiries({ adminData, user, onReload }) {
     const [filterYear, setFilterYear] = useState('');
     const [filterBranch, setFilterBranch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
+    const [showConfirmed, setShowConfirmed] = useState(false);
 
     const inquiries = adminData?.inquiries || [];
     const dropdowns = adminData?.dropdowns || {};
@@ -118,6 +119,7 @@ export default function Inquiries({ adminData, user, onReload }) {
         return inquiries.filter(r => {
             if (filterBranch && r[2] !== filterBranch) return false;  // r[2] = Branch
             if (filterStatus && r[7] !== filterStatus) return false;  // r[7] = Status
+            if (!showConfirmed && r[7] === 'Confirmed') return false; // Hide confirmed by default
             if (filterMonth || filterYear) {
                 const d = String(r[1] || '');  // r[1] = Date
                 if (filterYear && !d.includes(filterYear)) return false;
@@ -130,7 +132,7 @@ export default function Inquiries({ adminData, user, onReload }) {
             }
             return true;
         });
-    }, [inquiries, filterBranch, filterStatus, filterMonth, filterYear]);
+    }, [inquiries, filterBranch, filterStatus, filterMonth, filterYear, showConfirmed]);
 
     const COLUMNS = [
         { key: 'sr', label: '#' },
@@ -262,8 +264,8 @@ export default function Inquiries({ adminData, user, onReload }) {
         exportPdf('Inquiries Report', headers, rows);
     };
 
-    const hasFilters = filterBranch || filterMonth || filterYear || filterStatus;
-    const clearFilters = () => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); setFilterStatus(''); };
+    const hasFilters = filterBranch || filterMonth || filterYear || filterStatus || showConfirmed;
+    const clearFilters = () => { setFilterBranch(''); setFilterMonth(''); setFilterYear(''); setFilterStatus(''); setShowConfirmed(false); };
 
     return (
         <div>
