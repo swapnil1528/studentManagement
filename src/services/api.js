@@ -207,6 +207,6 @@ export const getQuizzes = (courses) =>
 export const submitQuizResult = (form) =>
     apiCall('submitQuiz', { form });
 
-/** Admin gets all quiz results */
-export const getQuizResults = () =>
-    apiCall('getQuizResults', {});
+/** Get quiz results (optionally filtered by studentId) */
+export const getQuizResults = (studentId = '') =>
+    apiCall('getQuizResults', { studentId });

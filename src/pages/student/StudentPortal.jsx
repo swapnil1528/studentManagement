@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { apiCall, uploadAssignment, getAssignments, getQuizzes, submitQuizResult } from '../../services/api';
+import { apiCall, uploadAssignment, getAssignments, getQuizzes, submitQuizResult, getQuizResults } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -93,10 +93,18 @@ export default function StudentPortal() {
 
     // ── Quiz state ─────────────────────────────────────────────────────────
     const [activeQuiz, setActiveQuiz] = useState(null);     // quiz object being taken
+    const [quizStartTime, setQuizStartTime] = useState(null); // timestamp when quiz attempt starts
     const [quizStep, setQuizStep] = useState(0);             // current question index
     const [quizAnswers, setQuizAnswers] = useState({});      // {qIdx: 'a'|'b'|'c'|'d'}
-    const [quizResult, setQuizResult] = useState(null);      // {score, total}
+    const [quizResult, setQuizResult] = useState(null);      // {score, total, duration}
     const [submittingQuiz, setSubmittingQuiz] = useState(false);
+
+    const { data: myQuizResultsData, refetch: refetchQuizResults } = useQuery({
+        queryKey: ['studentQuizResults', user?.studentId || user?.userId],
+        queryFn: () => getQuizResults(user?.studentId || user?.userId),
+        enabled: !!user,
+    });
+    const myQuizResults = myQuizResultsData?.success ? myQuizResultsData.results : [];
 
     const { data: settings } = useQuery({
         queryKey: ['settings'],
@@ -561,8 +569,15 @@ export default function StudentPortal() {
                                         <div style={{ fontSize: 64, marginBottom: 16 }}>{quizResult.score / quizResult.total >= 0.6 ? '🎉' : quizResult.score / quizResult.total >= 0.4 ? '👍' : '😔'}</div>
                                         <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 8 }}>Quiz Complete!</div>
                                         <div style={{ fontSize: 48, fontWeight: 900, color: '#7c3aed', marginBottom: 4 }}>{quizResult.score}/{quizResult.total}</div>
-                                        <div style={{ fontSize: 16, color: '#94a3b8', marginBottom: 24 }}>{Math.round((quizResult.score / quizResult.total) * 100)}% Score</div>
-                                        <button onClick={() => { setQuizResult(null); setActiveQuiz(null); setQuizAnswers({}); setQuizStep(0); }} style={{ padding: '14px 40px', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Done ✓</button>
+                                        <div style={{ fontSize: 16, color: '#94a3b8', marginBottom: 12 }}>{Math.round((quizResult.score / quizResult.total) * 100)}% Score</div>
+                                        {quizResult.duration && (
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#06b6d4', marginBottom: 24, background: 'rgba(6,182,212,0.1)', padding: '6px 14px', borderRadius: 20, display: 'inline-block' }}>
+                                                ⏱️ Time Taken: {quizResult.duration}
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'block' }}>
+                                            <button onClick={() => { setQuizResult(null); setActiveQuiz(null); setQuizAnswers({}); setQuizStep(0); }} style={{ padding: '14px 40px', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Done ✓</button>
+                                        </div>
                                     </motion.div>
                                 </div>
                             )}
@@ -601,16 +616,27 @@ export default function StudentPortal() {
                                                     setSubmittingQuiz(true);
                                                     let score = 0;
                                                     activeQuiz.questions.forEach((q, idx) => { if (quizAnswers[idx] === q.correct) score++; });
-                                                    const res = await submitQuizResult({
+
+                                                    // Calculate attempt duration
+                                                    const durationMs = Date.now() - (quizStartTime || Date.now());
+                                                    const totalSecs = Math.max(1, Math.round(durationMs / 1000));
+                                                    const mins = Math.floor(totalSecs / 60);
+                                                    const secs = totalSecs % 60;
+                                                    const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+                                                    await submitQuizResult({
                                                         studentId: user?.studentId || user?.userId,
-                                                        studentName: profile?.name || 'Student',
+                                                        studentName: profile?.name || user?.username || 'Student',
                                                         quizId: activeQuiz.id,
                                                         quizTitle: activeQuiz.title,
                                                         course: activeQuiz.course,
-                                                        score, total: activeQuiz.questions.length,
+                                                        score,
+                                                        total: activeQuiz.questions.length,
+                                                        duration: durationStr,
                                                     });
                                                     setSubmittingQuiz(false);
-                                                    setQuizResult({ score, total: activeQuiz.questions.length });
+                                                    setQuizResult({ score, total: activeQuiz.questions.length, duration: durationStr });
+                                                    if (refetchQuizResults) refetchQuizResults();
                                                 }} style={{ flex: 2, padding: 14, borderRadius: 14, border: 'none', background: submittingQuiz ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
                                                     {submittingQuiz ? '⏳ Submitting...' : '✅ Submit Quiz'}
                                                 </button>
@@ -626,22 +652,30 @@ export default function StudentPortal() {
                                     {sectionTitle('📝', 'Available Quizzes & Exams')}
                                     {quizList.length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                            {quizList.map((qz, i) => (
-                                                <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderRadius: 16, background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(124,58,237,0.08)'}` }}>
-                                                    <div>
-                                                        <div style={{ fontWeight: 800, fontSize: 15, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 4 }}>📋 {qz.title}</div>
-                                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7c3aed', padding: '2px 9px', borderRadius: 20 }}>{qz.course}</span>
-                                                            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{qz.questions?.length || 0} Questions</span>
-                                                            {qz.dueDate && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Due: {qz.dueDate}</span>}
+                                            {quizList.map((qz, i) => {
+                                                const attempt = myQuizResults.find(r => String(r.quizId) === String(qz.id));
+                                                return (
+                                                    <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderRadius: 16, background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(124,58,237,0.08)'}` }}>
+                                                        <div>
+                                                            <div style={{ fontWeight: 800, fontSize: 15, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 4 }}>📋 {qz.title}</div>
+                                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7c3aed', padding: '2px 9px', borderRadius: 20 }}>{qz.course}</span>
+                                                                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{qz.questions?.length || 0} Questions</span>
+                                                                {qz.dueDate && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Due: {qz.dueDate}</span>}
+                                                                {attempt && (
+                                                                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.12)', color: '#059669', padding: '2px 9px', borderRadius: 20 }}>
+                                                                        Score: {attempt.score}/{attempt.total} ({attempt.percentage}%) {attempt.duration ? `• ⏱️ ${attempt.duration}` : ''}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => { setActiveQuiz(qz); setQuizStep(0); setQuizAnswers({}); }}
-                                                        style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                                                    >Start Quiz →</button>
-                                                </motion.div>
-                                            ))}
+                                                        <button
+                                                            onClick={() => { setActiveQuiz(qz); setQuizStep(0); setQuizAnswers({}); setQuizStartTime(Date.now()); }}
+                                                            style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: attempt ? 'rgba(124,58,237,0.15)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? '#7c3aed' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                                        >{attempt ? 'Retake Quiz ↻' : 'Start Quiz →'}</button>
+                                                    </motion.div>
+                                                );
+                                            })}
                                         </div>
                                     ) : emptyState('📝', 'No quizzes yet', 'Your teacher will publish quizzes here. Check back soon!')}
                                 </div>
@@ -651,50 +685,99 @@ export default function StudentPortal() {
 
                     {/* ── Results ── */}
                     {activeTab === 'results' && (
-                        <div style={cardS}>
-                            {sectionTitle('🏆', 'Exam Results')}
-                            {data?.results && data.results.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    {data.results.map((r, i) => {
-                                        const pct = r.total ? Math.round((r.marks / r.total) * 100) : 0;
-                                        const passed = r.grade !== 'Fail' && pct >= 40;
-                                        return (
-                                            <motion.div
-                                                key={i}
-                                                initial={{ opacity: 0, x: -12 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.06 }}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                    padding: '14px 16px', borderRadius: 14,
-                                                    background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
-                                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.07)'}`,
-                                                }}
-                                            >
-                                                <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#ede9fe' : '#1a1035' }}>
-                                                    {r.exam}
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                    <span style={{
-                                                        fontSize: 15, fontWeight: 900,
-                                                        color: passed ? '#10b981' : '#f43f5e',
-                                                    }}>
-                                                        {r.marks}/{r.total}
-                                                    </span>
-                                                    <span style={{
-                                                        fontSize: 11, fontWeight: 700, padding: '3px 9px',
-                                                        borderRadius: 20,
-                                                        background: passed ? '#d1fae5' : '#fee2e2',
-                                                        color: passed ? '#065f46' : '#991b1b',
-                                                    }}>
-                                                        {pct}%
-                                                    </span>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            ) : emptyState('🏆', 'No results yet', 'Your exam results will appear here.')}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            {/* Quiz Results Section */}
+                            <div style={cardS}>
+                                {sectionTitle('📝', 'Quiz / Test Results')}
+                                {myQuizResults && myQuizResults.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        {myQuizResults.map((r, i) => {
+                                            const pct = Number(r.percentage) || 0;
+                                            const passed = pct >= 40;
+                                            return (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, x: -12 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: i * 0.06 }}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                        padding: '14px 16px', borderRadius: 14,
+                                                        background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
+                                                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.07)'}`,
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: 14, color: isDark ? '#ede9fe' : '#1a1035' }}>
+                                                            {r.quizTitle}
+                                                        </div>
+                                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <span>{r.course}</span>
+                                                            {r.duration && <span style={{ color: '#06b6d4', fontWeight: 700 }}>⏱️ {r.duration}</span>}
+                                                            {r.date && <span>• {new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                        <span style={{ fontSize: 15, fontWeight: 900, color: passed ? '#10b981' : '#f43f5e' }}>
+                                                            {r.score}/{r.total}
+                                                        </span>
+                                                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: passed ? '#d1fae5' : '#fee2e2', color: passed ? '#065f46' : '#991b1b' }}>
+                                                            {pct}%
+                                                        </span>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : emptyState('📝', 'No quiz attempts yet', 'Quiz scores and attempt duration will show up here after taking a test.')}
+                            </div>
+
+                            {/* Exam Results Section */}
+                            <div style={cardS}>
+                                {sectionTitle('🏆', 'Exam Results')}
+                                {data?.results && data.results.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        {data.results.map((r, i) => {
+                                            const pct = r.total ? Math.round((r.marks / r.total) * 100) : 0;
+                                            const passed = r.grade !== 'Fail' && pct >= 40;
+                                            return (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, x: -12 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: i * 0.06 }}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                        padding: '14px 16px', borderRadius: 14,
+                                                        background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
+                                                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.07)'}`,
+                                                    }}
+                                                >
+                                                    <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#ede9fe' : '#1a1035' }}>
+                                                        {r.exam}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                        <span style={{
+                                                            fontSize: 15, fontWeight: 900,
+                                                            color: passed ? '#10b981' : '#f43f5e',
+                                                        }}>
+                                                            {r.marks}/{r.total}
+                                                        </span>
+                                                        <span style={{
+                                                            fontSize: 11, fontWeight: 700, padding: '3px 9px',
+                                                            borderRadius: 20,
+                                                            background: passed ? '#d1fae5' : '#fee2e2',
+                                                            color: passed ? '#065f46' : '#991b1b',
+                                                        }}>
+                                                            {pct}%
+                                                        </span>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : emptyState('🏆', 'No exam results yet', 'Your term exam results will appear here.')}
+                            </div>
                         </div>
                     )}
 

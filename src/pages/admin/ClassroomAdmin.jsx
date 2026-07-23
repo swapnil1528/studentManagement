@@ -2,11 +2,12 @@
  * ClassroomAdmin — Full LMS Dashboard for Admins
  * Tabs: Classwork (publish + edit/delete materials), Submissions (grade), Quizzes (create), Exam Marks (results)
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSContent, saveQuiz, getQuizResults } from '../../services/api';
 import { setLoading } from '../../components/ui/LoadingBar';
 import { showToast } from '../../components/ui/Toast';
-import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play } from 'lucide-react';
+import { exportCsv, exportPdf } from '../../utils/exportUtils';
+import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play, Download, FileSpreadsheet, Printer } from 'lucide-react';
 
 // ─── Helper: get YouTube embed URL ───────────────────────────────────────────
 function getYouTubeEmbed(url) {
@@ -240,6 +241,126 @@ export default function ClassroomAdmin({ adminData }) {
     const updateQ = (i, field, val) => setQuestions(prev => prev.map((q, idx) => idx === i ? { ...q, [field]: val } : q));
     const removeQ = (i) => setQuestions(prev => prev.filter((_, idx) => idx !== i));
 
+    // ── Bulk Excel / CSV Upload & Sample Download ────────────────────────────
+    const excelInputRef = useRef(null);
+
+    const handleDownloadSampleCsv = () => {
+        const headers = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer (a/b/c/d)'];
+        const rows = [
+            ['What is the capital of France?', 'London', 'Paris', 'Berlin', 'Madrid', 'b'],
+            ['Which planet is known as the Red Planet?', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'b'],
+            ['What is 15 + 25?', '35', '40', '45', '50', 'b']
+        ];
+        exportCsv('Sample_Quiz_Template', headers, rows);
+        showToast('Sample Excel Template Downloaded! 📥');
+    };
+
+    const handleExcelImport = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const text = evt.target.result;
+                const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length <= 1) {
+                    alert('Uploaded file is empty or missing data rows');
+                    return;
+                }
+
+                const parseCsvLine = (line) => {
+                    const result = [];
+                    let cur = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const c = line[i];
+                        if (c === '"') {
+                            if (inQuotes && line[i + 1] === '"') {
+                                cur += '"';
+                                i++;
+                            } else {
+                                inQuotes = !inQuotes;
+                            }
+                        } else if (c === ',' && !inQuotes) {
+                            result.push(cur.trim());
+                            cur = '';
+                        } else {
+                            cur += c;
+                        }
+                    }
+                    result.push(cur.trim());
+                    return result;
+                };
+
+                const parsedQuestions = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = parseCsvLine(lines[i]);
+                    if (cols.length >= 2 && cols[0]) {
+                        const q = cols[0] || '';
+                        const a = cols[1] || '';
+                        const b = cols[2] || '';
+                        const c = cols[3] || '';
+                        const d = cols[4] || '';
+                        let correct = (cols[5] || 'a').toLowerCase().trim();
+                        if (!['a', 'b', 'c', 'd'].includes(correct)) correct = 'a';
+                        parsedQuestions.push({ q, a, b, c, d, correct });
+                    }
+                }
+
+                if (parsedQuestions.length > 0) {
+                    setQuestions(parsedQuestions);
+                    showToast(`Loaded ${parsedQuestions.length} questions from Excel! 🎉`);
+                } else {
+                    alert('No valid questions found in the file.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Failed to parse Excel/CSV file');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+
+    // ── Export Quiz Results to Excel & PDF ────────────────────────────────────
+    const handleExportExcelResults = () => {
+        if (!quizResults.length) return alert('No results to export');
+        const headers = ['Sr No', 'Student ID', 'Student Name', 'Quiz Title', 'Course', 'Score', 'Total', 'Percentage (%)', 'Duration', 'Date'];
+        const rows = quizResults.map((r, i) => [
+            i + 1,
+            r.studentId,
+            r.studentName,
+            r.quizTitle,
+            r.course,
+            r.score,
+            r.total,
+            `${Number(r.percentage) || 0}%`,
+            r.duration || '—',
+            r.date ? new Date(r.date).toLocaleString('en-IN') : '—'
+        ]);
+        exportCsv('Quiz_Results', headers, rows);
+        showToast('Quiz Results exported as Excel CSV! 📊');
+    };
+
+    const handleExportPdfResults = () => {
+        if (!quizResults.length) return alert('No results to export');
+        const headers = ['Sr No', 'Student ID', 'Student Name', 'Quiz Title', 'Course', 'Score', 'Total', '%ile', 'Duration', 'Date'];
+        const rows = quizResults.map((r, i) => [
+            i + 1,
+            r.studentId,
+            r.studentName,
+            r.quizTitle,
+            r.course,
+            r.score,
+            r.total,
+            `${Number(r.percentage) || 0}%`,
+            r.duration || '—',
+            r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+        ]);
+        exportPdf('Classroom Quiz Results Report', headers, rows);
+    };
+
     // ── TOC filtered materials ────────────────────────────────────────────────
     const tocCourses = [...new Set(materials.map(m => m.course))];
     const filteredMaterials = tocCourse ? materials.filter(m => m.course === tocCourse) : materials;
@@ -472,10 +593,36 @@ export default function ClassroomAdmin({ adminData }) {
             {/* ── QUIZZES TAB ── */}
             {activeTab === 'quizzes' && (
                 <div className="card shadow-md">
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <CheckCircle size={20} className="text-indigo-500" />
-                        Create Quiz / Exam
-                    </h2>
+                    <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <CheckCircle size={20} className="text-indigo-500" />
+                            Create Quiz / Exam
+                        </h2>
+                        {/* Excel Bulk Upload & Sample Template Buttons */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={handleDownloadSampleCsv}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition border border-emerald-200"
+                            >
+                                <Download size={14} /> Download Sample Excel Template
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => excelInputRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition border border-indigo-200"
+                            >
+                                <FileSpreadsheet size={14} /> Upload Excel / CSV Quiz
+                            </button>
+                            <input
+                                ref={excelInputRef}
+                                type="file"
+                                accept=".csv, .xlsx, .xls, .txt"
+                                onChange={handleExcelImport}
+                                className="hidden"
+                            />
+                        </div>
+                    </div>
                     <div className="space-y-5 max-w-2xl">
                         {/* Quiz Meta */}
                         <div className="grid grid-cols-3 gap-4">
@@ -567,12 +714,26 @@ export default function ClassroomAdmin({ adminData }) {
             {/* ── EXAM MARKS TAB ── */}
             {activeTab === 'exammarks' && (
                 <div className="card shadow-md">
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
                         <h2 className="text-xl font-bold flex items-center gap-2">
                             <BarChart2 size={20} className="text-indigo-500" />
                             Exam / Quiz Results
                         </h2>
-                        <button className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm font-semibold hover:bg-gray-200" onClick={loadQuizResults}>↻ Refresh</button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={handleExportExcelResults}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition"
+                            >
+                                <FileSpreadsheet size={14} /> Export Excel
+                            </button>
+                            <button
+                                onClick={handleExportPdfResults}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition"
+                            >
+                                <Printer size={14} /> Export PDF
+                            </button>
+                            <button className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200" onClick={loadQuizResults}>↻ Refresh</button>
+                        </div>
                     </div>
                     {loadingResults ? (
                         <div className="text-center py-12"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" /></div>
@@ -588,6 +749,7 @@ export default function ClassroomAdmin({ adminData }) {
                                         <th className="pb-3 text-left">Course</th>
                                         <th className="pb-3 text-center">Score</th>
                                         <th className="pb-3 text-center">%ile</th>
+                                        <th className="pb-3 text-center">Duration</th>
                                         <th className="pb-3 text-left">Date</th>
                                     </tr>
                                 </thead>
@@ -617,6 +779,9 @@ export default function ClassroomAdmin({ adminData }) {
                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                                                         {pct}%
                                                     </span>
+                                                </td>
+                                                <td className="py-3 text-center text-xs font-semibold text-gray-600">
+                                                    {r.duration ? `⏱️ ${r.duration}` : '—'}
                                                 </td>
                                                 <td className="py-3 text-xs text-gray-400">{r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                                             </tr>

@@ -79,7 +79,7 @@ function doPost(e) {
     else if(act==='saveQuiz') res = saveQuiz(d.form);
     else if(act==='getQuizzes') res = getQuizzes(d.courses);
     else if(act==='submitQuiz') res = submitQuizResult(d.form);
-    else if(act==='getQuizResults') res = getQuizResults();
+    else if(act==='getQuizResults') res = getQuizResults(d.studentId);
 
     // --- SETTINGS ---
     else if(act==='getSettings') res = getSettings();
@@ -1128,21 +1128,22 @@ function getQuizzes(courses) {
 }
 
 function submitQuizResult(f) {
-  // Sheet: ID, Date, StudentID, StudentName, QuizID, QuizTitle, Course, Score, Total, Percentage
-  const sheet = ensureSheet("Quiz Results", ["ID", "Date", "StudentID", "StudentName", "QuizID", "QuizTitle", "Course", "Score", "Total", "Percentage"]);
+  // Sheet: ID, Date, StudentID, StudentName, QuizID, QuizTitle, Course, Score, Total, Percentage, Duration
+  const sheet = ensureSheet("Quiz Results", ["ID", "Date", "StudentID", "StudentName", "QuizID", "QuizTitle", "Course", "Score", "Total", "Percentage", "Duration"]);
   const id = "QR-" + Date.now();
   const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const pct = f.total > 0 ? Math.round((f.score / f.total) * 100) : 0;
-  sheet.appendRow([id, dateStr, f.studentId, f.studentName, f.quizId, f.quizTitle, f.course, f.score, f.total, pct]);
+  const duration = f.duration || f.durationStr || '';
+  sheet.appendRow([id, dateStr, f.studentId, f.studentName, f.quizId, f.quizTitle, f.course, f.score, f.total, pct, duration]);
   return { success: true, id: id };
 }
 
-function getQuizResults() {
+function getQuizResults(studentId) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName("Quiz Results");
   if (!sheet || sheet.getLastRow() < 2) return { success: true, results: [] };
   const data = sheet.getDataRange().getValues().slice(1);
-  const results = data.map(r => ({
+  let results = data.map(r => ({
     id: String(r[0]),
     date: r[1],
     studentId: String(r[2]),
@@ -1153,7 +1154,12 @@ function getQuizResults() {
     score: r[7],
     total: r[8],
     percentage: r[9],
+    duration: r[10] || '',
   })).reverse();
+
+  if (studentId) {
+    results = results.filter(r => String(r.studentId) === String(studentId));
+  }
   return { success: true, results: results };
 }
 
