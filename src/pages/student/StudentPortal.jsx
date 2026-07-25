@@ -167,6 +167,12 @@ export default function StudentPortal() {
         const printWin = window.open('', '_blank', 'width=850,height=900');
         if (!printWin) return alert('Please allow popups to print report.');
 
+        const franchiseInfo = data?.franchise;
+        const centerName = franchiseInfo?.centerName || 'EduManager Institute Portal';
+        const centerAddress = franchiseInfo?.address || '';
+        const centerPhone = franchiseInfo?.mobile ? `• Phone: +91 ${franchiseInfo.mobile}` : '';
+        const centerBranch = franchiseInfo?.branch || profile?.branch || '';
+
         const qRows = (questionsList || []).map((q, i) => {
             const studentAns = userAnswersMap?.[i] || 'Not Answered';
             const correctOpt = q.correct || 'a';
@@ -193,9 +199,9 @@ export default function StudentPortal() {
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1e293b; background: #fff; }
                     .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; margin-bottom: 24px; }
-                    .logo { font-size: 26px; font-weight: 900; color: #7c3aed; }
-                    .sub { font-size: 13px; color: #64748b; margin-top: 4px; }
-                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; }
+                    .logo { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; letter-spacing: 0.5px; }
+                    .sub { font-size: 13px; color: #475569; margin-top: 4px; font-weight: 600; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; border: 1px solid #e2e8f0; }
                     .badge { padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 14px; display: inline-block; }
                     .badge-pass { background: #d1fae5; color: #065f46; }
                     .badge-fail { background: #fee2e2; color: #991b1b; }
@@ -206,8 +212,9 @@ export default function StudentPortal() {
             </head>
             <body>
                 <div class="header">
-                    <div class="logo">🎓 EduManager Institute Portal</div>
-                    <div class="sub">Official Quiz & Exam Performance Marksheet Report</div>
+                    <div class="logo">${centerName}</div>
+                    <div class="sub">${centerAddress} ${centerPhone}</div>
+                    ${centerBranch ? `<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-top:4px;">Branch: ${centerBranch}</div>` : ''}
                 </div>
                 <div class="grid">
                     <div><strong>Student Name:</strong> ${profile?.name || user?.name || 'Student'}</div>

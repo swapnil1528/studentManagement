@@ -247,6 +247,26 @@ function getStudentBasic(id) {
   const ad = safeGet("Admission Data").filter(r => r[2] == id);
   const cs = [...new Set(ad.map(r => r[7]))];
   const att = safeGet("Attendance").filter(r => r[1] == id);
+
+  const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
+  let franchiseInfo = null;
+  const fSheet = ss.getSheetByName("Master Franchise");
+  if (fSheet && fSheet.getLastRow() > 1) {
+    const fData = fSheet.getDataRange().getValues().slice(1);
+    const matches = fData.map(r => ({
+      branch: String(r[1] || '').trim(),
+      centerCode: String(r[2] || ''),
+      centerName: String(r[3] || ''),
+      address: String(r[4] || ''),
+      mobile: String(r[5] || '')
+    })).filter(f => f.branch);
+    if (studentBranch) {
+      franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());
+    }
+    if (!franchiseInfo && matches.length > 0) {
+      franchiseInfo = matches[0];
+    }
+  }
   
   let p = 0;
   att.forEach(r => { if(String(r[4]).toLowerCase().includes('present') || String(r[4]).toLowerCase().includes('check-in')) p++; });
@@ -268,7 +288,8 @@ function getStudentBasic(id) {
   const recentLogs = attLogs.slice(0, 6);
   
   return { 
-    profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", hasFace: true }, 
+    profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", branch: studentBranch, hasFace: true }, 
+    franchise: franchiseInfo,
     courses: cs, 
     attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: recentLogs, allLogs: attLogs }
   };
@@ -298,6 +319,26 @@ function getStudentPortalData(id) {
   const lms = safeGet("LMS Content").filter(r => cs.includes(r[1]));
   const att = safeGet("Attendance").filter(r => r[1] == id);
   const res = safeGet("Exam Results").filter(r => r[1] == id);
+
+  const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
+  let franchiseInfo = null;
+  const fSheet = ss.getSheetByName("Master Franchise");
+  if (fSheet && fSheet.getLastRow() > 1) {
+    const fData = fSheet.getDataRange().getValues().slice(1);
+    const matches = fData.map(r => ({
+      branch: String(r[1] || '').trim(),
+      centerCode: String(r[2] || ''),
+      centerName: String(r[3] || ''),
+      address: String(r[4] || ''),
+      mobile: String(r[5] || '')
+    })).filter(f => f.branch);
+    if (studentBranch) {
+      franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());
+    }
+    if (!franchiseInfo && matches.length > 0) {
+      franchiseInfo = matches[0];
+    }
+  }
   
   let p = 0;
   att.forEach(r => { if(String(r[4]).toLowerCase().includes('present') || String(r[4]).toLowerCase().includes('check-in')) p++; });
@@ -319,7 +360,8 @@ function getStudentPortalData(id) {
   const recentLogs = attLogs.slice(0, 6);
   
   return { 
-    profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", hasFace: true }, 
+    profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", branch: studentBranch, hasFace: true }, 
+    franchise: franchiseInfo,
     courses: cs, 
     lms: lms.map(r => ({ title: r[2], type: r[3], link: r[4], desc: r[5] })), 
     attendance: { perc: att.length ? Math.round((p / att.length) * 100) : 0, pres: p, total: att.length, todayStatus: todayStatus, lastCheckInTime: lastCheckInTime, logs: recentLogs, allLogs: attLogs }, 
