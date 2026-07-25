@@ -78,6 +78,7 @@ function doPost(e) {
     // --- QUIZ / EXAM ---
     else if(act==='saveQuiz') res = saveQuiz(d.form);
     else if(act==='getQuizzes') res = getQuizzes(d.courses);
+    else if(act==='deleteQuiz') res = deleteQuiz(d.id);
     else if(act==='submitQuiz') res = submitQuizResult(d.form);
     else if(act==='getQuizResults') res = getQuizResults(d.studentId);
 
@@ -1098,12 +1099,27 @@ function saveAssignmentGrade(id, grade) {
 // QUIZ / EXAM FUNCTIONS
 // ============================================
 function saveQuiz(f) {
-  // Sheet columns: ID, Date, Course, Title, DueDate, Questions(JSON), TotalMarks
-  const sheet = ensureSheet("Quizzes", ["ID", "Date", "Course", "Title", "DueDate", "Questions", "TotalMarks"]);
-  const id = "QZ-" + Date.now();
+  // Sheet columns: ID, Date, Course, Title, DueDate, Questions(JSON), TotalMarks, TimeLimit
+  const sheet = ensureSheet("Quizzes", ["ID", "Date", "Course", "Title", "DueDate", "Questions", "TotalMarks", "TimeLimit"]);
   const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const questions = typeof f.questions === 'string' ? f.questions : JSON.stringify(f.questions || []);
-  sheet.appendRow([id, dateStr, f.course, f.title, f.dueDate || '', questions, f.totalMarks || 0]);
+  const timeLimit = f.timeLimit ? Number(f.timeLimit) : 0;
+  const totalMarks = f.totalMarks || (Array.isArray(f.questions) ? f.questions.length : 0);
+
+  if (f.id) {
+    // Edit existing quiz
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(f.id)) {
+        sheet.getRange(i + 1, 3, 1, 6).setValues([[f.course, f.title, f.dueDate || '', questions, totalMarks, timeLimit]]);
+        return { success: true, id: f.id, updated: true };
+      }
+    }
+  }
+
+  // Create new quiz
+  const id = "QZ-" + Date.now();
+  sheet.appendRow([id, dateStr, f.course, f.title, f.dueDate || '', questions, totalMarks, timeLimit]);
   return { success: true, id: id };
 }
 
@@ -1123,8 +1139,23 @@ function getQuizzes(courses) {
       dueDate: r[4],
       questions: (() => { try { return JSON.parse(r[5]); } catch(e) { return []; } })(),
       totalMarks: r[6] || 0,
+      timeLimit: r[7] ? Number(r[7]) : 0,
     }));
   return { success: true, quizzes: quizzes };
+}
+
+function deleteQuiz(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Quizzes");
+  if (!sheet || sheet.getLastRow() < 2) return { success: false, error: "Quiz sheet empty" };
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { success: true, id: id };
+    }
+  }
+  return { success: false, error: "Quiz not found" };
 }
 
 function submitQuizResult(f) {

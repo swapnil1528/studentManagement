@@ -203,6 +203,10 @@ export const saveQuiz = (form) =>
 export const getQuizzes = (courses) =>
     apiCall('getQuizzes', { courses });
 
+/** Delete quiz by ID */
+export const deleteQuiz = (id) =>
+    apiCall('deleteQuiz', { id });
+
 /** Student submits quiz result */
 export const submitQuizResult = (form) =>
     apiCall('submitQuiz', { form });

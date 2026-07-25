@@ -98,6 +98,8 @@ export default function StudentPortal() {
     const [quizAnswers, setQuizAnswers] = useState({});      // {qIdx: 'a'|'b'|'c'|'d'}
     const [quizResult, setQuizResult] = useState(null);      // {score, total, duration}
     const [submittingQuiz, setSubmittingQuiz] = useState(false);
+    const [secondsLeft, setSecondsLeft] = useState(null);    // continuous countdown timer seconds
+    const [analysisModal, setAnalysisModal] = useState(null); // detailed question analysis object
 
     const { data: myQuizResultsData, refetch: refetchQuizResults } = useQuery({
         queryKey: ['studentQuizResults', user?.studentId || user?.userId],
@@ -105,6 +107,144 @@ export default function StudentPortal() {
         enabled: !!user,
     });
     const myQuizResults = myQuizResultsData?.success ? myQuizResultsData.results : [];
+
+    // Continuous Live Countdown Timer
+    useEffect(() => {
+        if (!activeQuiz || quizResult || secondsLeft === null || secondsLeft <= 0) return;
+        const timer = setInterval(() => {
+            setSecondsLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    alert('⏰ Time is up! Your quiz answers will now be automatically submitted.');
+                    submitQuizAuto();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [activeQuiz, quizResult, secondsLeft]);
+
+    const submitQuizAuto = async () => {
+        if (!activeQuiz) return;
+        setSubmittingQuiz(true);
+        let score = 0;
+        activeQuiz.questions.forEach((q, idx) => { if (quizAnswers[idx] === q.correct) score++; });
+        const durationMs = Date.now() - (quizStartTime || Date.now());
+        const totalSecs = Math.max(1, Math.round(durationMs / 1000));
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+        await submitQuizResult({
+            studentId: user?.studentId || user?.userId,
+            studentName: profile?.name || user?.username || 'Student',
+            quizId: activeQuiz.id,
+            quizTitle: activeQuiz.title,
+            course: activeQuiz.course,
+            score,
+            total: activeQuiz.questions.length,
+            duration: durationStr,
+        });
+        setSubmittingQuiz(false);
+        setQuizResult({
+            score,
+            total: activeQuiz.questions.length,
+            duration: durationStr,
+            questions: activeQuiz.questions,
+            answers: { ...quizAnswers },
+            quizTitle: activeQuiz.title,
+            course: activeQuiz.course,
+        });
+        if (refetchQuizResults) refetchQuizResults();
+    };
+
+    const handlePrintQuizReport = (quizTitle, course, score, total, duration, dateStr, questionsList, userAnswersMap) => {
+        const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+        const passed = pct >= 40;
+        const printWin = window.open('', '_blank', 'width=850,height=900');
+        if (!printWin) return alert('Please allow popups to print report.');
+
+        const qRows = (questionsList || []).map((q, i) => {
+            const studentAns = userAnswersMap?.[i] || 'Not Answered';
+            const correctOpt = q.correct || 'a';
+            const isRight = String(studentAns).toLowerCase() === String(correctOpt).toLowerCase();
+            const studentText = q.options?.[studentAns] ? `${String(studentAns).toUpperCase()}. ${q.options[studentAns]}` : String(studentAns).toUpperCase();
+            const correctText = `${String(correctOpt).toUpperCase()}. ${q.options?.[correctOpt] || ''}`;
+
+            return `
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:10px;font-weight:bold;">Q${i + 1}</td>
+                    <td style="padding:10px;">${q.q}</td>
+                    <td style="padding:10px;color:${isRight ? '#059669' : '#dc2626'};font-weight:bold;">${studentText}</td>
+                    <td style="padding:10px;color:#059669;font-weight:bold;">${correctText}</td>
+                    <td style="padding:10px;font-weight:bold;color:${isRight ? '#059669' : '#dc2626'};">${isRight ? '✓ Correct' : '✕ Incorrect'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Quiz Marksheet - ${quizTitle}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1e293b; background: #fff; }
+                    .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; margin-bottom: 24px; }
+                    .logo { font-size: 26px; font-weight: 900; color: #7c3aed; }
+                    .sub { font-size: 13px; color: #64748b; margin-top: 4px; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; }
+                    .badge { padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 14px; display: inline-block; }
+                    .badge-pass { background: #d1fae5; color: #065f46; }
+                    .badge-fail { background: #fee2e2; color: #991b1b; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+                    th { background: #7c3aed; color: #fff; padding: 10px; text-align: left; }
+                    @media print { button { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo">🎓 EduManager Institute Portal</div>
+                    <div class="sub">Official Quiz & Exam Performance Marksheet Report</div>
+                </div>
+                <div class="grid">
+                    <div><strong>Student Name:</strong> ${profile?.name || user?.name || 'Student'}</div>
+                    <div><strong>Student ID / Roll:</strong> ${user?.studentId || user?.userId || 'N/A'}</div>
+                    <div><strong>Course:</strong> ${course}</div>
+                    <div><strong>Quiz / Test Name:</strong> ${quizTitle}</div>
+                    <div><strong>Score Obtained:</strong> ${score} / ${total} (${pct}%)</div>
+                    <div><strong>Attempt Duration:</strong> ⏱️ ${duration || 'N/A'}</div>
+                    <div><strong>Date Taken:</strong> ${dateStr || new Date().toLocaleDateString('en-IN')}</div>
+                    <div><strong>Result Status:</strong> <span class="badge ${passed ? 'badge-pass' : 'badge-fail'}">${passed ? 'PASSED ✅' : 'NEEDS IMPROVEMENT ⚠️'}</span></div>
+                </div>
+
+                <h3 style="color:#7c3aed;margin-top:24px;">Question & Option Analysis</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Question Text</th>
+                            <th>Your Answer</th>
+                            <th>Correct Answer</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${qRows || '<tr><td colspan="5" style="padding:10px;text-align:center;">Question detail list unavailable</td></tr>'}
+                    </tbody>
+                </table>
+
+                <div style="margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px;">
+                    Generated by EduManager Student Portal • ${new Date().toLocaleString('en-IN')}
+                </div>
+                <script>
+                    window.onload = function() { window.print(); };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    };
 
     const { data: settings } = useQuery({
         queryKey: ['settings'],
@@ -562,21 +702,132 @@ export default function StudentPortal() {
                     {/* ── QUIZZES TAB ── */}
                     {activeTab === 'quizzes' && (
                         <div>
+                            {/* Quiz Detailed Analysis Modal */}
+                            {analysisModal && (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ background: isDark ? '#1a1035' : '#fff', borderRadius: 24, padding: 30, maxWidth: 640, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, paddingBottom: 12 }}>
+                                            <div>
+                                                <div style={{ fontSize: 20, fontWeight: 900, color: isDark ? '#ede9fe' : '#1a1035' }}>📊 Detailed Quiz Analysis</div>
+                                                <div style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>{analysisModal.quizTitle} • Score: {analysisModal.score}/{analysisModal.total}</div>
+                                            </div>
+                                            <button onClick={() => setAnalysisModal(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: isDark ? '#ede9fe' : '#64748b' }}>✕</button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                            {(analysisModal.questions || []).map((q, idx) => {
+                                                const userOpt = analysisModal.answers?.[idx];
+                                                const correctOpt = q.correct || 'a';
+                                                const isCorrect = String(userOpt).toLowerCase() === String(correctOpt).toLowerCase();
+
+                                                return (
+                                                    <div key={idx} style={{ padding: 16, borderRadius: 16, background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', border: `1px solid ${isCorrect ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}` }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                                                            <div style={{ fontWeight: 800, fontSize: 14, color: isDark ? '#ede9fe' : '#1e293b' }}>
+                                                                Q{idx + 1}. {q.q}
+                                                            </div>
+                                                            <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 12, background: isCorrect ? '#d1fae5' : '#fee2e2', color: isCorrect ? '#065f46' : '#991b1b', whiteSpace: 'nowrap' }}>
+                                                                {isCorrect ? '✓ Correct (+1)' : '✕ Incorrect'}
+                                                            </span>
+                                                        </div>
+
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                                            {['a', 'b', 'c', 'd'].filter(opt => q.options?.[opt]).map(opt => {
+                                                                const isChosen = String(userOpt).toLowerCase() === opt;
+                                                                const isRightOpt = String(correctOpt).toLowerCase() === opt;
+                                                                let bg = isDark ? 'rgba(255,255,255,0.05)' : '#fff';
+                                                                let border = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                                                                let color = isDark ? '#94a3b8' : '#64748b';
+
+                                                                if (isRightOpt) {
+                                                                    bg = '#d1fae5';
+                                                                    border = '#10b981';
+                                                                    color = '#065f46';
+                                                                } else if (isChosen && !isRightOpt) {
+                                                                    bg = '#fee2e2';
+                                                                    border = '#f43f5e';
+                                                                    color = '#991b1b';
+                                                                }
+
+                                                                return (
+                                                                    <div key={opt} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${border}`, background: bg, color, fontSize: 12, fontWeight: (isChosen || isRightOpt) ? 800 : 500 }}>
+                                                                        <span style={{ textTransform: 'uppercase', marginRight: 6 }}>{opt}.</span>
+                                                                        {q.options[opt]}
+                                                                        {isRightOpt && <span style={{ marginLeft: 6 }}>✓ Correct</span>}
+                                                                        {isChosen && !isRightOpt && <span style={{ marginLeft: 6 }}>✕ Your Choice</span>}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div style={{ marginTop: 20, display: 'flex', gap: 12 }}>
+                                            <button
+                                                onClick={() => handlePrintQuizReport(analysisModal.quizTitle, analysisModal.course, analysisModal.score, analysisModal.total, analysisModal.duration, analysisModal.date, analysisModal.questions, analysisModal.answers)}
+                                                style={{ flex: 1, padding: 12, borderRadius: 14, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                                            >
+                                                𖤂 Print Marksheet Report
+                                            </button>
+                                            <button
+                                                onClick={() => setAnalysisModal(null)}
+                                                style={{ padding: '12px 24px', borderRadius: 14, border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, background: 'transparent', color: isDark ? '#ede9fe' : '#64748b', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            )}
+
                             {/* Quiz Result Modal */}
                             {quizResult && (
                                 <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                                    <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ background: isDark ? '#1a1035' : '#fff', borderRadius: 24, padding: 40, textAlign: 'center', maxWidth: 380, width: '100%' }}>
+                                    <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ background: isDark ? '#1a1035' : '#fff', borderRadius: 24, padding: 40, textAlign: 'center', maxWidth: 400, width: '100%' }}>
                                         <div style={{ fontSize: 64, marginBottom: 16 }}>{quizResult.score / quizResult.total >= 0.6 ? '🎉' : quizResult.score / quizResult.total >= 0.4 ? '👍' : '😔'}</div>
                                         <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 8 }}>Quiz Complete!</div>
                                         <div style={{ fontSize: 48, fontWeight: 900, color: '#7c3aed', marginBottom: 4 }}>{quizResult.score}/{quizResult.total}</div>
                                         <div style={{ fontSize: 16, color: '#94a3b8', marginBottom: 12 }}>{Math.round((quizResult.score / quizResult.total) * 100)}% Score</div>
                                         {quizResult.duration && (
-                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#06b6d4', marginBottom: 24, background: 'rgba(6,182,212,0.1)', padding: '6px 14px', borderRadius: 20, display: 'inline-block' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#06b6d4', marginBottom: 20, background: 'rgba(6,182,212,0.1)', padding: '6px 14px', borderRadius: 20, display: 'inline-block' }}>
                                                 ⏱️ Time Taken: {quizResult.duration}
                                             </div>
                                         )}
-                                        <div style={{ display: 'block' }}>
-                                            <button onClick={() => { setQuizResult(null); setActiveQuiz(null); setQuizAnswers({}); setQuizStep(0); }} style={{ padding: '14px 40px', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Done ✓</button>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                            {quizResult.questions && (
+                                                <button
+                                                    onClick={() => setAnalysisModal({
+                                                        quizTitle: quizResult.quizTitle || activeQuiz?.title,
+                                                        course: quizResult.course || activeQuiz?.course,
+                                                        score: quizResult.score,
+                                                        total: quizResult.total,
+                                                        duration: quizResult.duration,
+                                                        questions: quizResult.questions,
+                                                        answers: quizResult.answers,
+                                                    })}
+                                                    style={{ padding: '12px 20px', borderRadius: 14, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}
+                                                >
+                                                    📊 View Detailed Analysis
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handlePrintQuizReport(
+                                                    quizResult.quizTitle || activeQuiz?.title,
+                                                    quizResult.course || activeQuiz?.course,
+                                                    quizResult.score,
+                                                    quizResult.total,
+                                                    quizResult.duration,
+                                                    new Date().toLocaleDateString('en-IN'),
+                                                    quizResult.questions || activeQuiz?.questions,
+                                                    quizResult.answers || quizAnswers
+                                                )}
+                                                style={{ padding: '12px 20px', borderRadius: 14, border: '1px solid rgba(6,182,212,0.3)', background: 'rgba(6,182,212,0.08)', color: '#0891b2', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}
+                                            >
+                                                🖨️ Print Marksheet Report
+                                            </button>
+                                            <button onClick={() => { setQuizResult(null); setActiveQuiz(null); setQuizAnswers({}); setQuizStep(0); setSecondsLeft(null); }} style={{ padding: '14px 40px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 6 }}>Done ✓</button>
                                         </div>
                                     </motion.div>
                                 </div>
@@ -585,11 +836,29 @@ export default function StudentPortal() {
                             {/* Quiz Player */}
                             {activeQuiz && !quizResult && (() => {
                                 const question = activeQuiz.questions[quizStep];
+                                const mins = secondsLeft !== null ? Math.floor(secondsLeft / 60) : 0;
+                                const secs = secondsLeft !== null ? secondsLeft % 60 : 0;
+                                const timeStr = secondsLeft !== null ? `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` : null;
+                                const isWarning = secondsLeft !== null && secondsLeft < 120;
+
                                 return (
                                     <div style={cardS}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                                             <div style={{ fontWeight: 800, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035' }}>📝 {activeQuiz.title}</div>
-                                            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Q{quizStep + 1} of {activeQuiz.questions.length}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                {timeStr && (
+                                                    <span style={{
+                                                        fontSize: 13, fontWeight: 900,
+                                                        color: isWarning ? '#ef4444' : '#0891b2',
+                                                        background: isWarning ? 'rgba(239,68,68,0.12)' : 'rgba(8,145,178,0.1)',
+                                                        border: `1px solid ${isWarning ? 'rgba(239,68,68,0.3)' : 'rgba(8,145,178,0.2)'}`,
+                                                        padding: '4px 12px', borderRadius: 20,
+                                                    }}>
+                                                        ⏱️ Time Left: {timeStr}
+                                                    </span>
+                                                )}
+                                                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Q{quizStep + 1} of {activeQuiz.questions.length}</div>
+                                            </div>
                                         </div>
                                         {/* Progress Bar */}
                                         <div style={{ height: 6, borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9', marginBottom: 24, overflow: 'hidden' }}>
@@ -635,7 +904,15 @@ export default function StudentPortal() {
                                                         duration: durationStr,
                                                     });
                                                     setSubmittingQuiz(false);
-                                                    setQuizResult({ score, total: activeQuiz.questions.length, duration: durationStr });
+                                                    setQuizResult({
+                                                        score,
+                                                        total: activeQuiz.questions.length,
+                                                        duration: durationStr,
+                                                        questions: activeQuiz.questions,
+                                                        answers: { ...quizAnswers },
+                                                        quizTitle: activeQuiz.title,
+                                                        course: activeQuiz.course,
+                                                    });
                                                     if (refetchQuizResults) refetchQuizResults();
                                                 }} style={{ flex: 2, padding: 14, borderRadius: 14, border: 'none', background: submittingQuiz ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
                                                     {submittingQuiz ? '⏳ Submitting...' : '✅ Submit Quiz'}
@@ -661,6 +938,7 @@ export default function StudentPortal() {
                                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                                                                 <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7c3aed', padding: '2px 9px', borderRadius: 20 }}>{qz.course}</span>
                                                                 <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{qz.questions?.length || 0} Questions</span>
+                                                                {qz.timeLimit > 0 && <span style={{ fontSize: 11, color: '#0891b2', fontWeight: 700 }}>⏱️ {qz.timeLimit} Mins</span>}
                                                                 {qz.dueDate && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Due: {qz.dueDate}</span>}
                                                                 {attempt && (
                                                                     <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.12)', color: '#059669', padding: '2px 9px', borderRadius: 20 }}>
@@ -670,7 +948,14 @@ export default function StudentPortal() {
                                                             </div>
                                                         </div>
                                                         <button
-                                                            onClick={() => { setActiveQuiz(qz); setQuizStep(0); setQuizAnswers({}); setQuizStartTime(Date.now()); }}
+                                                            onClick={() => {
+                                                                setActiveQuiz(qz);
+                                                                setQuizStep(0);
+                                                                setQuizAnswers({});
+                                                                setQuizStartTime(Date.now());
+                                                                const limitMins = Number(qz.timeLimit) || 0;
+                                                                setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
+                                                            }}
                                                             style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: attempt ? 'rgba(124,58,237,0.15)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? '#7c3aed' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                                                         >{attempt ? 'Retake Quiz ↻' : 'Start Quiz →'}</button>
                                                     </motion.div>
@@ -724,6 +1009,13 @@ export default function StudentPortal() {
                                                         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: passed ? '#d1fae5' : '#fee2e2', color: passed ? '#065f46' : '#991b1b' }}>
                                                             {pct}%
                                                         </span>
+                                                        <button
+                                                            onClick={() => handlePrintQuizReport(r.quizTitle, r.course, r.score, r.total, r.duration, r.date, [], {})}
+                                                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.08)', color: '#7c3aed', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                                                            title="Print Quiz Report"
+                                                        >
+                                                            🖨️ Print Report
+                                                        </button>
                                                     </div>
                                                 </motion.div>
                                             );

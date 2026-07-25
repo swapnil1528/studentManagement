@@ -3,11 +3,11 @@
  * Tabs: Classwork (publish + edit/delete materials), Submissions (grade), Quizzes (create), Exam Marks (results)
  */
 import { useState, useEffect, useRef } from 'react';
-import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSContent, saveQuiz, getQuizResults } from '../../services/api';
+import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSContent, saveQuiz, getQuizzes, deleteQuiz, getQuizResults } from '../../services/api';
 import { setLoading } from '../../components/ui/LoadingBar';
 import { showToast } from '../../components/ui/Toast';
 import { exportCsv, exportPdf } from '../../utils/exportUtils';
-import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play, Download, FileSpreadsheet, Printer } from 'lucide-react';
+import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play, Download, FileSpreadsheet, Printer, Clock } from 'lucide-react';
 
 // ─── Helper: get YouTube embed URL ───────────────────────────────────────────
 function getYouTubeEmbed(url) {
@@ -103,10 +103,14 @@ export default function ClassroomAdmin({ adminData }) {
     const [grading, setGrading] = useState({});
     const [savingGrade, setSavingGrade] = useState(null);
 
-    // ── Quiz creation state ───────────────────────────────────────────────────
-    const [quizForm, setQuizForm] = useState({ course: '', title: '', dueDate: '' });
+    // ── Quiz creation & history state ─────────────────────────────────────────
+    const [quizForm, setQuizForm] = useState({ course: '', title: '', dueDate: '', timeLimit: '15' });
     const [questions, setQuestions] = useState([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
     const [savingQuiz, setSavingQuiz] = useState(false);
+    const [publishedQuizzes, setPublishedQuizzes] = useState([]);
+    const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+    const [editingQuizId, setEditingQuizId] = useState(null);
+    const quizFormRef = useRef(null);
 
     // ── Exam marks state ──────────────────────────────────────────────────────
     const [quizResults, setQuizResults] = useState([]);
@@ -116,8 +120,16 @@ export default function ClassroomAdmin({ adminData }) {
     useEffect(() => {
         if (activeTab === 'classwork') loadMaterials();
         if (activeTab === 'submissions') loadAllAssignments();
+        if (activeTab === 'quizzes') loadPublishedQuizzes();
         if (activeTab === 'exammarks') loadQuizResults();
     }, [activeTab]);
+
+    const loadPublishedQuizzes = async () => {
+        setLoadingQuizzes(true);
+        const result = await getQuizzes([]);
+        setLoadingQuizzes(false);
+        if (result?.success) setPublishedQuizzes(result.quizzes || []);
+    };
 
     const loadMaterials = async () => {
         setLoadingMaterials(true);
@@ -209,7 +221,7 @@ export default function ClassroomAdmin({ adminData }) {
         else alert(result?.error || 'Failed to save grade');
     };
 
-    // ── Publish quiz ──────────────────────────────────────────────────────────
+    // ── Publish / Edit quiz ───────────────────────────────────────────────────
     const handlePublishQuiz = async () => {
         if (!quizForm.course || !quizForm.title || questions.length === 0) {
             alert('Please fill course, title, and add at least one question');
@@ -221,19 +233,66 @@ export default function ClassroomAdmin({ adminData }) {
         setSavingQuiz(true);
         const totalMarks = questions.length;
         const result = await saveQuiz({
+            id: editingQuizId || undefined,
             course: quizForm.course,
             title: quizForm.title,
             dueDate: quizForm.dueDate,
+            timeLimit: Number(quizForm.timeLimit) || 0,
             questions: questions.map(q => ({ q: q.q, options: { a: q.a, b: q.b, c: q.c, d: q.d }, correct: q.correct })),
             totalMarks,
         });
         setSavingQuiz(false);
         if (result?.success) {
-            showToast('Quiz Published to Students ✅');
-            setQuizForm({ course: '', title: '', dueDate: '' });
+            showToast(editingQuizId ? 'Quiz Updated Successfully! ✅' : 'Quiz Published to Students ✅');
+            setEditingQuizId(null);
+            setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15' });
             setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+            loadPublishedQuizzes();
         } else {
-            alert(result?.error || 'Failed to publish quiz');
+            alert(result?.error || 'Failed to save quiz');
+        }
+    };
+
+    const handleEditQuiz = (qz) => {
+        setEditingQuizId(qz.id);
+        setQuizForm({
+            course: qz.course || '',
+            title: qz.title || '',
+            dueDate: qz.dueDate || '',
+            timeLimit: String(qz.timeLimit ?? 15),
+        });
+        if (Array.isArray(qz.questions) && qz.questions.length > 0) {
+            setQuestions(qz.questions.map(q => ({
+                q: q.q || '',
+                a: q.options?.a || '',
+                b: q.options?.b || '',
+                c: q.options?.c || '',
+                d: q.options?.d || '',
+                correct: q.correct || 'a',
+            })));
+        } else {
+            setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+        }
+        showToast(`Editing Quiz: ${qz.title}`);
+        quizFormRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingQuizId(null);
+        setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15' });
+        setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+    };
+
+    const handleDeleteQuiz = async (qz) => {
+        if (!confirm(`Are you sure you want to delete quiz "${qz.title}"?`)) return;
+        setLoadingQuizzes(true);
+        const res = await deleteQuiz(qz.id);
+        setLoadingQuizzes(false);
+        if (res?.success) {
+            showToast('Quiz deleted 🗑️');
+            loadPublishedQuizzes();
+        } else {
+            alert(res?.error || 'Failed to delete quiz');
         }
     };
 
@@ -592,121 +651,226 @@ export default function ClassroomAdmin({ adminData }) {
 
             {/* ── QUIZZES TAB ── */}
             {activeTab === 'quizzes' && (
-                <div className="card shadow-md">
-                    <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <CheckCircle size={20} className="text-indigo-500" />
-                            Create Quiz / Exam
-                        </h2>
-                        {/* Excel Bulk Upload & Sample Template Buttons */}
-                        <div className="flex items-center gap-2 flex-wrap">
+                <div className="space-y-6">
+                    {/* Published Quizzes History List */}
+                    <div className="card shadow-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-900">
+                                <BookOpen size={20} className="text-indigo-600" />
+                                Published Quizzes & Exams ({publishedQuizzes.length})
+                            </h2>
                             <button
-                                type="button"
-                                onClick={handleDownloadSampleCsv}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition border border-emerald-200"
+                                onClick={loadPublishedQuizzes}
+                                className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition"
                             >
-                                <Download size={14} /> Download Sample Excel Template
+                                🔄 Refresh List
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => excelInputRef.current?.click()}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition border border-indigo-200"
-                            >
-                                <FileSpreadsheet size={14} /> Upload Excel / CSV Quiz
-                            </button>
-                            <input
-                                ref={excelInputRef}
-                                type="file"
-                                accept=".csv, .xlsx, .xls, .txt"
-                                onChange={handleExcelImport}
-                                className="hidden"
-                            />
                         </div>
+
+                        {loadingQuizzes ? (
+                            <div className="text-center py-8 text-gray-500 font-semibold">Loading published quizzes...</div>
+                        ) : publishedQuizzes.length === 0 ? (
+                            <EmptyBox icon="📝" text="No Quizzes Published Yet" sub="Created quizzes will appear here with options to edit or delete" />
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-sm">
+                                    <thead>
+                                        <tr className="bg-indigo-50/50 text-indigo-900 border-b border-indigo-100 font-bold text-xs uppercase">
+                                            <th className="p-3">Quiz Title</th>
+                                            <th className="p-3">Course</th>
+                                            <th className="p-3">Time Limit</th>
+                                            <th className="p-3">Questions</th>
+                                            <th className="p-3">Due Date</th>
+                                            <th className="p-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {publishedQuizzes.map(qz => (
+                                            <tr key={qz.id} className="hover:bg-gray-50/80 transition">
+                                                <td className="p-3 font-bold text-gray-800 flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                    {qz.title}
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md font-semibold text-xs">
+                                                        {qz.course}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className="flex items-center gap-1 font-semibold text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-md w-fit">
+                                                        <Clock size={12} /> {qz.timeLimit ? `${qz.timeLimit} Mins` : 'No Limit'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 font-semibold text-gray-600">
+                                                    {Array.isArray(qz.questions) ? qz.questions.length : 0} Questions
+                                                </td>
+                                                <td className="p-3 text-xs text-gray-500">
+                                                    {qz.dueDate ? new Date(qz.dueDate).toLocaleDateString('en-IN') : 'No Due Date'}
+                                                </td>
+                                                <td className="p-3 text-right space-x-2">
+                                                    <button
+                                                        onClick={() => handleEditQuiz(qz)}
+                                                        className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-lg transition inline-flex items-center gap-1"
+                                                        title="Edit Quiz"
+                                                    >
+                                                        <Edit2 size={13} /> Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteQuiz(qz)}
+                                                        className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-xs rounded-lg transition inline-flex items-center gap-1"
+                                                        title="Delete Quiz"
+                                                    >
+                                                        <Trash2 size={13} /> Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
-                    <div className="space-y-5 max-w-2xl">
-                        {/* Quiz Meta */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div>
-                                <label className="text-xs font-bold opacity-50 mb-1 block">Course *</label>
-                                <select className="inp" value={quizForm.course} onChange={e => setQuizForm({ ...quizForm, course: e.target.value })}>
-                                    <option value="">Select Course</option>
-                                    {(dropdowns.courses || []).map(c => <option key={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold opacity-50 mb-1 block">Quiz Title *</label>
-                                <input className="inp" placeholder="e.g. Unit 1 Test" value={quizForm.title} onChange={e => setQuizForm({ ...quizForm, title: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold opacity-50 mb-1 block">Due Date</label>
-                                <input className="inp" type="date" value={quizForm.dueDate} onChange={e => setQuizForm({ ...quizForm, dueDate: e.target.value })} />
-                            </div>
-                        </div>
 
-                        {/* Questions */}
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="text-sm font-bold text-gray-700">Questions ({questions.length})</label>
+                    {/* Create / Edit Quiz Form */}
+                    <div ref={quizFormRef} className="card shadow-md border-2 border-indigo-100">
+                        <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-900">
+                                <CheckCircle size={20} className="text-indigo-500" />
+                                {editingQuizId ? `✏️ Edit Quiz: ${quizForm.title || 'Untitled'}` : 'Create Quiz / Exam'}
+                            </h2>
+                            {/* Excel Bulk Upload & Sample Template Buttons */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {editingQuizId && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelEdit}
+                                        className="flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl text-xs font-bold transition"
+                                    >
+                                        <X size={14} /> Cancel Edit
+                                    </button>
+                                )}
                                 <button
-                                    onClick={addQuestion}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
+                                    type="button"
+                                    onClick={handleDownloadSampleCsv}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition border border-emerald-200"
                                 >
-                                    <Plus size={13} /> Add Question
+                                    <Download size={14} /> Download Sample Excel Template
                                 </button>
-                            </div>
-                            <div className="space-y-4">
-                                {questions.map((q, i) => (
-                                    <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
-                                            {questions.length > 1 && (
-                                                <button onClick={() => removeQ(i)} className="text-red-400 hover:text-red-600 transition">
-                                                    <X size={16} />
-                                                </button>
-                                            )}
-                                        </div>
-                                        <input
-                                            className="inp mb-3"
-                                            placeholder="Question text *"
-                                            value={q.q}
-                                            onChange={e => updateQ(i, 'q', e.target.value)}
-                                        />
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {['a', 'b', 'c', 'd'].map(opt => (
-                                                <div key={opt} className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
-                                                    <input
-                                                        className="inp flex-1"
-                                                        placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
-                                                        value={q[opt]}
-                                                        onChange={e => updateQ(i, opt, e.target.value)}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-3 flex items-center gap-2">
-                                            <label className="text-xs font-bold text-gray-500">Correct Answer:</label>
-                                            {['a', 'b', 'c', 'd'].map(opt => (
-                                                <label key={opt} className={`flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${q.correct === opt ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
-                                                    <input type="radio" name={`correct-${i}`} value={opt} checked={q.correct === opt} onChange={() => updateQ(i, 'correct', opt)} className="sr-only" />
-                                                    {opt.toUpperCase()}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => excelInputRef.current?.click()}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition border border-indigo-200"
+                                >
+                                    <FileSpreadsheet size={14} /> Upload Excel / CSV Quiz
+                                </button>
+                                <input
+                                    ref={excelInputRef}
+                                    type="file"
+                                    accept=".csv, .xlsx, .xls, .txt"
+                                    onChange={handleExcelImport}
+                                    className="hidden"
+                                />
                             </div>
                         </div>
+                        <div className="space-y-5 max-w-3xl">
+                            {/* Quiz Meta */}
+                            <div className="grid grid-cols-4 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold opacity-50 mb-1 block">Course *</label>
+                                    <select className="inp" value={quizForm.course} onChange={e => setQuizForm({ ...quizForm, course: e.target.value })}>
+                                        <option value="">Select Course</option>
+                                        {(dropdowns.courses || []).map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold opacity-50 mb-1 block">Quiz Title *</label>
+                                    <input className="inp" placeholder="e.g. Unit 1 Test" value={quizForm.title} onChange={e => setQuizForm({ ...quizForm, title: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold opacity-50 mb-1 block">Time Limit (Mins) *</label>
+                                    <select className="inp" value={quizForm.timeLimit} onChange={e => setQuizForm({ ...quizForm, timeLimit: e.target.value })}>
+                                        <option value="15">15 Minutes</option>
+                                        <option value="30">30 Minutes</option>
+                                        <option value="45">45 Minutes</option>
+                                        <option value="60">60 Minutes (1 Hr)</option>
+                                        <option value="90">90 Minutes (1.5 Hrs)</option>
+                                        <option value="120">120 Minutes (2 Hrs)</option>
+                                        <option value="0">No Time Limit</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold opacity-50 mb-1 block">Due Date</label>
+                                    <input className="inp" type="date" value={quizForm.dueDate} onChange={e => setQuizForm({ ...quizForm, dueDate: e.target.value })} />
+                                </div>
+                            </div>
 
-                        <button
-                            className="btn w-full py-3 text-lg flex justify-center items-center gap-2"
-                            onClick={handlePublishQuiz}
-                            disabled={savingQuiz}
-                        >
-                            {savingQuiz
-                                ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                : `🚀 Publish Quiz (${questions.length} Questions)`}
-                        </button>
+                            {/* Questions */}
+                            <div>
+                                <div className="flex justify-between items-center mb-3">
+                                    <label className="text-sm font-bold text-gray-700">Questions ({questions.length})</label>
+                                    <button
+                                        onClick={addQuestion}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
+                                    >
+                                        <Plus size={13} /> Add Question
+                                    </button>
+                                </div>
+                                <div className="space-y-4">
+                                    {questions.map((q, i) => (
+                                        <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
+                                                {questions.length > 1 && (
+                                                    <button onClick={() => removeQ(i)} className="text-red-400 hover:text-red-600 transition">
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <input
+                                                className="inp mb-3"
+                                                placeholder="Question text *"
+                                                value={q.q}
+                                                onChange={e => updateQ(i, 'q', e.target.value)}
+                                            />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {['a', 'b', 'c', 'd'].map(opt => (
+                                                    <div key={opt} className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
+                                                        <input
+                                                            className="inp flex-1"
+                                                            placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
+                                                            value={q[opt]}
+                                                            onChange={e => updateQ(i, opt, e.target.value)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <label className="text-xs font-bold text-gray-500">Correct Answer:</label>
+                                                {['a', 'b', 'c', 'd'].map(opt => (
+                                                    <label key={opt} className={`flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${q.correct === opt ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                                                        <input type="radio" name={`correct-${i}`} value={opt} checked={q.correct === opt} onChange={() => updateQ(i, 'correct', opt)} className="sr-only" />
+                                                        {opt.toUpperCase()}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                className="btn w-full py-3 text-lg flex justify-center items-center gap-2"
+                                onClick={handlePublishQuiz}
+                                disabled={savingQuiz}
+                            >
+                                {savingQuiz
+                                    ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    : editingQuizId
+                                        ? `💾 Update Quiz (${questions.length} Questions)`
+                                        : `🚀 Publish Quiz (${questions.length} Questions)`}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
