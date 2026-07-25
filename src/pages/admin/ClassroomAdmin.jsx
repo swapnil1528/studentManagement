@@ -104,8 +104,8 @@ export default function ClassroomAdmin({ adminData }) {
     const [savingGrade, setSavingGrade] = useState(null);
 
     // ── Quiz creation & history state ─────────────────────────────────────────
-    const [quizForm, setQuizForm] = useState({ course: '', title: '', dueDate: '', timeLimit: '15' });
-    const [questions, setQuestions] = useState([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+    const [quizForm, setQuizForm] = useState({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
+    const [questions, setQuestions] = useState([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
     const [savingQuiz, setSavingQuiz] = useState(false);
     const [publishedQuizzes, setPublishedQuizzes] = useState([]);
     const [loadingQuizzes, setLoadingQuizzes] = useState(false);
@@ -248,15 +248,17 @@ export default function ClassroomAdmin({ adminData }) {
             title: quizForm.title,
             dueDate: quizForm.dueDate,
             timeLimit: Number(quizForm.timeLimit) || 0,
-            questions: questions.map(q => ({ q: q.q, options: { a: q.a, b: q.b, c: q.c, d: q.d }, correct: q.correct })),
+            shuffleQuestions: quizForm.shuffleQuestions !== false,
+            shuffleOptions: quizForm.shuffleOptions !== false,
+            questions: questions.map(q => ({ q: q.q, type: q.type || 'single', options: { a: q.a, b: q.b, c: q.c, d: q.d }, correct: q.correct })),
             totalMarks,
         });
         setSavingQuiz(false);
         if (result?.success) {
             showToast(editingQuizId ? 'Quiz Updated Successfully! ✅' : 'Quiz Published to Students ✅');
             setEditingQuizId(null);
-            setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15' });
-            setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+            setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
+            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
             loadPublishedQuizzes();
         } else {
             alert(result?.error || 'Failed to save quiz');
@@ -270,6 +272,8 @@ export default function ClassroomAdmin({ adminData }) {
             title: qz.title || '',
             dueDate: qz.dueDate || '',
             timeLimit: String(qz.timeLimit ?? 15),
+            shuffleQuestions: qz.shuffleQuestions !== false,
+            shuffleOptions: qz.shuffleOptions !== false,
         });
         if (Array.isArray(qz.questions) && qz.questions.length > 0) {
             setQuestions(qz.questions.map(q => ({
@@ -278,10 +282,11 @@ export default function ClassroomAdmin({ adminData }) {
                 b: q.options?.b || '',
                 c: q.options?.c || '',
                 d: q.options?.d || '',
+                type: q.type || (String(q.correct || '').includes(',') ? 'multiple' : 'single'),
                 correct: q.correct || 'a',
             })));
         } else {
-            setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
         }
         showToast(`Editing Quiz: ${qz.title}`);
         quizFormRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -289,8 +294,8 @@ export default function ClassroomAdmin({ adminData }) {
 
     const handleCancelEdit = () => {
         setEditingQuizId(null);
-        setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15' });
-        setQuestions([{ q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+        setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
+        setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
     };
 
     const handleDeleteQuiz = async (qz) => {
@@ -306,21 +311,51 @@ export default function ClassroomAdmin({ adminData }) {
         }
     };
 
-    const addQuestion = () => setQuestions(prev => [...prev, { q: '', a: '', b: '', c: '', d: '', correct: 'a' }]);
+    const addQuestion = () => setQuestions(prev => [...prev, { q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
     const updateQ = (i, field, val) => setQuestions(prev => prev.map((q, idx) => idx === i ? { ...q, [field]: val } : q));
     const removeQ = (i) => setQuestions(prev => prev.filter((_, idx) => idx !== i));
+
+    const toggleCorrectOption = (questionIndex, optKey) => {
+        setQuestions(prev => prev.map((q, idx) => {
+            if (idx !== questionIndex) return q;
+            if (q.type === 'multiple') {
+                const currentArr = typeof q.correct === 'string' ? q.correct.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+                let nextArr;
+                if (currentArr.includes(optKey)) {
+                    nextArr = currentArr.filter(x => x !== optKey);
+                } else {
+                    nextArr = [...currentArr, optKey].sort();
+                }
+                return { ...q, correct: nextArr.join(',') || 'a' };
+            } else {
+                return { ...q, correct: optKey };
+            }
+        }));
+    };
+
+    const toggleQuestionType = (questionIndex, type) => {
+        setQuestions(prev => prev.map((q, idx) => {
+            if (idx !== questionIndex) return q;
+            let newCorrect = q.correct;
+            if (type === 'single' && typeof newCorrect === 'string' && newCorrect.includes(',')) {
+                newCorrect = newCorrect.split(',')[0] || 'a';
+            }
+            return { ...q, type, correct: newCorrect };
+        }));
+    };
 
     // ── Bulk Excel / CSV Upload & Sample Download ────────────────────────────
     const excelInputRef = useRef(null);
 
     const handleDownloadSampleCsv = () => {
-        const headers = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer (a/b/c/d)'];
+        const headers = ['Question Text', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer (a/b/c/d or a,c)', 'Question Type (single/multiple)'];
         const rows = [
-            ['What is the capital of France?', 'London', 'Paris', 'Berlin', 'Madrid', 'b'],
-            ['Which planet is known as the Red Planet?', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'b'],
-            ['What is 15 + 25?', '35', '40', '45', '50', 'b']
+            ['Which unit of CPU performs mathematical calculations?', 'Arithmetic Logic Unit (ALU)', 'Control Unit', 'Memory Unit', 'Bus Unit', 'a', 'single'],
+            ['Select all input devices from the list below:', 'Keyboard', 'Monitor', 'Mouse', 'Printer', 'a,c', 'multiple'],
+            ['Which of the following are Operating Systems?', 'Windows 11', 'MS Word', 'Linux Ubuntu', 'MS PowerPoint', 'a,c', 'multiple'],
+            ['What is the binary representation of decimal 10?', '1010', '1100', '1001', '1111', 'a', 'single']
         ];
-        exportCsv('Sample_Quiz_Template', headers, rows);
+        exportCsv('Sample_Quiz_Template_With_MultiSelect', headers, rows);
         showToast('Sample Excel Template Downloaded! 📥');
     };
 
@@ -371,9 +406,19 @@ export default function ClassroomAdmin({ adminData }) {
                         const b = cols[2] || '';
                         const c = cols[3] || '';
                         const d = cols[4] || '';
-                        let correct = (cols[5] || 'a').toLowerCase().trim();
-                        if (!['a', 'b', 'c', 'd'].includes(correct)) correct = 'a';
-                        parsedQuestions.push({ q, a, b, c, d, correct });
+                        let rawCorrect = (cols[5] || 'a').toLowerCase().trim().replace(/[|;]/g, ',');
+                        let qType = (cols[6] || '').toLowerCase().trim();
+
+                        if (rawCorrect.includes(',') || qType === 'multiple') {
+                            qType = 'multiple';
+                            const validOpts = rawCorrect.split(',').map(s => s.trim()).filter(s => ['a', 'b', 'c', 'd'].includes(s));
+                            rawCorrect = validOpts.length > 0 ? Array.from(new Set(validOpts)).sort().join(',') : 'a';
+                        } else {
+                            qType = 'single';
+                            if (!['a', 'b', 'c', 'd'].includes(rawCorrect)) rawCorrect = 'a';
+                        }
+
+                        parsedQuestions.push({ q, a, b, c, d, type: qType, correct: rawCorrect });
                     }
                 }
 
@@ -1101,6 +1146,28 @@ export default function ClassroomAdmin({ adminData }) {
                                 </div>
                             </div>
 
+                            {/* Shuffle Toggles */}
+                            <div className="flex flex-wrap items-center gap-6 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-xs font-bold text-indigo-900">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={quizForm.shuffleQuestions !== false}
+                                        onChange={e => setQuizForm({ ...quizForm, shuffleQuestions: e.target.checked })}
+                                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                    />
+                                    <span>🔀 Shuffle Questions Order</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={quizForm.shuffleOptions !== false}
+                                        onChange={e => setQuizForm({ ...quizForm, shuffleOptions: e.target.checked })}
+                                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                    />
+                                    <span>🔀 Shuffle Options (A, B, C, D)</span>
+                                </label>
+                            </div>
+
                             {/* Questions */}
                             <div>
                                 <div className="flex justify-between items-center mb-3">
@@ -1113,46 +1180,79 @@ export default function ClassroomAdmin({ adminData }) {
                                     </button>
                                 </div>
                                 <div className="space-y-4">
-                                    {questions.map((q, i) => (
-                                        <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
-                                                {questions.length > 1 && (
-                                                    <button onClick={() => removeQ(i)} className="text-red-400 hover:text-red-600 transition">
-                                                        <X size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <input
-                                                className="inp mb-3"
-                                                placeholder="Question text *"
-                                                value={q.q}
-                                                onChange={e => updateQ(i, 'q', e.target.value)}
-                                            />
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {['a', 'b', 'c', 'd'].map(opt => (
-                                                    <div key={opt} className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
-                                                        <input
-                                                            className="inp flex-1"
-                                                            placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
-                                                            value={q[opt]}
-                                                            onChange={e => updateQ(i, opt, e.target.value)}
-                                                        />
+                                    {questions.map((q, i) => {
+                                        const isMulti = q.type === 'multiple';
+                                        const correctArr = typeof q.correct === 'string' ? q.correct.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+
+                                        return (
+                                            <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative">
+                                                <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
+                                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
+
+                                                    {/* Question Type Switcher */}
+                                                    <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-lg text-xs font-bold">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleQuestionType(i, 'single')}
+                                                            className={`px-2.5 py-1 rounded-md transition ${!isMulti ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                                        >
+                                                            Radio (Single Choice)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleQuestionType(i, 'multiple')}
+                                                            className={`px-2.5 py-1 rounded-md transition ${isMulti ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                                        >
+                                                            ☑️ Checkbox (Multi Choice)
+                                                        </button>
                                                     </div>
-                                                ))}
-                                            </div>
-                                            <div className="mt-3 flex items-center gap-2">
-                                                <label className="text-xs font-bold text-gray-500">Correct Answer:</label>
-                                                {['a', 'b', 'c', 'd'].map(opt => (
-                                                    <label key={opt} className={`flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${q.correct === opt ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
-                                                        <input type="radio" name={`correct-${i}`} value={opt} checked={q.correct === opt} onChange={() => updateQ(i, 'correct', opt)} className="sr-only" />
-                                                        {opt.toUpperCase()}
+
+                                                    {questions.length > 1 && (
+                                                        <button onClick={() => removeQ(i)} className="text-red-400 hover:text-red-600 transition">
+                                                            <X size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <input
+                                                    className="inp mb-3"
+                                                    placeholder="Question text *"
+                                                    value={q.q}
+                                                    onChange={e => updateQ(i, 'q', e.target.value)}
+                                                />
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {['a', 'b', 'c', 'd'].map(opt => (
+                                                        <div key={opt} className="flex items-center gap-2">
+                                                            <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
+                                                            <input
+                                                                className="inp flex-1"
+                                                                placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
+                                                                value={q[opt]}
+                                                                onChange={e => updateQ(i, opt, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                                    <label className="text-xs font-bold text-gray-500">
+                                                        {isMulti ? 'Select ALL Correct Answers (Checkboxes):' : 'Correct Answer:'}
                                                     </label>
-                                                ))}
+                                                    {['a', 'b', 'c', 'd'].map(opt => {
+                                                        const isSelected = isMulti ? correctArr.includes(opt) : q.correct === opt;
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                key={opt}
+                                                                onClick={() => toggleCorrectOption(i, opt)}
+                                                                className={`flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${isSelected ? (isMulti ? 'bg-purple-600 text-white' : 'bg-green-500 text-white') : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                                                            >
+                                                                {isMulti ? (isSelected ? '☑️' : '☐') : ''} Option {opt.toUpperCase()}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 

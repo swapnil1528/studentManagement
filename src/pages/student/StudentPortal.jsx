@@ -125,11 +125,88 @@ export default function StudentPortal() {
         return () => clearInterval(timer);
     }, [activeQuiz, quizResult, secondsLeft]);
 
+    const checkQuizAnswer = (q, studentAns) => {
+        if (!studentAns) return false;
+        const isMulti = q.type === 'multiple' || String(q.correct || '').includes(',');
+        if (isMulti) {
+            const studentArr = Array.isArray(studentAns) ? studentAns : String(studentAns).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const correctArr = typeof q.correct === 'string' ? q.correct.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : (Array.isArray(q.correct) ? q.correct : []);
+            if (studentArr.length !== correctArr.length) return false;
+            return studentArr.sort().join(',') === correctArr.sort().join(',');
+        } else {
+            return String(studentAns).trim().toLowerCase() === String(q.correct).trim().toLowerCase();
+        }
+    };
+
+    const formatAnswerDisplay = (q, rawAns) => {
+        if (!rawAns) return 'Not Answered';
+        const isMulti = q.type === 'multiple' || String(q.correct || '').includes(',');
+        const ansArr = isMulti
+            ? (Array.isArray(rawAns) ? rawAns : String(rawAns).split(',').map(s => s.trim().toLowerCase()).filter(Boolean))
+            : [String(rawAns).trim().toLowerCase()];
+
+        if (ansArr.length === 0) return 'Not Answered';
+
+        const textParts = ansArr.map(k => {
+            const optVal = q.options?.[k];
+            return optVal ? `${k.toUpperCase()}. ${optVal}` : k.toUpperCase();
+        });
+        return textParts.join(' | ');
+    };
+
+    const shuffleArray = (arr) => {
+        const array = [...arr];
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    };
+
+    const handleStartQuiz = (qz) => {
+        let preparedQuestions = (qz.questions || []).map(q => ({ ...q }));
+
+        if (qz.shuffleQuestions !== false) {
+            preparedQuestions = shuffleArray(preparedQuestions);
+        }
+
+        preparedQuestions = preparedQuestions.map(q => {
+            const defaultKeys = ['a', 'b', 'c', 'd'].filter(k => q.options?.[k]);
+            const keys = (qz.shuffleOptions !== false) ? shuffleArray(defaultKeys) : defaultKeys;
+            return { ...q, shuffledOptionKeys: keys };
+        });
+
+        setActiveQuiz({ ...qz, questions: preparedQuestions });
+        setQuizStep(0);
+        setQuizAnswers({});
+        setQuizStartTime(Date.now());
+        const limitMins = Number(qz.timeLimit) || 0;
+        setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
+    };
+
+    const handleToggleStudentOption = (stepIndex, optKey, isMulti) => {
+        setQuizAnswers(prev => {
+            if (isMulti) {
+                const currentStr = prev[stepIndex] || '';
+                const currentArr = currentStr ? currentStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+                let nextArr;
+                if (currentArr.includes(optKey)) {
+                    nextArr = currentArr.filter(x => x !== optKey);
+                } else {
+                    nextArr = [...currentArr, optKey].sort();
+                }
+                return { ...prev, [stepIndex]: nextArr.join(',') };
+            } else {
+                return { ...prev, [stepIndex]: optKey };
+            }
+        });
+    };
+
     const submitQuizAuto = async () => {
         if (!activeQuiz) return;
         setSubmittingQuiz(true);
         let score = 0;
-        activeQuiz.questions.forEach((q, idx) => { if (quizAnswers[idx] === q.correct) score++; });
+        activeQuiz.questions.forEach((q, idx) => { if (checkQuizAnswer(q, quizAnswers[idx])) score++; });
         const durationMs = Date.now() - (quizStartTime || Date.now());
         const totalSecs = Math.max(1, Math.round(durationMs / 1000));
         const mins = Math.floor(totalSecs / 60);
@@ -174,11 +251,10 @@ export default function StudentPortal() {
         const centerBranch = franchiseInfo?.branch || profile?.branch || '';
 
         const qRows = (questionsList || []).map((q, i) => {
-            const studentAns = userAnswersMap?.[i] || 'Not Answered';
-            const correctOpt = q.correct || 'a';
-            const isRight = String(studentAns).toLowerCase() === String(correctOpt).toLowerCase();
-            const studentText = q.options?.[studentAns] ? `${String(studentAns).toUpperCase()}. ${q.options[studentAns]}` : String(studentAns).toUpperCase();
-            const correctText = `${String(correctOpt).toUpperCase()}. ${q.options?.[correctOpt] || ''}`;
+            const studentAns = userAnswersMap?.[i];
+            const isRight = checkQuizAnswer(q, studentAns);
+            const studentText = formatAnswerDisplay(q, studentAns);
+            const correctText = formatAnswerDisplay(q, q.correct);
 
             return `
                 <tr style="border-bottom:1px solid #e2e8f0;">
@@ -845,6 +921,11 @@ export default function StudentPortal() {
                             {/* Quiz Player */}
                             {activeQuiz && !quizResult && (() => {
                                 const question = activeQuiz.questions[quizStep];
+                                const isMulti = question?.type === 'multiple' || String(question?.correct || '').includes(',');
+                                const displayOptionKeys = question?.shuffledOptionKeys || ['a', 'b', 'c', 'd'].filter(opt => question?.options?.[opt]);
+                                const currentAnswerStr = quizAnswers[quizStep] || '';
+                                const currentAnswerArr = currentAnswerStr ? currentAnswerStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+
                                 const mins = secondsLeft !== null ? Math.floor(secondsLeft / 60) : 0;
                                 const secs = secondsLeft !== null ? secondsLeft % 60 : 0;
                                 const timeStr = secondsLeft !== null ? `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` : null;
@@ -853,7 +934,14 @@ export default function StudentPortal() {
                                 return (
                                     <div style={cardS}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                            <div style={{ fontWeight: 800, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035' }}>📝 {activeQuiz.title}</div>
+                                            <div>
+                                                <div style={{ fontWeight: 800, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035' }}>📝 {activeQuiz.title}</div>
+                                                {isMulti && (
+                                                    <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.12)', color: '#7c3aed', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginTop: 4 }}>
+                                                        ☑️ Select ALL correct options (Multi-Choice)
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                                 {timeStr && (
                                                     <span style={{
@@ -875,14 +963,35 @@ export default function StudentPortal() {
                                         </div>
                                         <div style={{ fontWeight: 700, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 20, lineHeight: 1.5 }}>{question?.q}</div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                                            {['a', 'b', 'c', 'd'].filter(opt => question?.options?.[opt]).map(opt => (
-                                                <button key={opt}
-                                                    onClick={() => setQuizAnswers(prev => ({ ...prev, [quizStep]: opt }))}
-                                                    style={{ padding: '14px 18px', borderRadius: 14, border: `2px solid ${quizAnswers[quizStep] === opt ? '#7c3aed' : isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`, background: quizAnswers[quizStep] === opt ? (isDark ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.06)') : 'transparent', color: isDark ? '#ede9fe' : '#1a1035', fontWeight: quizAnswers[quizStep] === opt ? 800 : 600, fontSize: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
-                                                >
-                                                    <span style={{ fontWeight: 900, marginRight: 10, color: '#7c3aed', textTransform: 'uppercase' }}>{opt}.</span> {question.options[opt]}
-                                                </button>
-                                            ))}
+                                            {displayOptionKeys.map(opt => {
+                                                const isSelected = isMulti ? currentAnswerArr.includes(opt) : currentAnswerStr === opt;
+                                                return (
+                                                    <button key={opt}
+                                                        onClick={() => handleToggleStudentOption(quizStep, opt, isMulti)}
+                                                        style={{
+                                                            padding: '14px 18px', borderRadius: 14,
+                                                            border: `2px solid ${isSelected ? '#7c3aed' : isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+                                                            background: isSelected ? (isDark ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.06)') : 'transparent',
+                                                            color: isDark ? '#ede9fe' : '#1a1035',
+                                                            fontWeight: isSelected ? 800 : 600,
+                                                            fontSize: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                                                            display: 'flex', alignItems: 'center', gap: 10
+                                                        }}
+                                                    >
+                                                        <span style={{
+                                                            width: 22, height: 22, borderRadius: isMulti ? 6 : 11,
+                                                            border: `2px solid ${isSelected ? '#7c3aed' : '#94a3b8'}`,
+                                                            background: isSelected ? '#7c3aed' : 'transparent',
+                                                            color: '#fff', fontSize: 12, fontWeight: 900,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                                        }}>
+                                                            {isSelected ? (isMulti ? '✓' : '•') : ''}
+                                                        </span>
+                                                        <span style={{ fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase' }}>{opt}.</span>
+                                                        <span>{question.options[opt]}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                         <div style={{ display: 'flex', gap: 12 }}>
                                             {quizStep > 0 && <button onClick={() => setQuizStep(s => s - 1)} style={{ flex: 1, padding: 14, borderRadius: 14, border: `2px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, background: 'transparent', color: isDark ? '#ede9fe' : '#1a1035', fontWeight: 700, cursor: 'pointer' }}>← Back</button>}
@@ -893,9 +1002,8 @@ export default function StudentPortal() {
                                                     if (!quizAnswers[quizStep]) { alert('Please select an answer'); return; }
                                                     setSubmittingQuiz(true);
                                                     let score = 0;
-                                                    activeQuiz.questions.forEach((q, idx) => { if (quizAnswers[idx] === q.correct) score++; });
+                                                    activeQuiz.questions.forEach((q, idx) => { if (checkQuizAnswer(q, quizAnswers[idx])) score++; });
 
-                                                    // Calculate attempt duration
                                                     const durationMs = Date.now() - (quizStartTime || Date.now());
                                                     const totalSecs = Math.max(1, Math.round(durationMs / 1000));
                                                     const mins = Math.floor(totalSecs / 60);
@@ -996,14 +1104,7 @@ export default function StudentPortal() {
                                                                 </>
                                                             )}
                                                             <button
-                                                                onClick={() => {
-                                                                    setActiveQuiz(qz);
-                                                                    setQuizStep(0);
-                                                                    setQuizAnswers({});
-                                                                    setQuizStartTime(Date.now());
-                                                                    const limitMins = Number(qz.timeLimit) || 0;
-                                                                    setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
-                                                                }}
+                                                                onClick={() => handleStartQuiz(qz)}
                                                                 style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: attempt ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? (isDark ? '#ede9fe' : '#475569') : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
                                                             >{attempt ? 'Retake ↻' : 'Start Quiz →'}</button>
                                                         </div>
