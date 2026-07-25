@@ -3,7 +3,7 @@
  * Bold hero text, emoji blobs, clean card, shimmer button.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -22,9 +22,19 @@ export default function LoginPage() {
     const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const { login, isAuthenticated, user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
+
+    // Auto-redirect if already authenticated (e.g. when user clicks back button)
+    useEffect(() => {
+        if (isAuthenticated && !authLoading) {
+            const role = user?.role || JSON.parse(localStorage.getItem('erp_session') || '{}')?.role;
+            if (role === 'student') navigate('/student', { replace: true });
+            else if (role === 'employee') navigate('/employee', { replace: true });
+            else navigate('/admin', { replace: true });
+        }
+    }, [isAuthenticated, user, authLoading, navigate]);
 
     const quote = QUOTES[new Date().getDay() % QUOTES.length];
 
@@ -35,9 +45,9 @@ export default function LoginPage() {
         const result = await login(username, password);
         if (result.success) {
             const stored = JSON.parse(localStorage.getItem('erp_session'));
-            if (stored?.role === 'student') navigate('/student');
-            else if (stored?.role === 'employee') navigate('/employee');
-            else navigate('/admin');
+            if (stored?.role === 'student') navigate('/student', { replace: true });
+            else if (stored?.role === 'employee') navigate('/employee', { replace: true });
+            else navigate('/admin', { replace: true });
         } else {
             setError(result.error || 'Invalid credentials');
         }
