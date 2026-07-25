@@ -78,7 +78,7 @@ export default function DashboardWidget({
             </motion.div>
 
             {/* Quick stats row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="sp-quick-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
                 {[
                     { icon: '📅', label: 'Attendance', value: `${percentage}%`, color: '#7c3aed' },
                     { icon: '📎', label: 'Submitted', value: asnCount, color: '#06b6d4' },
@@ -90,21 +90,21 @@ export default function DashboardWidget({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.08, duration: 0.3 }}
                         style={{
-                            ...cardStyle, padding: '14px 12px',
+                            ...cardStyle, padding: '12px 6px',
                             textAlign: 'center',
                         }}
                     >
-                        <div style={{ fontSize: 20, marginBottom: 4 }}>{stat.icon}</div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: stat.color }}>{stat.value}</div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                        <div style={{ fontSize: 18, marginBottom: 2 }}>{stat.icon}</div>
+                        <div style={{ fontSize: 16, fontWeight: 900, color: stat.color }}>{stat.value}</div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
                             {stat.label}
                         </div>
                     </motion.div>
                 ))}
             </div>
 
-            {/* Main 2-col grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* Main grid */}
+            <div className="sp-main-grid">
 
                 {/* ─── Attendance Check-In Widget ─── */}
                 <motion.div

@@ -566,7 +566,7 @@ export default function StudentPortal() {
                     {/* ── Attendance ── */}
                     {activeTab === 'attendance' && (
                         <div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+                            <div className="sp-main-grid" style={{ marginBottom: 16 }}>
                                 {/* Mark Card */}
                                 <div style={cardS}>
                                     {sectionTitle('📍', 'Mark Attendance')}
@@ -783,7 +783,7 @@ export default function StudentPortal() {
                             {/* Assignment Upload */}
                             <div style={cardS}>
                                 {sectionTitle('📤', 'Submit Assignment')}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                                <div className="sp-main-grid" style={{ marginBottom: 14 }}>
                                     <div>
                                         <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Course</label>
                                         <select className="inp" value={asnForm.course} style={isDark ? { background: 'rgba(255,255,255,0.04)', color: '#e2e8f0', borderColor: 'rgba(139,92,246,0.2)' } : {}} onChange={(e) => setAsnForm(p => ({ ...p, course: e.target.value, topic: '' }))}>

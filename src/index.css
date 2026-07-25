@@ -379,6 +379,19 @@ body {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
+/* ─── Responsive Grid ─── */
+.sp-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .sp-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ─── Bottom Navigation Bar ─── */
 .sp-bottom-nav {
   position: fixed;
