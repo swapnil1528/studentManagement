@@ -112,9 +112,13 @@ export default function ClassroomAdmin({ adminData }) {
     const [editingQuizId, setEditingQuizId] = useState(null);
     const quizFormRef = useRef(null);
 
-    // ── Exam marks state ──────────────────────────────────────────────────────
+    // ── Exam marks & Test history state ──────────────────────────────────────
     const [quizResults, setQuizResults] = useState([]);
     const [loadingResults, setLoadingResults] = useState(false);
+    const [thSearch, setThSearch] = useState('');
+    const [thCourseFilter, setThCourseFilter] = useState('');
+    const [thQuizFilter, setThQuizFilter] = useState('');
+    const [thAnalysisModal, setThAnalysisModal] = useState(null);
 
     // Load materials when tab active
     useEffect(() => {
@@ -122,6 +126,7 @@ export default function ClassroomAdmin({ adminData }) {
         if (activeTab === 'submissions') loadAllAssignments();
         if (activeTab === 'quizzes') loadPublishedQuizzes();
         if (activeTab === 'exammarks') loadQuizResults();
+        if (activeTab === 'testhistory') { loadQuizResults(); loadPublishedQuizzes(); }
     }, [activeTab]);
 
     const loadPublishedQuizzes = async () => {
@@ -420,6 +425,192 @@ export default function ClassroomAdmin({ adminData }) {
         exportPdf('Classroom Quiz Results Report', headers, rows);
     };
 
+    // ── Print Individual Student Quiz Marksheet (Branch Header) ─────────────
+    const handlePrintStudentMarksheet = (r) => {
+        const studentBranch = r.branch || '';
+        const franchiseList = adminData?.franchises || [];
+        let franchise = franchiseList.find(f => String(f.branch).toLowerCase() === String(studentBranch).toLowerCase());
+        if (!franchise && franchiseList.length > 0) franchise = franchiseList[0];
+
+        const centerName = franchise?.centerName || 'EduManager Institute Portal';
+        const centerAddress = franchise?.address || '';
+        const centerPhone = franchise?.mobile ? `• Phone: +91 ${franchise.mobile}` : '';
+        const centerBranch = franchise?.branch || studentBranch || '';
+
+        const matchedQuiz = (publishedQuizzes || []).find(q => String(q.id) === String(r.quizId) || String(q.title).toLowerCase() === String(r.quizTitle).toLowerCase());
+        const questionsList = matchedQuiz?.questions || [];
+        const userAnswersMap = typeof r.answers === 'object' ? r.answers : (() => { try { return JSON.parse(r.answers || '{}'); } catch (e) { return {}; } })();
+
+        const pct = Number(r.percentage) || (r.total > 0 ? Math.round((r.score / r.total) * 100) : 0);
+        const passed = pct >= 40;
+
+        const printWin = window.open('', '_blank', 'width=850,height=900');
+        if (!printWin) return alert('Please allow popups to print report.');
+
+        const qRows = (questionsList || []).map((q, i) => {
+            const studentAns = userAnswersMap?.[i] || 'Not Answered';
+            const correctOpt = q.correct || 'a';
+            const isRight = String(studentAns).toLowerCase() === String(correctOpt).toLowerCase();
+            const studentText = q.options?.[studentAns] ? `${String(studentAns).toUpperCase()}. ${q.options[studentAns]}` : String(studentAns).toUpperCase();
+            const correctText = `${String(correctOpt).toUpperCase()}. ${q.options?.[correctOpt] || ''}`;
+
+            return `
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:10px;font-weight:bold;">Q${i + 1}</td>
+                    <td style="padding:10px;">${q.q}</td>
+                    <td style="padding:10px;color:${isRight ? '#059669' : '#dc2626'};font-weight:bold;">${studentText}</td>
+                    <td style="padding:10px;color:#059669;font-weight:bold;">${correctText}</td>
+                    <td style="padding:10px;font-weight:bold;color:${isRight ? '#059669' : '#dc2626'};">${isRight ? '✓ Correct' : '✕ Incorrect'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Quiz Marksheet - ${r.quizTitle} - ${r.studentName}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1e293b; background: #fff; }
+                    .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; margin-bottom: 24px; }
+                    .logo { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; letter-spacing: 0.5px; }
+                    .sub { font-size: 13px; color: #475569; margin-top: 4px; font-weight: 600; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; border: 1px solid #e2e8f0; }
+                    .badge { padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 14px; display: inline-block; }
+                    .badge-pass { background: #d1fae5; color: #065f46; }
+                    .badge-fail { background: #fee2e2; color: #991b1b; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+                    th { background: #7c3aed; color: #fff; padding: 10px; text-align: left; }
+                    @media print { button { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo">${centerName}</div>
+                    <div class="sub">${centerAddress} ${centerPhone}</div>
+                    ${centerBranch ? `<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-top:4px;">Branch: ${centerBranch}</div>` : ''}
+                </div>
+                <div class="grid">
+                    <div><strong>Student Name:</strong> ${r.studentName}</div>
+                    <div><strong>Student ID / Roll:</strong> ${r.studentId}</div>
+                    <div><strong>Course / Class:</strong> ${r.course}</div>
+                    <div><strong>Quiz / Test Name:</strong> ${r.quizTitle}</div>
+                    <div><strong>Score Obtained:</strong> ${r.score} / ${r.total} (${pct}%)</div>
+                    <div><strong>Attempt Duration:</strong> ⏱️ ${r.duration || 'N/A'}</div>
+                    <div><strong>Date Taken:</strong> ${r.date ? new Date(r.date).toLocaleDateString('en-IN') : 'N/A'}</div>
+                    <div><strong>Result Status:</strong> <span class="badge ${passed ? 'badge-pass' : 'badge-fail'}">${passed ? 'PASSED ✅' : 'NEEDS IMPROVEMENT ⚠️'}</span></div>
+                </div>
+
+                ${questionsList.length > 0 ? `
+                <h3 style="color:#7c3aed;margin-top:24px;">Question & Option Analysis</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Question Text</th>
+                            <th>Student Answer</th>
+                            <th>Correct Answer</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${qRows}
+                    </tbody>
+                </table>` : ''}
+
+                <div style="margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px;">
+                    Generated by ${centerName} • ${new Date().toLocaleString('en-IN')}
+                </div>
+                <script>
+                    window.onload = function() { window.print(); };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    };
+
+    // ── Print All Test History Summary (Branch Header) ──────────────────────
+    const handlePrintAllTestHistory = (list) => {
+        if (!list || !list.length) return alert('No test history records to print.');
+        const franchiseList = adminData?.franchises || [];
+        const franchise = franchiseList[0] || {};
+        const centerName = franchise.centerName || 'EduManager Institute Portal';
+        const centerAddress = franchise.address || '';
+        const centerPhone = franchise.mobile ? `• Phone: +91 ${franchise.mobile}` : '';
+
+        const printWin = window.open('', '_blank', 'width=950,height=900');
+        if (!printWin) return alert('Please allow popups to print report.');
+
+        const rowsHtml = list.map((r, i) => {
+            const pct = Number(r.percentage) || (r.total > 0 ? Math.round((r.score / r.total) * 100) : 0);
+            const passed = pct >= 40;
+            return `
+                <tr style="border-bottom:1px solid #e2e8f0;font-size:12px;">
+                    <td style="padding:8px;">${i + 1}</td>
+                    <td style="padding:8px;font-weight:bold;">${r.studentName}<br><span style="font-size:10px;color:#64748b;">${r.studentId}</span></td>
+                    <td style="padding:8px;font-weight:bold;color:#4338ca;">${r.course}</td>
+                    <td style="padding:8px;font-weight:bold;">${r.quizTitle}</td>
+                    <td style="padding:8px;font-weight:bold;text-align:center;">${r.score}/${r.total}</td>
+                    <td style="padding:8px;text-align:center;font-weight:bold;color:${passed ? '#059669' : '#dc2626'};">${pct}% (${passed ? 'PASS' : 'FAIL'})</td>
+                    <td style="padding:8px;text-align:center;">${r.duration || '—'}</td>
+                    <td style="padding:8px;">${r.date ? new Date(r.date).toLocaleDateString('en-IN') : '—'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>All Student Test History Report</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; background: #fff; }
+                    .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 14px; margin-bottom: 20px; }
+                    .logo { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; }
+                    .sub { font-size: 13px; color: #475569; margin-top: 4px; font-weight: 600; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th { background: #7c3aed; color: #fff; padding: 9px; text-align: left; font-size: 12px; }
+                    @media print { button { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo">${centerName}</div>
+                    <div class="sub">${centerAddress} ${centerPhone}</div>
+                    <div style="font-size:14px;color:#7c3aed;font-weight:800;margin-top:6px;">All Student Quiz & Test History Report</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Student</th>
+                            <th>Class / Course</th>
+                            <th>Test / Quiz Name</th>
+                            <th style="text-align:center;">Marks</th>
+                            <th style="text-align:center;">% Result</th>
+                            <th style="text-align:center;">Duration</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <div style="margin-top: 30px; text-align: center; color: #94a3b8; font-size: 11px;">
+                    Generated by ${centerName} • Total Records: ${list.length} • ${new Date().toLocaleString('en-IN')}
+                </div>
+                <script>
+                    window.onload = function() { window.print(); };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    };
+
     // ── TOC filtered materials ────────────────────────────────────────────────
     const tocCourses = [...new Set(materials.map(m => m.course))];
     const filteredMaterials = tocCourse ? materials.filter(m => m.course === tocCourse) : materials;
@@ -429,6 +620,7 @@ export default function ClassroomAdmin({ adminData }) {
         { id: 'submissions', label: '📤 Submissions', desc: 'Grade student work' },
         { id: 'quizzes', label: '📝 Quizzes', desc: 'Create exams & quizzes' },
         { id: 'exammarks', label: '🏆 Exam Marks', desc: 'View student results' },
+        { id: 'testhistory', label: '📊 Test History', desc: 'Detailed student test reports & marksheets' },
     ];
 
     return (
@@ -955,6 +1147,258 @@ export default function ClassroomAdmin({ adminData }) {
                             </table>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── TEST HISTORY TAB ── */}
+            {activeTab === 'testhistory' && (
+                <div className="space-y-6">
+                    {/* Filters & Actions Header */}
+                    <div className="card shadow-md">
+                        <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-900">
+                                    <BarChart2 size={20} className="text-indigo-600" />
+                                    Student Test History & Marksheets ({quizResults.length})
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-1">View detailed test performance, filter by class/quiz, and print official marksheets with branch header.</p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    onClick={() => handlePrintAllTestHistory(
+                                        quizResults.filter(r => {
+                                            const matchesSearch = !thSearch || String(r.studentName || '').toLowerCase().includes(thSearch.toLowerCase()) || String(r.studentId || '').toLowerCase().includes(thSearch.toLowerCase());
+                                            const matchesCourse = !thCourseFilter || String(r.course) === String(thCourseFilter);
+                                            const matchesQuiz = !thQuizFilter || String(r.quizTitle) === String(thQuizFilter);
+                                            return matchesSearch && matchesCourse && matchesQuiz;
+                                        })
+                                    )}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition shadow-sm"
+                                >
+                                    <Printer size={14} /> Print Summary Report
+                                </button>
+                                <button
+                                    onClick={handleExportExcelResults}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition"
+                                >
+                                    <FileSpreadsheet size={14} /> Export Excel
+                                </button>
+                                <button
+                                    onClick={handleExportPdfResults}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-xl text-xs font-bold transition"
+                                >
+                                    <Printer size={14} /> Export PDF
+                                </button>
+                                <button className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition" onClick={loadQuizResults}>↻ Refresh</button>
+                            </div>
+                        </div>
+
+                        {/* Search & Filter Controls */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-gray-50/80 p-4 rounded-xl border border-gray-200/80">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">🔍 Search Student</label>
+                                <input
+                                    type="text"
+                                    className="inp bg-white"
+                                    placeholder="Search by student name or roll ID..."
+                                    value={thSearch}
+                                    onChange={e => setThSearch(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">🏫 Class / Course Filter</label>
+                                <select className="inp bg-white" value={thCourseFilter} onChange={e => setThCourseFilter(e.target.value)}>
+                                    <option value="">All Classes / Courses</option>
+                                    {[...new Set(quizResults.map(r => r.course).filter(Boolean))].map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">📝 Test / Quiz Filter</label>
+                                <select className="inp bg-white" value={thQuizFilter} onChange={e => setThQuizFilter(e.target.value)}>
+                                    <option value="">All Tests / Quizzes</option>
+                                    {[...new Set(quizResults.map(r => r.quizTitle).filter(Boolean))].map(q => <option key={q} value={q}>{q}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Test History Data Table */}
+                        {loadingResults ? (
+                            <div className="text-center py-12"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" /></div>
+                        ) : quizResults.length === 0 ? (
+                            <EmptyBox icon="📊" text="No student test history available" sub="Attempted student test results will appear here." />
+                        ) : (() => {
+                            const filtered = quizResults.filter(r => {
+                                const matchesSearch = !thSearch || String(r.studentName || '').toLowerCase().includes(thSearch.toLowerCase()) || String(r.studentId || '').toLowerCase().includes(thSearch.toLowerCase());
+                                const matchesCourse = !thCourseFilter || String(r.course) === String(thCourseFilter);
+                                const matchesQuiz = !thQuizFilter || String(r.quizTitle) === String(thQuizFilter);
+                                return matchesSearch && matchesCourse && matchesQuiz;
+                            });
+
+                            if (filtered.length === 0) {
+                                return <EmptyBox icon="🔍" text="No matching test records found" sub="Try adjusting your search query or filters." />;
+                            }
+
+                            return (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm border-collapse">
+                                        <thead>
+                                            <tr className="bg-indigo-50/60 text-indigo-950 font-bold text-xs uppercase border-b border-indigo-100">
+                                                <th className="p-3 text-left">Student Info</th>
+                                                <th className="p-3 text-left">Class / Course</th>
+                                                <th className="p-3 text-left">Test / Quiz Name</th>
+                                                <th className="p-3 text-center">Marks</th>
+                                                <th className="p-3 text-center">Result Status</th>
+                                                <th className="p-3 text-center">Duration</th>
+                                                <th className="p-3 text-left">Date</th>
+                                                <th className="p-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {filtered.map((r, i) => {
+                                                const pct = Number(r.percentage) || (r.total > 0 ? Math.round((r.score / r.total) * 100) : 0);
+                                                const passed = pct >= 40;
+                                                const matchedQuiz = (publishedQuizzes || []).find(q => String(q.id) === String(r.quizId) || String(q.title).toLowerCase() === String(r.quizTitle).toLowerCase());
+                                                return (
+                                                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                                                        <td className="p-3">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                                                    {r.studentName ? r.studentName[0].toUpperCase() : 'S'}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-gray-900">{r.studentName}</div>
+                                                                    <div className="text-xs font-mono text-gray-400">ID: {r.studentId}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md font-bold text-xs">
+                                                                {r.course}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 font-bold text-gray-800">{r.quizTitle}</td>
+                                                        <td className="p-3 text-center font-bold text-gray-900 text-base">{r.score}/{r.total}</td>
+                                                        <td className="p-3 text-center">
+                                                            <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                                                {pct}% {passed ? 'PASSED ✅' : 'FAILED ⚠️'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center text-xs font-semibold text-gray-600">
+                                                            {r.duration ? `⏱️ ${r.duration}` : '—'}
+                                                        </td>
+                                                        <td className="p-3 text-xs font-medium text-gray-500">
+                                                            {r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                        </td>
+                                                        <td className="p-3 text-right space-x-2">
+                                                            <button
+                                                                onClick={() => setThAnalysisModal({ result: r, quiz: matchedQuiz })}
+                                                                className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-lg transition inline-flex items-center gap-1 border border-indigo-200"
+                                                                title="View Question Analysis"
+                                                            >
+                                                                <BarChart2 size={13} /> Breakdown
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handlePrintStudentMarksheet(r)}
+                                                                className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs rounded-lg transition inline-flex items-center gap-1 border border-emerald-200"
+                                                                title="Print Marksheet with Branch Header"
+                                                            >
+                                                                <Printer size={13} /> Print
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* ── TEST ANALYSIS BREAKDOWN MODAL FOR ADMIN ── */}
+            {thAnalysisModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={e => { if (e.target === e.currentTarget) setThAnalysisModal(null); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+                        <div className="p-5 bg-gradient-to-r from-indigo-900 to-indigo-700 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <BarChart2 size={20} /> Question Analysis: {thAnalysisModal.result.quizTitle}
+                                </h3>
+                                <p className="text-xs text-indigo-200 mt-0.5">
+                                    Student: <strong className="text-white">{thAnalysisModal.result.studentName}</strong> ({thAnalysisModal.result.studentId}) • Class: {thAnalysisModal.result.course}
+                                </p>
+                            </div>
+                            <button onClick={() => setThAnalysisModal(null)} className="text-indigo-200 hover:text-white"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            <div className="grid grid-cols-3 gap-3 bg-indigo-50/70 p-4 rounded-xl text-center">
+                                <div>
+                                    <div className="text-xs font-bold text-indigo-600 uppercase">Score</div>
+                                    <div className="text-xl font-extrabold text-indigo-950">{thAnalysisModal.result.score} / {thAnalysisModal.result.total}</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs font-bold text-indigo-600 uppercase">Percentage</div>
+                                    <div className="text-xl font-extrabold text-indigo-950">{thAnalysisModal.result.percentage}%</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs font-bold text-indigo-600 uppercase">Duration</div>
+                                    <div className="text-xl font-extrabold text-indigo-950">{thAnalysisModal.result.duration || 'N/A'}</div>
+                                </div>
+                            </div>
+
+                            {(!thAnalysisModal.quiz || !thAnalysisModal.quiz.questions || thAnalysisModal.quiz.questions.length === 0) ? (
+                                <div className="p-4 bg-amber-50 text-amber-800 rounded-xl text-sm font-medium border border-amber-200">
+                                    ⚠️ Detailed question list is not available for this legacy quiz record.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-gray-800 text-sm">Questions & Answers Breakdown:</h4>
+                                    {thAnalysisModal.quiz.questions.map((q, idx) => {
+                                        const userAnsMap = typeof thAnalysisModal.result.answers === 'object' ? thAnalysisModal.result.answers : (() => { try { return JSON.parse(thAnalysisModal.result.answers || '{}'); } catch (e) { return {}; } })();
+                                        const studentChoice = userAnsMap[idx];
+                                        const isCorrect = String(studentChoice).toLowerCase() === String(q.correct).toLowerCase();
+                                        return (
+                                            <div key={idx} className={`p-4 rounded-xl border text-sm ${isCorrect ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
+                                                <div className="flex justify-between font-bold mb-2">
+                                                    <span className="text-gray-900">Q{idx + 1}. {q.q}</span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                                        {isCorrect ? '✓ Correct' : '✕ Incorrect'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-500 font-semibold">Student Selected: </span>
+                                                        <strong className={isCorrect ? 'text-emerald-700' : 'text-rose-700'}>
+                                                            {studentChoice ? `${String(studentChoice).toUpperCase()}. ${q.options?.[studentChoice] || ''}` : 'Not Answered'}
+                                                        </strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-500 font-semibold">Correct Answer: </span>
+                                                        <strong className="text-emerald-700">
+                                                            {q.correct ? `${String(q.correct).toUpperCase()}. ${q.options?.[q.correct] || ''}` : 'N/A'}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                            <button
+                                onClick={() => handlePrintStudentMarksheet(thAnalysisModal.result)}
+                                className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition flex items-center gap-1.5"
+                            >
+                                <Printer size={14} /> Print Marksheet Report
+                            </button>
+                            <button onClick={() => setThAnalysisModal(null)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-300 transition">
+                                Close
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
