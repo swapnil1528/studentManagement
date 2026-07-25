@@ -49,25 +49,26 @@ export default function PortalLayout({
 
                     {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <h1 style={{
-                                fontSize: 17, fontWeight: 800, margin: 0,
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <h1 className="sp-header-name" style={{
+                                fontSize: 16, fontWeight: 800, margin: 0,
                                 color: isDark ? '#ede9fe' : '#1a1035',
-                                letterSpacing: '-0.3px', whiteSpace: 'nowrap',
+                                letterSpacing: '-0.3px',
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}>
                                 {name || 'Student'}
                             </h1>
-                            <span style={{
-                                fontSize: 10, fontWeight: 700, padding: '3px 8px',
+                            <span className="sp-header-role" style={{
+                                fontSize: 9, fontWeight: 700, padding: '2px 8px',
                                 borderRadius: 20,
                                 background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(6,182,212,0.12))',
-                                color: '#7c3aed',
+                                color: '#7c3aed', flexShrink: 0,
                             }}>
                                 {role || 'Student'}
                             </span>
                         </div>
-                        <p style={{
-                            margin: '2px 0 0', fontSize: 12,
+                        <p className="sp-header-id" style={{
+                            margin: '2px 0 0', fontSize: 11,
                             color: isDark ? '#94a3b8' : '#6b7280', fontWeight: 500,
                         }}>
                             #{id || '---'}
@@ -75,30 +76,31 @@ export default function PortalLayout({
                     </div>
 
                     {/* Actions */}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                    <div className="sp-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                         <button
                             onClick={toggleTheme}
                             title={isDark ? 'Light Mode' : 'Dark Mode'}
                             style={{
-                                width: 36, height: 36, borderRadius: 10, border: 'none',
+                                width: 34, height: 34, borderRadius: 10, border: 'none',
                                 background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.08)',
                                 color: isDark ? '#fbbf24' : '#7c3aed',
-                                fontSize: 15, cursor: 'pointer', display: 'flex',
+                                fontSize: 14, cursor: 'pointer', display: 'flex',
                                 alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.2s ease',
+                                transition: 'all 0.2s ease', flexShrink: 0,
                             }}
                         >
                             <i className={isDark ? 'fas fa-sun' : 'fas fa-moon'} />
                         </button>
                         <button
                             onClick={onLogout}
+                            className="sp-header-logout"
                             style={{
-                                padding: '8px 14px', borderRadius: 10, border: 'none',
+                                padding: '7px 12px', borderRadius: 10, border: 'none',
                                 background: 'linear-gradient(135deg, #f43f5e, #fb7185)',
-                                color: 'white', fontSize: 12, fontWeight: 700,
+                                color: 'white', fontSize: 11, fontWeight: 700,
                                 cursor: 'pointer', letterSpacing: '0.2px',
                                 boxShadow: '0 4px 12px rgba(244,63,94,0.25)',
-                                fontFamily: 'inherit',
+                                fontFamily: 'inherit', flexShrink: 0, whiteSpace: 'nowrap',
                             }}
                         >
                             Sign Out

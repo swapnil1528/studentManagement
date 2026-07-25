@@ -35,13 +35,18 @@
   --gz-nav-height: 72px;
 }
 
+html,
 body {
   font-family: 'Inter', sans-serif;
   background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 50%, #f5f0ff 100%);
   color: #1e293b;
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* --- Top Loading Bar --- */
@@ -379,7 +384,7 @@ body {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
-/* ─── Responsive Grid ─── */
+/* ─── Responsive Grid & Mobile Layout Overrides ─── */
 .sp-main-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -389,6 +394,38 @@ body {
 @media (max-width: 768px) {
   .sp-main-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .sp-container {
+    padding: 10px 10px calc(var(--gz-nav-height) + 16px) !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  .sp-header {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    border-radius: 16px !important;
+  }
+
+  .sp-header-name {
+    font-size: 13px !important;
+    max-width: 110px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .sp-header img {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .sp-header-logout {
+    padding: 6px 10px !important;
+    font-size: 10px !important;
   }
 }
 
