@@ -168,9 +168,9 @@ export default function StudentPortal() {
         if (!printWin) return alert('Please allow popups to print report.');
 
         const franchiseInfo = data?.franchise;
-        const centerName = franchiseInfo?.centerName || franchiseInfo?.branch || profile?.branch || 'Institute Marksheet Report';
+        const centerName = franchiseInfo?.centerName && franchiseInfo.centerName !== 'Institute Marksheet Report' ? franchiseInfo.centerName : 'DURGE COMPUTER CLASSES';
         const centerAddress = franchiseInfo?.address || '';
-        const centerPhone = franchiseInfo?.mobile ? `• Phone: +91 ${franchiseInfo.mobile}` : '';
+        const centerPhone = franchiseInfo?.mobile ? (franchiseInfo.mobile.startsWith('+91') ? franchiseInfo.mobile : `• Phone: +91 ${franchiseInfo.mobile}`) : '';
         const centerBranch = franchiseInfo?.branch || profile?.branch || '';
 
         const qRows = (questionsList || []).map((q, i) => {

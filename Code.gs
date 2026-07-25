@@ -195,30 +195,45 @@ function fetchAllAdminData(b) {
     batches = batchSheet.getRange(2, 2, batchSheet.getLastRow() - 1).getValues().flat().filter(String);
   }
 
-  // Master Franchise Data
-  const franchiseSheet = ss.getSheetByName("Master Franchise") || ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise Sheet") || ss.getSheetByName("Franchise") || ss.getSheetByName("Branch");
+  // Master Franchise / Branch Data
+  const franchiseSheet = ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise") || ss.getSheetByName("Branch") || ss.getSheetByName("Franchise");
   let franchises = [];
   if (franchiseSheet && franchiseSheet.getLastRow() > 1) {
     const fData = franchiseSheet.getDataRange().getValues();
     const headers = fData[0].map(h => String(h || '').trim().toLowerCase());
     
     let branchCol = headers.findIndex(h => h.includes('branch')); if (branchCol === -1) branchCol = 1;
-    let codeCol = headers.findIndex(h => h.includes('code')); if (codeCol === -1) codeCol = 2;
-    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes')); if (nameCol === -1) nameCol = 3;
-    let addrCol = headers.findIndex(h => h.includes('address')); if (addrCol === -1) addrCol = 4;
-    let mobCol = headers.findIndex(h => h.includes('mobile') || h.includes('phone') || h.includes('contact')); if (mobCol === -1) mobCol = 5;
+    let codeCol = headers.findIndex(h => h.includes('code'));
+    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes') || h.includes('institute'));
+    let addrCol = headers.findIndex(h => h.includes('address') || h.includes('addr')); if (addrCol === -1) addrCol = 2;
+    let mobCol = headers.findIndex(h => h.includes('contact') || h.includes('mobile') || h.includes('phone')); if (mobCol === -1) mobCol = 3;
 
     franchises = fData.slice(1).map(r => {
       const b = String(r[branchCol] || '').trim();
-      const cn = String(r[nameCol] || r[branchCol] || r[0] || '').trim();
+      const rawName = nameCol !== -1 ? String(r[nameCol] || '').trim() : '';
+      const cn = rawName || 'Durge Computer Classes';
+      const addr = addrCol !== -1 ? String(r[addrCol] || '').trim() : '';
+      const mob = mobCol !== -1 ? String(r[mobCol] || '').trim() : '';
+      const code = codeCol !== -1 ? String(r[codeCol] || '').trim() : '';
+
       return {
-        branch: b || cn,
-        centerCode: String(r[codeCol] || '').trim(),
+        branch: b || 'Durge Computer Classes',
+        centerCode: code,
         centerName: cn,
-        address: String(r[addrCol] || '').trim(),
-        mobile: String(r[mobCol] || '').trim()
+        address: addr,
+        mobile: mob
       };
     }).filter(f => f.branch || f.centerName);
+  }
+
+  if (!franchises || franchises.length === 0) {
+    franchises = [{
+      branch: 'Main Branch',
+      centerCode: '',
+      centerName: 'Durge Computer Classes',
+      address: '',
+      mobile: '7666440573'
+    }];
   }
 
   return { 
@@ -262,28 +277,41 @@ function getStudentBasic(id) {
 
   const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
   let franchiseInfo = null;
-  const fSheet = ss.getSheetByName("Master Franchise") || ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise Sheet") || ss.getSheetByName("Franchise") || ss.getSheetByName("Branch");
+  const fSheet = ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise") || ss.getSheetByName("Branch") || ss.getSheetByName("Franchise");
   if (fSheet && fSheet.getLastRow() > 1) {
     const fData = fSheet.getDataRange().getValues();
     const headers = fData[0].map(h => String(h || '').trim().toLowerCase());
     
     let branchCol = headers.findIndex(h => h.includes('branch')); if (branchCol === -1) branchCol = 1;
-    let codeCol = headers.findIndex(h => h.includes('code')); if (codeCol === -1) codeCol = 2;
-    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes')); if (nameCol === -1) nameCol = 3;
-    let addrCol = headers.findIndex(h => h.includes('address')); if (addrCol === -1) addrCol = 4;
-    let mobCol = headers.findIndex(h => h.includes('mobile') || h.includes('phone') || h.includes('contact')); if (mobCol === -1) mobCol = 5;
+    let codeCol = headers.findIndex(h => h.includes('code'));
+    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes') || h.includes('institute'));
+    let addrCol = headers.findIndex(h => h.includes('address') || h.includes('addr')); if (addrCol === -1) addrCol = 2;
+    let mobCol = headers.findIndex(h => h.includes('contact') || h.includes('mobile') || h.includes('phone')); if (mobCol === -1) mobCol = 3;
 
     const matches = fData.slice(1).map(r => {
       const b = String(r[branchCol] || '').trim();
-      const cn = String(r[nameCol] || r[branchCol] || r[0] || '').trim();
+      const rawName = nameCol !== -1 ? String(r[nameCol] || '').trim() : '';
+      const cn = rawName || 'Durge Computer Classes';
+      const addr = addrCol !== -1 ? String(r[addrCol] || '').trim() : '';
+      const mob = mobCol !== -1 ? String(r[mobCol] || '').trim() : '';
+      const code = codeCol !== -1 ? String(r[codeCol] || '').trim() : '';
+
       return {
-        branch: b || cn,
-        centerCode: String(r[codeCol] || '').trim(),
+        branch: b || 'Durge Computer Classes',
+        centerCode: code,
         centerName: cn,
-        address: String(r[addrCol] || '').trim(),
-        mobile: String(r[mobCol] || '').trim()
+        address: addr,
+        mobile: mob
       };
     }).filter(f => f.branch || f.centerName);
+
+    if (studentBranch) {
+      franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());
+    }
+    if (!franchiseInfo && matches.length > 0) {
+      franchiseInfo = matches[0];
+    }
+  }
 
     if (studentBranch) {
       franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());

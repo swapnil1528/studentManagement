@@ -440,9 +440,9 @@ export default function ClassroomAdmin({ adminData }) {
         if (!match && franchiseList.length > 0) {
             match = franchiseList[0];
         }
-        const centerName = match?.centerName || match?.branch || 'Institute Marksheet Report';
+        const centerName = match?.centerName && match.centerName !== 'Institute Marksheet Report' ? match.centerName : 'DURGE COMPUTER CLASSES';
         const centerAddress = match?.address || '';
-        const centerPhone = match?.mobile ? `• Phone: +91 ${match.mobile}` : '';
+        const centerPhone = match?.mobile ? (match.mobile.startsWith('+91') ? match.mobile : `• Phone: +91 ${match.mobile}`) : '';
         const centerBranch = match?.branch || branchName || '';
         return { centerName, centerAddress, centerPhone, centerBranch };
     };
