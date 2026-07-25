@@ -62,6 +62,17 @@ const formatSize = (bytes) => {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
+const formatDueDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+        return dateStr;
+    }
+};
+
 const getFileIcon = (mimeType, fileName) => {
     if (!mimeType && !fileName) return '📄';
     const ext = fileName?.split('.').pop()?.toLowerCase() || '';
@@ -1075,22 +1086,40 @@ export default function StudentPortal() {
                                             {quizList.map((qz, i) => {
                                                 const attempt = myQuizResults.find(r => String(r.quizId) === String(qz.id));
                                                 return (
-                                                    <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderRadius: 16, background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(124,58,237,0.08)'}` }}>
-                                                        <div>
-                                                            <div style={{ fontWeight: 800, fontSize: 15, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 4 }}>📋 {qz.title}</div>
-                                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                                                                <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7c3aed', padding: '2px 9px', borderRadius: 20 }}>{qz.course}</span>
-                                                                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{qz.questions?.length || 0} Questions</span>
-                                                                {qz.timeLimit > 0 && <span style={{ fontSize: 11, color: '#0891b2', fontWeight: 700 }}>⏱️ {qz.timeLimit} Mins</span>}
-                                                                {qz.dueDate && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Due: {qz.dueDate}</span>}
-                                                                {attempt && (
-                                                                    <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.12)', color: '#059669', padding: '2px 9px', borderRadius: 20 }}>
-                                                                        Score: {attempt.score}/{attempt.total} ({attempt.percentage}%) {attempt.duration ? `• ⏱️ ${attempt.duration}` : ''}
-                                                                    </span>
-                                                                )}
+                                                    <motion.div
+                                                        key={i}
+                                                        initial={{ opacity: 0, y: 8 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: i * 0.05 }}
+                                                        style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: 12,
+                                                            padding: '16px',
+                                                            borderRadius: 16,
+                                                            background: isDark ? 'rgba(255,255,255,0.04)' : '#f8f7ff',
+                                                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(124,58,237,0.08)'}`
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                                                            <div>
+                                                                <div style={{ fontWeight: 800, fontSize: 15, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 6 }}>📋 {qz.title}</div>
+                                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                    <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7c3aed', padding: '2px 9px', borderRadius: 20 }}>{qz.course}</span>
+                                                                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{qz.questions?.length || 0} Questions</span>
+                                                                    {qz.timeLimit > 0 && <span style={{ fontSize: 11, color: '#0891b2', fontWeight: 700 }}>⏱️ {qz.timeLimit} Mins</span>}
+                                                                    {qz.dueDate && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>📅 Due: {formatDueDate(qz.dueDate)}</span>}
+                                                                </div>
                                                             </div>
+                                                            {attempt && (
+                                                                <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(16,185,129,0.12)', color: '#059669', padding: '4px 10px', borderRadius: 20 }}>
+                                                                    Score: {attempt.score}/{attempt.total} ({attempt.percentage}%) {attempt.duration ? `• ⏱️ ${attempt.duration}` : ''}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+
+                                                        {/* Responsive action buttons */}
+                                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%', paddingTop: 6, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(124,58,237,0.05)'}` }}>
                                                             {attempt && (
                                                                 <>
                                                                     <button
@@ -1106,7 +1135,7 @@ export default function StudentPortal() {
                                                                                 answers: attempt.answers || {},
                                                                             });
                                                                         }}
-                                                                        style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+                                                                        style={{ flex: '1 1 120px', padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
                                                                     >
                                                                         📊 Analysis
                                                                     </button>
@@ -1121,7 +1150,7 @@ export default function StudentPortal() {
                                                                             qz.questions || [],
                                                                             attempt.answers || {}
                                                                         )}
-                                                                        style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+                                                                        style={{ flex: '1 1 120px', padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
                                                                     >
                                                                         🖨️ Print
                                                                     </button>
@@ -1129,8 +1158,22 @@ export default function StudentPortal() {
                                                             )}
                                                             <button
                                                                 onClick={() => handleStartQuiz(qz)}
-                                                                style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: attempt ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? (isDark ? '#ede9fe' : '#475569') : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                                            >{attempt ? 'Retake ↻' : 'Start Quiz →'}</button>
+                                                                style={{
+                                                                    flex: attempt ? '1 1 120px' : '1 1 100%',
+                                                                    padding: '10px 16px',
+                                                                    borderRadius: 10,
+                                                                    border: 'none',
+                                                                    background: attempt ? (isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0') : 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                                                    color: attempt ? (isDark ? '#ede9fe' : '#475569') : '#fff',
+                                                                    fontWeight: 800,
+                                                                    fontSize: 13,
+                                                                    cursor: 'pointer',
+                                                                    textAlign: 'center',
+                                                                    boxShadow: attempt ? 'none' : '0 4px 14px rgba(124,58,237,0.25)'
+                                                                }}
+                                                            >
+                                                                {attempt ? 'Retake ↻' : 'Start Quiz →'}
+                                                            </button>
                                                         </div>
                                                     </motion.div>
                                                 );
