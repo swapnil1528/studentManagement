@@ -168,7 +168,7 @@ export default function StudentPortal() {
         if (!printWin) return alert('Please allow popups to print report.');
 
         const franchiseInfo = data?.franchise;
-        const centerName = franchiseInfo?.centerName || 'EduManager Institute Portal';
+        const centerName = franchiseInfo?.centerName || franchiseInfo?.branch || profile?.branch || 'Institute Marksheet Report';
         const centerAddress = franchiseInfo?.address || '';
         const centerPhone = franchiseInfo?.mobile ? `• Phone: +91 ${franchiseInfo.mobile}` : '';
         const centerBranch = franchiseInfo?.branch || profile?.branch || '';

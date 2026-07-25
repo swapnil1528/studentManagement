@@ -196,17 +196,29 @@ function fetchAllAdminData(b) {
   }
 
   // Master Franchise Data
-  const franchiseSheet = ss.getSheetByName("Master Franchise Data");
+  const franchiseSheet = ss.getSheetByName("Master Franchise") || ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise Sheet") || ss.getSheetByName("Franchise") || ss.getSheetByName("Branch");
   let franchises = [];
   if (franchiseSheet && franchiseSheet.getLastRow() > 1) {
-    const fData = franchiseSheet.getDataRange().getValues().slice(1);
-    franchises = fData.map(r => ({
-      branch: String(r[1] || '').trim(),
-      centerCode: String(r[2] || ''),
-      centerName: String(r[3] || ''),
-      address: String(r[4] || ''),
-      mobile: String(r[5] || '')
-    })).filter(f => f.branch);
+    const fData = franchiseSheet.getDataRange().getValues();
+    const headers = fData[0].map(h => String(h || '').trim().toLowerCase());
+    
+    let branchCol = headers.findIndex(h => h.includes('branch')); if (branchCol === -1) branchCol = 1;
+    let codeCol = headers.findIndex(h => h.includes('code')); if (codeCol === -1) codeCol = 2;
+    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes')); if (nameCol === -1) nameCol = 3;
+    let addrCol = headers.findIndex(h => h.includes('address')); if (addrCol === -1) addrCol = 4;
+    let mobCol = headers.findIndex(h => h.includes('mobile') || h.includes('phone') || h.includes('contact')); if (mobCol === -1) mobCol = 5;
+
+    franchises = fData.slice(1).map(r => {
+      const b = String(r[branchCol] || '').trim();
+      const cn = String(r[nameCol] || r[branchCol] || r[0] || '').trim();
+      return {
+        branch: b || cn,
+        centerCode: String(r[codeCol] || '').trim(),
+        centerName: cn,
+        address: String(r[addrCol] || '').trim(),
+        mobile: String(r[mobCol] || '').trim()
+      };
+    }).filter(f => f.branch || f.centerName);
   }
 
   return { 
@@ -250,16 +262,29 @@ function getStudentBasic(id) {
 
   const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
   let franchiseInfo = null;
-  const fSheet = ss.getSheetByName("Master Franchise");
+  const fSheet = ss.getSheetByName("Master Franchise") || ss.getSheetByName("Master Franchise Data") || ss.getSheetByName("Master Franchise Sheet") || ss.getSheetByName("Franchise") || ss.getSheetByName("Branch");
   if (fSheet && fSheet.getLastRow() > 1) {
-    const fData = fSheet.getDataRange().getValues().slice(1);
-    const matches = fData.map(r => ({
-      branch: String(r[1] || '').trim(),
-      centerCode: String(r[2] || ''),
-      centerName: String(r[3] || ''),
-      address: String(r[4] || ''),
-      mobile: String(r[5] || '')
-    })).filter(f => f.branch);
+    const fData = fSheet.getDataRange().getValues();
+    const headers = fData[0].map(h => String(h || '').trim().toLowerCase());
+    
+    let branchCol = headers.findIndex(h => h.includes('branch')); if (branchCol === -1) branchCol = 1;
+    let codeCol = headers.findIndex(h => h.includes('code')); if (codeCol === -1) codeCol = 2;
+    let nameCol = headers.findIndex(h => h.includes('name') || h.includes('center') || h.includes('classes')); if (nameCol === -1) nameCol = 3;
+    let addrCol = headers.findIndex(h => h.includes('address')); if (addrCol === -1) addrCol = 4;
+    let mobCol = headers.findIndex(h => h.includes('mobile') || h.includes('phone') || h.includes('contact')); if (mobCol === -1) mobCol = 5;
+
+    const matches = fData.slice(1).map(r => {
+      const b = String(r[branchCol] || '').trim();
+      const cn = String(r[nameCol] || r[branchCol] || r[0] || '').trim();
+      return {
+        branch: b || cn,
+        centerCode: String(r[codeCol] || '').trim(),
+        centerName: cn,
+        address: String(r[addrCol] || '').trim(),
+        mobile: String(r[mobCol] || '').trim()
+      };
+    }).filter(f => f.branch || f.centerName);
+
     if (studentBranch) {
       franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());
     }

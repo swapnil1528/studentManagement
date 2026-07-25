@@ -430,17 +430,26 @@ export default function ClassroomAdmin({ adminData }) {
         exportPdf('Classroom Quiz Results Report', headers, rows);
     };
 
+    // Helper to get franchise header details
+    const getFranchiseDetails = (branchName = '') => {
+        const franchiseList = adminData?.franchises || [];
+        let match = null;
+        if (branchName) {
+            match = franchiseList.find(f => String(f.branch || '').toLowerCase() === String(branchName).toLowerCase());
+        }
+        if (!match && franchiseList.length > 0) {
+            match = franchiseList[0];
+        }
+        const centerName = match?.centerName || match?.branch || 'Institute Marksheet Report';
+        const centerAddress = match?.address || '';
+        const centerPhone = match?.mobile ? `• Phone: +91 ${match.mobile}` : '';
+        const centerBranch = match?.branch || branchName || '';
+        return { centerName, centerAddress, centerPhone, centerBranch };
+    };
+
     // ── Print Individual Student Quiz Marksheet (Branch Header) ─────────────
     const handlePrintStudentMarksheet = (r) => {
-        const studentBranch = r.branch || '';
-        const franchiseList = adminData?.franchises || [];
-        let franchise = franchiseList.find(f => String(f.branch).toLowerCase() === String(studentBranch).toLowerCase());
-        if (!franchise && franchiseList.length > 0) franchise = franchiseList[0];
-
-        const centerName = franchise?.centerName || 'EduManager Institute Portal';
-        const centerAddress = franchise?.address || '';
-        const centerPhone = franchise?.mobile ? `• Phone: +91 ${franchise.mobile}` : '';
-        const centerBranch = franchise?.branch || studentBranch || '';
+        const { centerName, centerAddress, centerPhone, centerBranch } = getFranchiseDetails(r.branch || r.course);
 
         const matchedQuiz = (publishedQuizzes || []).find(q => String(q.id) === String(r.quizId) || String(q.title).toLowerCase() === String(r.quizTitle).toLowerCase());
         const questionsList = matchedQuiz?.questions || [];
@@ -538,11 +547,7 @@ export default function ClassroomAdmin({ adminData }) {
     // ── Print All Test History Summary (Branch Header) ──────────────────────
     const handlePrintAllTestHistory = (list) => {
         if (!list || !list.length) return alert('No test history records to print.');
-        const franchiseList = adminData?.franchises || [];
-        const franchise = franchiseList[0] || {};
-        const centerName = franchise.centerName || 'EduManager Institute Portal';
-        const centerAddress = franchise.address || '';
-        const centerPhone = franchise.mobile ? `• Phone: +91 ${franchise.mobile}` : '';
+        const { centerName, centerAddress, centerPhone } = getFranchiseDetails();
 
         const printWin = window.open('', '_blank', 'width=950,height=900');
         if (!printWin) return alert('Please allow popups to print report.');
@@ -619,11 +624,7 @@ export default function ClassroomAdmin({ adminData }) {
     // ── Print Test Class Marksheets Report (All Students for Selected Test) ──
     const handlePrintTestClassReport = (testTitle, courseName, list) => {
         if (!list || !list.length) return alert('No student test attempts found for this quiz.');
-        const franchiseList = adminData?.franchises || [];
-        const franchise = franchiseList[0] || {};
-        const centerName = franchise.centerName || 'EduManager Institute Portal';
-        const centerAddress = franchise.address || '';
-        const centerPhone = franchise.mobile ? `• Phone: +91 ${franchise.mobile}` : '';
+        const { centerName, centerAddress, centerPhone } = getFranchiseDetails();
 
         const printWin = window.open('', '_blank', 'width=950,height=900');
         if (!printWin) return alert('Please allow popups to print report.');
