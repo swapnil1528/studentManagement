@@ -3,7 +3,7 @@
  * Tabs: Overview, Attendance, Assignments, Logs, Notices, LMS, Results, Schedule, Grades
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { apiCall, uploadAssignment, getAssignments, getQuizzes, submitQuizResult, getQuizResults } from '../../services/api';
