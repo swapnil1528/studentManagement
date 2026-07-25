@@ -82,8 +82,32 @@ function EmptyBox({ icon, text, sub }) {
     );
 }
 
+const CLASSROOM_TABS = ['classwork', 'submissions', 'quizzes', 'exammarks', 'testhistory'];
+
 export default function ClassroomAdmin({ adminData }) {
-    const [activeTab, setActiveTab] = useState('classwork');
+    const getInitialTab = () => {
+        const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+        return CLASSROOM_TABS.includes(hash) ? hash : 'classwork';
+    };
+
+    const [activeTab, setActiveTabState] = useState(getInitialTab);
+
+    const setActiveTab = (tab) => {
+        setActiveTabState(tab);
+        window.history.replaceState(null, '', `#${tab}`);
+    };
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+            if (CLASSROOM_TABS.includes(hash)) {
+                setActiveTabState(hash);
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
     const dropdowns = adminData?.dropdowns || {};
 
     // ── Classwork / Materials state ──────────────────────────────────────────

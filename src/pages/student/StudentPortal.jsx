@@ -76,11 +76,35 @@ const getFileIcon = (mimeType, fileName) => {
     return '📄';
 };
 
+const STUDENT_TABS = ['overview', 'syllabus', 'attendance', 'materials', 'quizzes', 'results'];
+
 export default function StudentPortal() {
     const { user, logout } = useAuth();
     const { isDark } = useTheme();
-    const [activeTab, setActiveTab] = useState('overview');
+
+    const getInitialTab = () => {
+        const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+        return STUDENT_TABS.includes(hash) ? hash : 'overview';
+    };
+
+    const [activeTab, setActiveTabState] = useState(getInitialTab);
     const queryClient = useQueryClient();
+
+    const setActiveTab = (tab) => {
+        setActiveTabState(tab);
+        window.history.replaceState(null, '', `#${tab}`);
+    };
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+            if (STUDENT_TABS.includes(hash)) {
+                setActiveTabState(hash);
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
 
     const [asnForm, setAsnForm] = useState({ topic: '', course: '', files: [] });
     const [uploading, setUploading] = useState(false);

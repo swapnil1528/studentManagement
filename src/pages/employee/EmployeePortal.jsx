@@ -25,10 +25,34 @@ const TABS = [
     { id: 'payslips', label: 'Payslips', emoji: '💰' },
 ];
 
+const EMP_TABS = ['attendance', 'attview', 'logs', 'notices', 'leaves', 'payslips'];
+
 export default function EmployeePortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
-    const [activeTab, setActiveTab] = useState('attendance');
+
+    const getInitialTab = () => {
+        const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+        return EMP_TABS.includes(hash) ? hash : 'attendance';
+    };
+
+    const [activeTab, setActiveTabState] = useState(getInitialTab);
     const queryClient = useQueryClient();
+
+    const setActiveTab = (tab) => {
+        setActiveTabState(tab);
+        window.history.replaceState(null, '', `#${tab}`);
+    };
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
+            if (EMP_TABS.includes(hash)) {
+                setActiveTabState(hash);
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
 
     const { data: result, isLoading: loading } = useQuery({
         queryKey: ['employeeData', user?.userId],
