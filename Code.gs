@@ -1159,13 +1159,14 @@ function deleteQuiz(id) {
 }
 
 function submitQuizResult(f) {
-  // Sheet: ID, Date, StudentID, StudentName, QuizID, QuizTitle, Course, Score, Total, Percentage, Duration
-  const sheet = ensureSheet("Quiz Results", ["ID", "Date", "StudentID", "StudentName", "QuizID", "QuizTitle", "Course", "Score", "Total", "Percentage", "Duration"]);
+  // Sheet: ID, Date, StudentID, StudentName, QuizID, QuizTitle, Course, Score, Total, Percentage, Duration, Answers
+  const sheet = ensureSheet("Quiz Results", ["ID", "Date", "StudentID", "StudentName", "QuizID", "QuizTitle", "Course", "Score", "Total", "Percentage", "Duration", "Answers"]);
   const id = "QR-" + Date.now();
   const dateStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const pct = f.total > 0 ? Math.round((f.score / f.total) * 100) : 0;
   const duration = f.duration || f.durationStr || '';
-  sheet.appendRow([id, dateStr, f.studentId, f.studentName, f.quizId, f.quizTitle, f.course, f.score, f.total, pct, duration]);
+  const answers = typeof f.answers === 'string' ? f.answers : JSON.stringify(f.answers || {});
+  sheet.appendRow([id, dateStr, f.studentId, f.studentName, f.quizId, f.quizTitle, f.course, f.score, f.total, pct, duration, answers]);
   return { success: true, id: id };
 }
 
@@ -1186,6 +1187,12 @@ function getQuizResults(studentId) {
     total: r[8],
     percentage: r[9],
     duration: r[10] || '',
+    answers: (() => {
+      try {
+        if (!r[11]) return {};
+        return typeof r[11] === 'string' ? JSON.parse(r[11]) : r[11];
+      } catch(e) { return {}; }
+    })(),
   })).reverse();
 
   if (studentId) {

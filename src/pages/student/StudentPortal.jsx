@@ -136,6 +136,7 @@ export default function StudentPortal() {
         const secs = totalSecs % 60;
         const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
+        const answersJson = JSON.stringify(quizAnswers);
         await submitQuizResult({
             studentId: user?.studentId || user?.userId,
             studentName: profile?.name || user?.username || 'Student',
@@ -145,6 +146,7 @@ export default function StudentPortal() {
             score,
             total: activeQuiz.questions.length,
             duration: durationStr,
+            answers: answersJson,
         });
         setSubmittingQuiz(false);
         setQuizResult({
@@ -893,6 +895,7 @@ export default function StudentPortal() {
                                                     const secs = totalSecs % 60;
                                                     const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
+                                                    const answersJson = JSON.stringify(quizAnswers);
                                                     await submitQuizResult({
                                                         studentId: user?.studentId || user?.userId,
                                                         studentName: profile?.name || user?.username || 'Student',
@@ -902,6 +905,7 @@ export default function StudentPortal() {
                                                         score,
                                                         total: activeQuiz.questions.length,
                                                         duration: durationStr,
+                                                        answers: answersJson,
                                                     });
                                                     setSubmittingQuiz(false);
                                                     setQuizResult({
@@ -947,17 +951,55 @@ export default function StudentPortal() {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                setActiveQuiz(qz);
-                                                                setQuizStep(0);
-                                                                setQuizAnswers({});
-                                                                setQuizStartTime(Date.now());
-                                                                const limitMins = Number(qz.timeLimit) || 0;
-                                                                setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
-                                                            }}
-                                                            style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: attempt ? 'rgba(124,58,237,0.15)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? '#7c3aed' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                                                        >{attempt ? 'Retake Quiz ↻' : 'Start Quiz →'}</button>
+                                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                            {attempt && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setAnalysisModal({
+                                                                                quizTitle: qz.title,
+                                                                                course: qz.course,
+                                                                                score: attempt.score,
+                                                                                total: attempt.total,
+                                                                                duration: attempt.duration,
+                                                                                date: attempt.date,
+                                                                                questions: qz.questions || [],
+                                                                                answers: attempt.answers || {},
+                                                                            });
+                                                                        }}
+                                                                        style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+                                                                    >
+                                                                        📊 Analysis
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handlePrintQuizReport(
+                                                                            qz.title,
+                                                                            qz.course,
+                                                                            attempt.score,
+                                                                            attempt.total,
+                                                                            attempt.duration,
+                                                                            attempt.date,
+                                                                            qz.questions || [],
+                                                                            attempt.answers || {}
+                                                                        )}
+                                                                        style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+                                                                    >
+                                                                        🖨️ Print
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setActiveQuiz(qz);
+                                                                    setQuizStep(0);
+                                                                    setQuizAnswers({});
+                                                                    setQuizStartTime(Date.now());
+                                                                    const limitMins = Number(qz.timeLimit) || 0;
+                                                                    setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
+                                                                }}
+                                                                style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: attempt ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: attempt ? (isDark ? '#ede9fe' : '#475569') : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                                            >{attempt ? 'Retake ↻' : 'Start Quiz →'}</button>
+                                                        </div>
                                                     </motion.div>
                                                 );
                                             })}
@@ -979,6 +1021,7 @@ export default function StudentPortal() {
                                         {myQuizResults.map((r, i) => {
                                             const pct = Number(r.percentage) || 0;
                                             const passed = pct >= 40;
+                                            const matchingQuiz = quizList.find(q => String(q.id) === String(r.quizId));
                                             return (
                                                 <motion.div
                                                     key={i}
@@ -1002,7 +1045,7 @@ export default function StudentPortal() {
                                                             {r.date && <span>• {new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>}
                                                         </div>
                                                     </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         <span style={{ fontSize: 15, fontWeight: 900, color: passed ? '#10b981' : '#f43f5e' }}>
                                                             {r.score}/{r.total}
                                                         </span>
@@ -1010,11 +1053,36 @@ export default function StudentPortal() {
                                                             {pct}%
                                                         </span>
                                                         <button
-                                                            onClick={() => handlePrintQuizReport(r.quizTitle, r.course, r.score, r.total, r.duration, r.date, [], {})}
-                                                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.08)', color: '#7c3aed', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                                                            title="Print Quiz Report"
+                                                            onClick={() => setAnalysisModal({
+                                                                quizTitle: r.quizTitle,
+                                                                course: r.course,
+                                                                score: r.score,
+                                                                total: r.total,
+                                                                duration: r.duration,
+                                                                date: r.date,
+                                                                questions: matchingQuiz?.questions || [],
+                                                                answers: r.answers || {},
+                                                            })}
+                                                            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
+                                                            title="View Detailed Question Analysis"
                                                         >
-                                                            🖨️ Print Report
+                                                            📊 Analysis
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handlePrintQuizReport(
+                                                                r.quizTitle,
+                                                                r.course,
+                                                                r.score,
+                                                                r.total,
+                                                                r.duration,
+                                                                r.date,
+                                                                matchingQuiz?.questions || [],
+                                                                r.answers || {}
+                                                            )}
+                                                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
+                                                            title="Print Marksheet Report"
+                                                        >
+                                                            🖨️ Print
                                                         </button>
                                                     </div>
                                                 </motion.div>
