@@ -87,7 +87,7 @@ const getFileIcon = (mimeType, fileName) => {
     return '📄';
 };
 
-const STUDENT_TABS = ['overview', 'syllabus', 'attendance', 'materials', 'quizzes', 'results'];
+const STUDENT_TABS = ['overview', 'attendance', 'classroom', 'quizzes', 'results', 'schedule', 'grades', 'notices', 'logs'];
 
 export default function StudentPortal() {
     const { user, logout } = useAuth();
@@ -135,6 +135,37 @@ export default function StudentPortal() {
     const [submittingQuiz, setSubmittingQuiz] = useState(false);
     const [secondsLeft, setSecondsLeft] = useState(null);    // continuous countdown timer seconds
     const [analysisModal, setAnalysisModal] = useState(null); // detailed question analysis object
+    const [wallClock, setWallClock] = useState(() => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+    const [flaggedQuestions, setFlaggedQuestions] = useState({}); // {qIdx: bool}
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setWallClock(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => { });
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => { });
+            }
+        }
+    };
+
+    useEffect(() => {
+        const handleFsChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFsChange);
+        return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    }, []);
 
     const { data: myQuizResultsData, refetch: refetchQuizResults } = useQuery({
         queryKey: ['studentQuizResults', user?.studentId || user?.userId],
@@ -198,7 +229,12 @@ export default function StudentPortal() {
         return array;
     };
 
-    const handleStartQuiz = (qz) => {
+    const handleStartQuiz = (qz, inNewTab = false, openFullscreen = true) => {
+        if (inNewTab) {
+            window.open(`${window.location.origin}${window.location.pathname}#quiz-take:${qz.id}`, '_blank');
+            return;
+        }
+
         let preparedQuestions = (qz.questions || []).map(q => ({ ...q }));
 
         if (qz.shuffleQuestions !== false) {
@@ -214,9 +250,17 @@ export default function StudentPortal() {
         setActiveQuiz({ ...qz, questions: preparedQuestions });
         setQuizStep(0);
         setQuizAnswers({});
+        setFlaggedQuestions({});
         setQuizStartTime(Date.now());
         const limitMins = Number(qz.timeLimit) || 0;
         setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
+        window.history.replaceState(null, '', `#quiz-take:${qz.id}`);
+
+        if (openFullscreen) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => { });
+            }
+        }
     };
 
     const handleToggleStudentOption = (stepIndex, optKey, isMulti) => {
@@ -539,6 +583,7 @@ export default function StudentPortal() {
             hasFace={true}
             onFaceReg={() => { }}
             onLogout={logout}
+            hideHeaderNav={Boolean(activeQuiz && !quizResult)}
         >
             <AnimatePresence mode="wait">
                 <motion.div
@@ -953,7 +998,7 @@ export default function StudentPortal() {
                                 </div>
                             )}
 
-                            {/* Quiz Player */}
+                            {/* Full-Screen Quiz & Exam Player */}
                             {activeQuiz && !quizResult && (() => {
                                 const question = activeQuiz.questions[quizStep];
                                 const isMulti = question?.type === 'multiple' || String(question?.correct || '').includes(',');
@@ -965,114 +1010,360 @@ export default function StudentPortal() {
                                 const secs = secondsLeft !== null ? secondsLeft % 60 : 0;
                                 const timeStr = secondsLeft !== null ? `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` : null;
                                 const isWarning = secondsLeft !== null && secondsLeft < 120;
+                                const isFlagged = !!flaggedQuestions[quizStep];
+
+                                const answeredCount = Object.keys(quizAnswers).filter(k => quizAnswers[k] && String(quizAnswers[k]).trim() !== '').length;
+                                const flaggedCount = Object.keys(flaggedQuestions).filter(k => flaggedQuestions[k]).length;
+                                const unansweredCount = activeQuiz.questions.length - answeredCount;
 
                                 return (
-                                    <div style={cardS}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                            <div>
-                                                <div style={{ fontWeight: 800, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035' }}>📝 {activeQuiz.title}</div>
-                                                {isMulti && (
-                                                    <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(124,58,237,0.12)', color: '#7c3aed', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginTop: 4 }}>
-                                                        ☑️ Select ALL correct options (Multi-Choice)
-                                                    </span>
-                                                )}
-                                            </div>
+                                    <div style={{
+                                        position: 'fixed', inset: 0, zIndex: 99999,
+                                        background: isDark ? '#0b0819' : '#f4f6f9',
+                                        overflowY: 'auto', display: 'flex', flexDirection: 'column'
+                                    }}>
+                                        {/* ── EXAM TOP HEADER BAR ── */}
+                                        <header style={{
+                                            position: 'sticky', top: 0, zIndex: 100,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                            padding: '12px 24px',
+                                            background: isDark ? 'rgba(26,22,48,0.98)' : '#ffffff',
+                                            borderBottom: `2px solid ${isDark ? 'rgba(139,92,246,0.2)' : '#e2e8f0'}`,
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                                            flexWrap: 'wrap', gap: 12
+                                        }}>
+                                            {/* TOP LEFT: Student Photo & Profile */}
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <img
+                                                    src={profile.photo && profile.photo.length > 10 ? profile.photo : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profile.name || 'student')}&backgroundColor=b6e3f4,c0aede,d1d4f9`}
+                                                    alt="Student"
+                                                    style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid #7c3aed', boxShadow: '0 2px 8px rgba(124,58,237,0.3)' }}
+                                                    onError={e => { e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile.name || 'S')}&backgroundColor=7c3aed`; }}
+                                                />
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: 14, color: isDark ? '#ede9fe' : '#1a1035', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        {profile.name || 'Student'}
+                                                        <span style={{ fontSize: 10, background: 'rgba(124,58,237,0.12)', color: '#7c3aed', padding: '1px 7px', borderRadius: 12, fontWeight: 700 }}>
+                                                            {profile.batch || 'Student'}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>
+                                                        ID: #{profile.id || '---'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* TOP CENTER: Exam Title & Subtitle */}
+                                            <div style={{ textAlign: 'center', flex: 1, minWidth: 200 }}>
+                                                <div style={{ fontWeight: 900, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035', letterSpacing: '-0.2px' }}>
+                                                    📝 {activeQuiz.title}
+                                                </div>
+                                                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700, marginTop: 2 }}>
+                                                    Course: <span style={{ color: '#7c3aed' }}>{activeQuiz.course}</span> • Q{quizStep + 1} of {activeQuiz.questions.length}
+                                                </div>
+                                            </div>
+
+                                            {/* TOP RIGHT: Clock - Timer & Fullscreen Toggle */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                                {/* Live Wall Clock */}
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: 6,
+                                                    padding: '6px 14px', borderRadius: 12,
+                                                    background: isDark ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.06)',
+                                                    border: `1px solid ${isDark ? 'rgba(124,58,237,0.3)' : 'rgba(124,58,237,0.15)'}`,
+                                                    color: isDark ? '#c4b5fd' : '#6d28d9', fontSize: 13, fontWeight: 800
+                                                }} title="Live Current Time">
+                                                    🕒 <span style={{ fontFamily: 'monospace', letterSpacing: 0.5 }}>{wallClock}</span>
+                                                </div>
+
+                                                {/* Continuous Countdown Timer */}
                                                 {timeStr && (
-                                                    <span style={{
-                                                        fontSize: 13, fontWeight: 900,
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', gap: 6,
+                                                        padding: '6px 14px', borderRadius: 12,
+                                                        background: isWarning ? 'rgba(239,68,68,0.15)' : 'rgba(8,145,178,0.12)',
+                                                        border: `1.5px solid ${isWarning ? '#f87171' : '#22d3ee'}`,
                                                         color: isWarning ? '#ef4444' : '#0891b2',
-                                                        background: isWarning ? 'rgba(239,68,68,0.12)' : 'rgba(8,145,178,0.1)',
-                                                        border: `1px solid ${isWarning ? 'rgba(239,68,68,0.3)' : 'rgba(8,145,178,0.2)'}`,
-                                                        padding: '4px 12px', borderRadius: 20,
-                                                    }}>
-                                                        ⏱️ Time Left: {timeStr}
-                                                    </span>
+                                                        fontSize: 14, fontWeight: 900
+                                                    }} title="Time Remaining">
+                                                        ⏱️ Time Left: <span style={{ fontFamily: 'monospace' }}>{timeStr}</span>
+                                                    </div>
                                                 )}
-                                                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Q{quizStep + 1} of {activeQuiz.questions.length}</div>
+
+                                                {/* Fullscreen Button */}
+                                                <button
+                                                    onClick={toggleFullscreen}
+                                                    style={{
+                                                        padding: '7px 14px', borderRadius: 12, border: 'none',
+                                                        background: isFullscreen ? 'rgba(239,68,68,0.15)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                                        color: isFullscreen ? '#f43f5e' : '#ffffff',
+                                                        fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 6,
+                                                        boxShadow: '0 2px 10px rgba(124,58,237,0.2)'
+                                                    }}
+                                                >
+                                                    {isFullscreen ? '↙ Exit Fullscreen' : '⛶ Fullscreen'}
+                                                </button>
+                                            </div>
+                                        </header>
+
+                                        {/* ── EXAM MAIN CONTAINER ── */}
+                                        <div style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '24px 16px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                                            {/* LEFT: Question Palette & Overview Sidebar */}
+                                            <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                                {/* Status Summary */}
+                                                <div style={{
+                                                    background: isDark ? 'rgba(26,22,48,0.85)' : '#ffffff',
+                                                    borderRadius: 20, padding: 18,
+                                                    border: `1.5px solid ${isDark ? 'rgba(139,92,246,0.15)' : 'rgba(124,58,237,0.08)'}`,
+                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                                                }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>📊 Quiz Navigator</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+                                                        <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                            <span>✓ Answered:</span> <strong>{answeredCount}</strong>
+                                                        </div>
+                                                        <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                            <span>🚩 Flagged:</span> <strong>{flaggedCount}</strong>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Question Grid */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                                                        {activeQuiz.questions.map((_, idx) => {
+                                                            const isAns = !!quizAnswers[idx];
+                                                            const isFlag = !!flaggedQuestions[idx];
+                                                            const isCur = quizStep === idx;
+                                                            let bg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9';
+                                                            let color = isDark ? '#94a3b8' : '#475569';
+                                                            let border = '1px solid transparent';
+
+                                                            if (isAns) { bg = '#10b981'; color = '#fff'; }
+                                                            if (isFlag) { bg = '#f59e0b'; color = '#fff'; }
+                                                            if (isCur) { border = '2.5px solid #7c3aed'; }
+
+                                                            return (
+                                                                <button
+                                                                    key={idx}
+                                                                    onClick={() => setQuizStep(idx)}
+                                                                    style={{
+                                                                        height: 38, borderRadius: 10, border, background: bg, color,
+                                                                        fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                        position: 'relative', transition: 'all 0.15s'
+                                                                    }}
+                                                                >
+                                                                    {idx + 1}
+                                                                    {isFlag && <span style={{ position: 'absolute', top: -2, right: -2, fontSize: 8 }}>🚩</span>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* RIGHT: Question Display Box */}
+                                            <div style={{ flex: 1, minWidth: 320 }}>
+                                                <div style={{
+                                                    background: isDark ? 'rgba(26,22,48,0.85)' : '#ffffff',
+                                                    borderRadius: 24, padding: '28px 32px',
+                                                    border: `1.5px solid ${isDark ? 'rgba(139,92,246,0.15)' : 'rgba(124,58,237,0.08)'}`,
+                                                    boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
+                                                }}>
+                                                    {/* Progress Line */}
+                                                    <div style={{ height: 6, borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9', marginBottom: 24, overflow: 'hidden' }}>
+                                                        <motion.div animate={{ width: `${((quizStep + 1) / activeQuiz.questions.length) * 100}%` }} style={{ height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #7c3aed, #06b6d4)' }} />
+                                                    </div>
+
+                                                    {/* Question Banner Header */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
+                                                        <div>
+                                                            <span style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', background: 'rgba(124,58,237,0.1)', padding: '4px 12px', borderRadius: 20 }}>
+                                                                Question {quizStep + 1} of {activeQuiz.questions.length}
+                                                            </span>
+                                                            {isMulti && (
+                                                                <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, background: 'rgba(6,182,212,0.12)', color: '#0891b2', padding: '4px 10px', borderRadius: 20 }}>
+                                                                    ☑️ Multi-Select
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setFlaggedQuestions(p => ({ ...p, [quizStep]: !p[quizStep] }))}
+                                                            style={{
+                                                                padding: '6px 14px', borderRadius: 12, border: `1px solid ${isFlagged ? '#f59e0b' : 'rgba(148,163,184,0.3)'}`,
+                                                                background: isFlagged ? 'rgba(245,158,11,0.12)' : 'transparent',
+                                                                color: isFlagged ? '#d97706' : '#94a3b8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                                                display: 'flex', alignItems: 'center', gap: 6
+                                                            }}
+                                                        >
+                                                            {isFlagged ? '🚩 Flagged for Review' : '🏳️ Flag Question'}
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Question Text */}
+                                                    <h2 style={{ fontWeight: 800, fontSize: 18, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 24, lineHeight: 1.6 }}>
+                                                        {question?.q}
+                                                    </h2>
+
+                                                    {/* Options List */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 30 }}>
+                                                        {displayOptionKeys.map(opt => {
+                                                            const isSelected = isMulti ? currentAnswerArr.includes(opt) : currentAnswerStr === opt;
+                                                            return (
+                                                                <button
+                                                                    key={opt}
+                                                                    onClick={() => handleToggleStudentOption(quizStep, opt, isMulti)}
+                                                                    style={{
+                                                                        padding: '16px 20px', borderRadius: 16,
+                                                                        border: `2px solid ${isSelected ? '#7c3aed' : isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+                                                                        background: isSelected ? (isDark ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.06)') : isDark ? 'rgba(255,255,255,0.02)' : '#ffffff',
+                                                                        color: isDark ? '#ede9fe' : '#1a1035',
+                                                                        fontWeight: isSelected ? 800 : 600,
+                                                                        fontSize: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                                                                        display: 'flex', alignItems: 'center', gap: 12,
+                                                                        boxShadow: isSelected ? '0 4px 14px rgba(124,58,237,0.15)' : 'none'
+                                                                    }}
+                                                                >
+                                                                    <span style={{
+                                                                        width: 24, height: 24, borderRadius: isMulti ? 6 : 12,
+                                                                        border: `2px solid ${isSelected ? '#7c3aed' : '#94a3b8'}`,
+                                                                        background: isSelected ? '#7c3aed' : 'transparent',
+                                                                        color: '#fff', fontSize: 12, fontWeight: 900,
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                                                    }}>
+                                                                        {isSelected ? (isMulti ? '✓' : '•') : ''}
+                                                                    </span>
+                                                                    <span style={{ fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase' }}>{opt}.</span>
+                                                                    <span style={{ flex: 1 }}>{question.options[opt]}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* Navigation Action Buttons */}
+                                                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                        <button
+                                                            disabled={quizStep === 0}
+                                                            onClick={() => setQuizStep(s => Math.max(0, s - 1))}
+                                                            style={{
+                                                                padding: '12px 20px', borderRadius: 14,
+                                                                border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
+                                                                background: 'transparent', color: quizStep === 0 ? '#94a3b8' : isDark ? '#ede9fe' : '#1a1035',
+                                                                fontWeight: 700, fontSize: 13, cursor: quizStep === 0 ? 'not-allowed' : 'pointer'
+                                                            }}
+                                                        >
+                                                            ← Previous
+                                                        </button>
+
+                                                        {quizAnswers[quizStep] && (
+                                                            <button
+                                                                onClick={() => setQuizAnswers(p => ({ ...p, [quizStep]: '' }))}
+                                                                style={{
+                                                                    padding: '12px 16px', borderRadius: 14, border: 'none',
+                                                                    background: 'rgba(244,63,94,0.1)', color: '#f43f5e',
+                                                                    fontWeight: 700, fontSize: 12, cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                Clear Selection
+                                                            </button>
+                                                        )}
+
+                                                        <div style={{ flex: 1 }} />
+
+                                                        {quizStep < activeQuiz.questions.length - 1 ? (
+                                                            <button
+                                                                onClick={() => setQuizStep(s => s + 1)}
+                                                                style={{
+                                                                    padding: '12px 28px', borderRadius: 14, border: 'none',
+                                                                    background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                                                    color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+                                                                    boxShadow: '0 4px 14px rgba(124,58,237,0.3)'
+                                                                }}
+                                                            >
+                                                                Next Question →
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setShowSubmitConfirm(true)}
+                                                                style={{
+                                                                    padding: '12px 28px', borderRadius: 14, border: 'none',
+                                                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                                                    color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+                                                                    boxShadow: '0 4px 14px rgba(16,185,129,0.3)'
+                                                                }}
+                                                            >
+                                                                Finish & Submit Exam ✅
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                        {/* Progress Bar */}
-                                        <div style={{ height: 6, borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9', marginBottom: 24, overflow: 'hidden' }}>
-                                            <motion.div animate={{ width: `${((quizStep + 1) / activeQuiz.questions.length) * 100}%` }} style={{ height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #7c3aed, #06b6d4)' }} />
-                                        </div>
-                                        <div style={{ fontWeight: 700, fontSize: 16, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 20, lineHeight: 1.5 }}>{question?.q}</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                                            {displayOptionKeys.map(opt => {
-                                                const isSelected = isMulti ? currentAnswerArr.includes(opt) : currentAnswerStr === opt;
-                                                return (
-                                                    <button key={opt}
-                                                        onClick={() => handleToggleStudentOption(quizStep, opt, isMulti)}
-                                                        style={{
-                                                            padding: '14px 18px', borderRadius: 14,
-                                                            border: `2px solid ${isSelected ? '#7c3aed' : isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
-                                                            background: isSelected ? (isDark ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.06)') : 'transparent',
-                                                            color: isDark ? '#ede9fe' : '#1a1035',
-                                                            fontWeight: isSelected ? 800 : 600,
-                                                            fontSize: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                                                            display: 'flex', alignItems: 'center', gap: 10
-                                                        }}
-                                                    >
-                                                        <span style={{
-                                                            width: 22, height: 22, borderRadius: isMulti ? 6 : 11,
-                                                            border: `2px solid ${isSelected ? '#7c3aed' : '#94a3b8'}`,
-                                                            background: isSelected ? '#7c3aed' : 'transparent',
-                                                            color: '#fff', fontSize: 12, fontWeight: 900,
-                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                                                        }}>
-                                                            {isSelected ? (isMulti ? '✓' : '•') : ''}
-                                                        </span>
-                                                        <span style={{ fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase' }}>{opt}.</span>
-                                                        <span>{question.options[opt]}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                        <div style={{ display: 'flex', gap: 12 }}>
-                                            {quizStep > 0 && <button onClick={() => setQuizStep(s => s - 1)} style={{ flex: 1, padding: 14, borderRadius: 14, border: `2px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, background: 'transparent', color: isDark ? '#ede9fe' : '#1a1035', fontWeight: 700, cursor: 'pointer' }}>← Back</button>}
-                                            {quizStep < activeQuiz.questions.length - 1 ? (
-                                                <button onClick={() => { if (!quizAnswers[quizStep]) { alert('Please select an answer'); return; } setQuizStep(s => s + 1); }} style={{ flex: 2, padding: 14, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>Next →</button>
-                                            ) : (
-                                                <button disabled={submittingQuiz} onClick={async () => {
-                                                    if (!quizAnswers[quizStep]) { alert('Please select an answer'); return; }
-                                                    setSubmittingQuiz(true);
-                                                    let score = 0;
-                                                    activeQuiz.questions.forEach((q, idx) => { if (checkQuizAnswer(q, quizAnswers[idx])) score++; });
 
-                                                    const durationMs = Date.now() - (quizStartTime || Date.now());
-                                                    const totalSecs = Math.max(1, Math.round(durationMs / 1000));
-                                                    const mins = Math.floor(totalSecs / 60);
-                                                    const secs = totalSecs % 60;
-                                                    const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                                        {/* Submit Confirmation Dialog Modal */}
+                                        {showSubmitConfirm && (
+                                            <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                                                <div style={{ background: isDark ? '#1a1035' : '#ffffff', borderRadius: 24, padding: 32, maxWidth: 440, width: '100%', textAlign: 'center' }}>
+                                                    <div style={{ fontSize: 48, marginBottom: 12 }}>🏁</div>
+                                                    <div style={{ fontSize: 20, fontWeight: 900, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 8 }}>Ready to Submit Exam?</div>
+                                                    <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>
+                                                        You have answered <strong>{answeredCount}</strong> out of <strong>{activeQuiz.questions.length}</strong> questions.
+                                                        {unansweredCount > 0 && <div style={{ color: '#ef4444', fontWeight: 700, marginTop: 4 }}>⚠️ {unansweredCount} question(s) remain unanswered!</div>}
+                                                    </div>
 
-                                                    const answersJson = JSON.stringify(quizAnswers);
-                                                    await submitQuizResult({
-                                                        studentId: user?.studentId || user?.userId,
-                                                        studentName: profile?.name || user?.username || 'Student',
-                                                        quizId: activeQuiz.id,
-                                                        quizTitle: activeQuiz.title,
-                                                        course: activeQuiz.course,
-                                                        score,
-                                                        total: activeQuiz.questions.length,
-                                                        duration: durationStr,
-                                                        answers: answersJson,
-                                                    });
-                                                    setSubmittingQuiz(false);
-                                                    setQuizResult({
-                                                        score,
-                                                        total: activeQuiz.questions.length,
-                                                        duration: durationStr,
-                                                        questions: activeQuiz.questions,
-                                                        answers: { ...quizAnswers },
-                                                        quizTitle: activeQuiz.title,
-                                                        course: activeQuiz.course,
-                                                    });
-                                                    if (refetchQuizResults) refetchQuizResults();
-                                                }} style={{ flex: 2, padding: 14, borderRadius: 14, border: 'none', background: submittingQuiz ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
-                                                    {submittingQuiz ? '⏳ Submitting...' : '✅ Submit Quiz'}
-                                                </button>
-                                            )}
-                                        </div>
+                                                    <div style={{ display: 'flex', gap: 12 }}>
+                                                        <button
+                                                            onClick={() => setShowSubmitConfirm(false)}
+                                                            style={{ flex: 1, padding: 12, borderRadius: 14, border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, background: 'transparent', color: isDark ? '#ede9fe' : '#64748b', fontWeight: 700, cursor: 'pointer' }}
+                                                        >
+                                                            Continue Test
+                                                        </button>
+                                                        <button
+                                                            disabled={submittingQuiz}
+                                                            onClick={async () => {
+                                                                setShowSubmitConfirm(false);
+                                                                setSubmittingQuiz(true);
+                                                                let score = 0;
+                                                                activeQuiz.questions.forEach((q, idx) => { if (checkQuizAnswer(q, quizAnswers[idx])) score++; });
+
+                                                                const durationMs = Date.now() - (quizStartTime || Date.now());
+                                                                const totalSecs = Math.max(1, Math.round(durationMs / 1000));
+                                                                const mins = Math.floor(totalSecs / 60);
+                                                                const secs = totalSecs % 60;
+                                                                const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+                                                                const answersJson = JSON.stringify(quizAnswers);
+                                                                await submitQuizResult({
+                                                                    studentId: user?.studentId || user?.userId,
+                                                                    studentName: profile?.name || user?.username || 'Student',
+                                                                    quizId: activeQuiz.id,
+                                                                    quizTitle: activeQuiz.title,
+                                                                    course: activeQuiz.course,
+                                                                    score,
+                                                                    total: activeQuiz.questions.length,
+                                                                    duration: durationStr,
+                                                                    answers: answersJson,
+                                                                });
+                                                                setSubmittingQuiz(false);
+                                                                setQuizResult({
+                                                                    score,
+                                                                    total: activeQuiz.questions.length,
+                                                                    duration: durationStr,
+                                                                    questions: activeQuiz.questions,
+                                                                    answers: { ...quizAnswers },
+                                                                    quizTitle: activeQuiz.title,
+                                                                    course: activeQuiz.course,
+                                                                });
+                                                                if (refetchQuizResults) refetchQuizResults();
+                                                            }}
+                                                            style={{ flex: 1, padding: 12, borderRadius: 14, border: 'none', background: submittingQuiz ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                                                        >
+                                                            {submittingQuiz ? 'Submitting...' : 'Yes, Submit Now'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })()}
@@ -1135,7 +1426,7 @@ export default function StudentPortal() {
                                                                                 answers: attempt.answers || {},
                                                                             });
                                                                         }}
-                                                                        style={{ flex: '1 1 120px', padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
+                                                                        style={{ flex: '1 1 100px', padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(124,58,237,0.12)', color: '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
                                                                     >
                                                                         📊 Analysis
                                                                     </button>
@@ -1150,16 +1441,22 @@ export default function StudentPortal() {
                                                                             qz.questions || [],
                                                                             attempt.answers || {}
                                                                         )}
-                                                                        style={{ flex: '1 1 120px', padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
+                                                                        style={{ flex: '1 1 100px', padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.3)', background: 'rgba(8,145,178,0.08)', color: '#0891b2', fontWeight: 800, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}
                                                                     >
                                                                         🖨️ Print
                                                                     </button>
                                                                 </>
                                                             )}
-                                                            <button
-                                                                onClick={() => handleStartQuiz(qz)}
+                                                            <a
+                                                                href={`#quiz-take:${qz.id}`}
+                                                                onClick={(e) => {
+                                                                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                                                                        e.preventDefault();
+                                                                        handleStartQuiz(qz, false, true);
+                                                                    }
+                                                                }}
                                                                 style={{
-                                                                    flex: attempt ? '1 1 120px' : '1 1 100%',
+                                                                    flex: attempt ? '1 1 120px' : '2 1 140px',
                                                                     padding: '10px 16px',
                                                                     borderRadius: 10,
                                                                     border: 'none',
@@ -1169,11 +1466,35 @@ export default function StudentPortal() {
                                                                     fontSize: 13,
                                                                     cursor: 'pointer',
                                                                     textAlign: 'center',
+                                                                    textDecoration: 'none',
+                                                                    display: 'inline-block',
                                                                     boxShadow: attempt ? 'none' : '0 4px 14px rgba(124,58,237,0.25)'
                                                                 }}
                                                             >
-                                                                {attempt ? 'Retake ↻' : 'Start Quiz →'}
-                                                            </button>
+                                                                {attempt ? 'Retake ⛶' : 'Start Exam (Fullscreen) ⛶'}
+                                                            </a>
+                                                            <a
+                                                                href={`#quiz-take:${qz.id}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                style={{
+                                                                    flex: '1 1 110px',
+                                                                    padding: '10px 14px',
+                                                                    borderRadius: 10,
+                                                                    border: '1px solid rgba(124,58,237,0.25)',
+                                                                    background: 'rgba(124,58,237,0.08)',
+                                                                    color: '#7c3aed',
+                                                                    fontWeight: 800,
+                                                                    fontSize: 12,
+                                                                    cursor: 'pointer',
+                                                                    textAlign: 'center',
+                                                                    textDecoration: 'none',
+                                                                    display: 'inline-block'
+                                                                }}
+                                                                title="Open Exam in New Window/Tab"
+                                                            >
+                                                                Open in New Tab ↗
+                                                            </a>
                                                         </div>
                                                     </motion.div>
                                                 );

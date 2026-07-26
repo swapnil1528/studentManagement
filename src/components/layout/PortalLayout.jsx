@@ -8,9 +8,23 @@ import { useTheme } from '../../context/ThemeContext';
 
 export default function PortalLayout({
     name, id, role, photo, tabs, activeTab, onTabChange,
-    hasFace, onFaceReg, onLogout, children
+    hasFace, onFaceReg, onLogout, hideHeaderNav = false, children
 }) {
     const { isDark, toggleTheme } = useTheme();
+
+    if (hideHeaderNav) {
+        return (
+            <div
+                style={{
+                    minHeight: '100vh',
+                    background: isDark ? '#0b0819' : '#f4f6f9',
+                    fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                }}
+            >
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div
@@ -122,13 +136,22 @@ export default function PortalLayout({
             >
                 <div className="sp-nav-inner">
                     {tabs.map((tab) => (
-                        <button
+                        <a
                             key={tab.id}
+                            href={`#${tab.id}`}
                             className={`sp-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-                            onClick={() => onTabChange(tab.id)}
-                            style={isDark && activeTab === tab.id ? {
-                                background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.15))',
-                            } : {}}
+                            onClick={(e) => {
+                                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                                    e.preventDefault();
+                                    onTabChange(tab.id);
+                                }
+                            }}
+                            style={{
+                                textDecoration: 'none',
+                                ...(isDark && activeTab === tab.id ? {
+                                    background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.15))',
+                                } : {})
+                            }}
                         >
                             <span className="nav-icon">{tab.emoji}</span>
                             <span
@@ -137,7 +160,7 @@ export default function PortalLayout({
                             >
                                 {tab.label}
                             </span>
-                        </button>
+                        </a>
                     ))}
                 </div>
             </nav>

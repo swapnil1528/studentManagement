@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { TAB_TO_SLUG } from './AdminLayout';
@@ -91,14 +91,17 @@ export default function Sidebar({ activeTab }) {
                         if (item.id === 'divider') {
                             return <div key="divider" className="my-3 mx-3" style={{ borderTop: '1px solid rgba(199,210,254,0.08)' }} />;
                         }
+                        const slug = TAB_TO_SLUG[item.id] || 'dashboard';
                         return (
-                            <div
+                            <Link
                                 key={item.id}
+                                to={`/admin/${slug}`}
                                 className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                                onClick={() => handleNavClick(item.id)}
+                                onClick={() => setIsOpen(false)}
+                                style={{ textDecoration: 'none' }}
                             >
                                 <i className={`${item.icon} w-5 text-center`} /> {item.label}
-                            </div>
+                            </Link>
                         );
                     })}
                 </div>
