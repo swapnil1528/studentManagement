@@ -139,6 +139,7 @@ export default function StudentPortal() {
     const [flaggedQuestions, setFlaggedQuestions] = useState({}); // {qIdx: bool}
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+    const [showEndExamModal, setShowEndExamModal] = useState(false);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -1104,6 +1105,22 @@ export default function StudentPortal() {
                                                 >
                                                     {isFullscreen ? '↙ Exit Fullscreen' : '⛶ Fullscreen'}
                                                 </button>
+
+                                                {/* End Exam Button */}
+                                                <button
+                                                    onClick={() => setShowEndExamModal(true)}
+                                                    style={{
+                                                        padding: '7px 14px', borderRadius: 12,
+                                                        border: '1.5px solid rgba(244,63,94,0.3)',
+                                                        background: 'rgba(244,63,94,0.1)',
+                                                        color: '#f43f5e',
+                                                        fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 6
+                                                    }}
+                                                    title="End or Exit Exam"
+                                                >
+                                                    🚪 End Exam
+                                                </button>
                                             </div>
                                         </header>
 
@@ -1160,6 +1177,19 @@ export default function StudentPortal() {
                                                         })}
                                                     </div>
                                                 </div>
+
+                                                {/* Sidebar Quick End Exam */}
+                                                <button
+                                                    onClick={() => setShowEndExamModal(true)}
+                                                    style={{
+                                                        padding: '12px', borderRadius: 16, border: '1.5px solid rgba(244,63,94,0.3)',
+                                                        background: 'rgba(244,63,94,0.08)', color: '#f43f5e',
+                                                        fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                                                    }}
+                                                >
+                                                    🚪 End Exam Early
+                                                </button>
                                             </div>
 
                                             {/* RIGHT: Question Display Box */}
@@ -1190,13 +1220,13 @@ export default function StudentPortal() {
                                                         <button
                                                             onClick={() => setFlaggedQuestions(p => ({ ...p, [quizStep]: !p[quizStep] }))}
                                                             style={{
-                                                                padding: '6px 14px', borderRadius: 12, border: `1px solid ${isFlagged ? '#f59e0b' : 'rgba(148,163,184,0.3)'}`,
+                                                                padding: '6px 14px', borderRadius: 10, border: `1px solid ${isFlagged ? '#f59e0b' : 'rgba(148,163,184,0.3)'}`,
                                                                 background: isFlagged ? 'rgba(245,158,11,0.12)' : 'transparent',
                                                                 color: isFlagged ? '#d97706' : '#94a3b8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                                                                 display: 'flex', alignItems: 'center', gap: 6
                                                             }}
                                                         >
-                                                            {isFlagged ? '🚩 Flagged for Review' : '🏳️ Flag Question'}
+                                                            {isFlagged ? '🚩 Flagged' : '🏳️ Flag Question'}
                                                         </button>
                                                     </div>
 
@@ -1206,7 +1236,7 @@ export default function StudentPortal() {
                                                     </h2>
 
                                                     {/* Options List */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 30 }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
                                                         {displayOptionKeys.map(opt => {
                                                             const isSelected = isMulti ? currentAnswerArr.includes(opt) : currentAnswerStr === opt;
                                                             return (
@@ -1359,6 +1389,86 @@ export default function StudentPortal() {
                                                             style={{ flex: 1, padding: 12, borderRadius: 14, border: 'none', background: submittingQuiz ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
                                                         >
                                                             {submittingQuiz ? 'Submitting...' : 'Yes, Submit Now'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* End Exam Confirmation Modal */}
+                                        {showEndExamModal && (
+                                            <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                                                <div style={{ background: isDark ? '#1a1035' : '#ffffff', borderRadius: 24, padding: 32, maxWidth: 460, width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+                                                    <div style={{ fontSize: 48, marginBottom: 12 }}>🚨</div>
+                                                    <div style={{ fontSize: 20, fontWeight: 900, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 8 }}>End Exam Early?</div>
+                                                    <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 22, lineHeight: 1.6 }}>
+                                                        You have answered <strong>{answeredCount}</strong> out of <strong>{activeQuiz.questions.length}</strong> questions.
+                                                        <br />Would you like to submit your current progress or exit without saving?
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                        <button
+                                                            disabled={submittingQuiz}
+                                                            onClick={async () => {
+                                                                setShowEndExamModal(false);
+                                                                setSubmittingQuiz(true);
+                                                                let score = 0;
+                                                                activeQuiz.questions.forEach((q, idx) => { if (checkQuizAnswer(q, quizAnswers[idx])) score++; });
+                                                                const durationMs = Date.now() - (quizStartTime || Date.now());
+                                                                const totalSecs = Math.max(1, Math.round(durationMs / 1000));
+                                                                const mins = Math.floor(totalSecs / 60);
+                                                                const secs = totalSecs % 60;
+                                                                const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+                                                                await submitQuizResult({
+                                                                    studentId: user?.studentId || user?.userId,
+                                                                    studentName: profile?.name || user?.username || 'Student',
+                                                                    quizId: activeQuiz.id,
+                                                                    quizTitle: activeQuiz.title,
+                                                                    course: activeQuiz.course,
+                                                                    score,
+                                                                    total: activeQuiz.questions.length,
+                                                                    duration: durationStr,
+                                                                    answers: JSON.stringify(quizAnswers),
+                                                                });
+                                                                setSubmittingQuiz(false);
+                                                                setQuizResult({
+                                                                    score,
+                                                                    total: activeQuiz.questions.length,
+                                                                    duration: durationStr,
+                                                                    questions: activeQuiz.questions,
+                                                                    answers: { ...quizAnswers },
+                                                                    quizTitle: activeQuiz.title,
+                                                                    course: activeQuiz.course,
+                                                                });
+                                                                if (refetchQuizResults) refetchQuizResults();
+                                                            }}
+                                                            style={{ width: '100%', padding: '13px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+                                                        >
+                                                            ✅ Submit Progress & View Score
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowEndExamModal(false);
+                                                                setActiveQuiz(null);
+                                                                setQuizAnswers({});
+                                                                setQuizStep(0);
+                                                                setSecondsLeft(null);
+                                                                if (document.exitFullscreen && document.fullscreenElement) {
+                                                                    document.exitFullscreen().catch(() => { });
+                                                                }
+                                                            }}
+                                                            style={{ width: '100%', padding: '12px', borderRadius: 14, border: '1.5px solid rgba(244,63,94,0.3)', background: 'rgba(244,63,94,0.08)', color: '#f43f5e', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                                                        >
+                                                            🚪 Exit Exam Without Saving
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => setShowEndExamModal(false)}
+                                                            style={{ width: '100%', padding: '11px', borderRadius: 14, border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, background: 'transparent', color: isDark ? '#ede9fe' : '#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                                                        >
+                                                            ← Continue Exam
                                                         </button>
                                                     </div>
                                                 </div>
