@@ -1086,7 +1086,7 @@ export default function StudentPortal() {
                                                 </div>
                                             </div>
 
-                                            {/* TOP RIGHT: Clock - Timer & Fullscreen Toggle */}
+                                            {/* TOP RIGHT: Clock - Timer, Language Selection, Theme Toggle & Fullscreen Toggle */}
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                                 {/* Live Wall Clock */}
                                                 <div style={{
@@ -1112,6 +1112,82 @@ export default function StudentPortal() {
                                                         ⏱️ Time Left: <span style={{ fontFamily: 'monospace' }}>{timeStr}</span>
                                                     </div>
                                                 )}
+
+                                                {/* Multi-Language Selector Controls */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, borderRadius: 12, background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}` }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setQuizLang('en')}
+                                                        style={{
+                                                            padding: '5px 11px', borderRadius: 9, border: 'none',
+                                                            background: quizLang === 'en' ? '#7c3aed' : 'transparent',
+                                                            color: quizLang === 'en' ? '#ffffff' : isDark ? '#94a3b8' : '#64748b',
+                                                            fontSize: 12, fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s'
+                                                        }}
+                                                    >
+                                                        🇬🇧 English
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setQuizLang('hi')}
+                                                        style={{
+                                                            padding: '5px 11px', borderRadius: 9, border: 'none',
+                                                            background: quizLang === 'hi' ? '#d97706' : 'transparent',
+                                                            color: quizLang === 'hi' ? '#ffffff' : isDark ? '#94a3b8' : '#64748b',
+                                                            fontSize: 12, fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s'
+                                                        }}
+                                                    >
+                                                        🇮🇳 हिन्दी
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setQuizLang('mr')}
+                                                        style={{
+                                                            padding: '5px 11px', borderRadius: 9, border: 'none',
+                                                            background: quizLang === 'mr' ? '#ea580c' : 'transparent',
+                                                            color: quizLang === 'mr' ? '#ffffff' : isDark ? '#94a3b8' : '#64748b',
+                                                            fontSize: 12, fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s'
+                                                        }}
+                                                    >
+                                                        🇮🇳 मराठी
+                                                    </button>
+                                                </div>
+
+                                                {quizLang !== 'en' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBilingualMode(b => !b)}
+                                                        style={{
+                                                            padding: '6px 12px', borderRadius: 12,
+                                                            border: `1.5px solid ${bilingualMode ? '#059669' : 'rgba(148,163,184,0.3)'}`,
+                                                            background: bilingualMode ? 'rgba(16,185,129,0.15)' : 'transparent',
+                                                            color: bilingualMode ? '#059669' : isDark ? '#94a3b8' : '#64748b',
+                                                            fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                                                            display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s'
+                                                        }}
+                                                        title="Toggle Dual View (English + Selected Language)"
+                                                    >
+                                                        📖 {bilingualMode ? 'Dual View (ON)' : 'Dual View (OFF)'}
+                                                    </button>
+                                                )}
+
+                                                {/* Theme Toggle (Dark / Light Mode) */}
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleTheme}
+                                                    style={{
+                                                        padding: '7px 14px', borderRadius: 12,
+                                                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1'}`,
+                                                        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                                                        color: isDark ? '#fbbf24' : '#475569',
+                                                        fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                                    }}
+                                                    title="Toggle Light / Dark mode theme during exam"
+                                                >
+                                                    {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                                                </button>
 
                                                 {/* Fullscreen Button */}
                                                 <button
