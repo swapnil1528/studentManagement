@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // Student Management System — Google Apps Script Backend
 // ============================================
 // Face detection & location checking REMOVED from attendance.
@@ -1226,16 +1226,28 @@ function getQuizzes(courses) {
   const courseList = Array.isArray(courses) ? courses.map(c => String(c).toLowerCase()) : [];
   const quizzes = data
     .filter(r => courseList.length === 0 || courseList.includes(String(r[2]).toLowerCase()))
-    .map(r => ({
-      id: String(r[0]),
-      date: r[1],
-      course: String(r[2]),
-      title: String(r[3]),
-      dueDate: r[4],
-      questions: (() => { try { return JSON.parse(r[5]); } catch(e) { return []; } })(),
-      totalMarks: r[6] || 0,
-      timeLimit: r[7] ? Number(r[7]) : 0,
-    }));
+    .map(r => {
+      const qList = (() => { try { return JSON.parse(r[5]); } catch(e) { return []; } })();
+      const langSet = new Set(['en']);
+      if (Array.isArray(qList)) {
+        qList.forEach(q => {
+          if (q && q.translations && typeof q.translations === 'object') {
+            Object.keys(q.translations).forEach(l => { if (q.translations[l]?.q) langSet.add(l); });
+          }
+        });
+      }
+      return {
+        id: String(r[0]),
+        date: r[1],
+        course: String(r[2]),
+        title: String(r[3]),
+        dueDate: r[4],
+        questions: qList,
+        availableLanguages: Array.from(langSet),
+        totalMarks: r[6] || 0,
+        timeLimit: r[7] ? Number(r[7]) : 0,
+      };
+    });
   return { success: true, quizzes: quizzes };
 }
 

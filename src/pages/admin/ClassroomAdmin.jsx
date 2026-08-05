@@ -129,8 +129,11 @@ export default function ClassroomAdmin({ adminData }) {
 
     // ── Quiz creation & history state ─────────────────────────────────────────
     const [quizForm, setQuizForm] = useState({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
-    const [questions, setQuestions] = useState([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
+    const [questions, setQuestions] = useState([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
+    const [qActiveLang, setQActiveLang] = useState({});
     const [savingQuiz, setSavingQuiz] = useState(false);
+    const [translatingQ, setTranslatingQ] = useState(null); // index of question currently auto-translating
+    const [bulkProgress, setBulkProgress] = useState(null); // { current: 1, total: 20 } progress tracking
     const [publishedQuizzes, setPublishedQuizzes] = useState([]);
     const [loadingQuizzes, setLoadingQuizzes] = useState(false);
     const [editingQuizId, setEditingQuizId] = useState(null);
@@ -262,7 +265,7 @@ export default function ClassroomAdmin({ adminData }) {
             return;
         }
         for (const [i, q] of questions.entries()) {
-            if (!q.q || !q.a || !q.b) { alert(`Question ${i + 1} is incomplete`); return; }
+            if (!q.q || !q.a || !q.b) { alert(`Question ${i + 1} is incomplete in English`); return; }
         }
         setSavingQuiz(true);
         const totalMarks = questions.length;
@@ -274,7 +277,32 @@ export default function ClassroomAdmin({ adminData }) {
             timeLimit: Number(quizForm.timeLimit) || 0,
             shuffleQuestions: quizForm.shuffleQuestions !== false,
             shuffleOptions: quizForm.shuffleOptions !== false,
-            questions: questions.map(q => ({ q: q.q, type: q.type || 'single', options: { a: q.a, b: q.b, c: q.c, d: q.d }, correct: q.correct })),
+            questions: questions.map(q => {
+                const cleanTranslations = {};
+                if (q.translations) {
+                    Object.keys(q.translations).forEach(l => {
+                        const tr = q.translations[l];
+                        if (tr && (tr.q || tr.options?.a || tr.options?.b)) {
+                            cleanTranslations[l] = {
+                                q: tr.q || '',
+                                options: {
+                                    a: tr.options?.a || '',
+                                    b: tr.options?.b || '',
+                                    c: tr.options?.c || '',
+                                    d: tr.options?.d || '',
+                                }
+                            };
+                        }
+                    });
+                }
+                return {
+                    q: q.q,
+                    type: q.type || 'single',
+                    options: { a: q.a, b: q.b, c: q.c, d: q.d },
+                    correct: q.correct,
+                    translations: cleanTranslations,
+                };
+            }),
             totalMarks,
         });
         setSavingQuiz(false);
@@ -282,7 +310,8 @@ export default function ClassroomAdmin({ adminData }) {
             showToast(editingQuizId ? 'Quiz Updated Successfully! ✅' : 'Quiz Published to Students ✅');
             setEditingQuizId(null);
             setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
-            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
+            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
+            setQActiveLang({});
             loadPublishedQuizzes();
         } else {
             alert(result?.error || 'Failed to save quiz');
@@ -308,9 +337,13 @@ export default function ClassroomAdmin({ adminData }) {
                 d: q.options?.d || '',
                 type: q.type || (String(q.correct || '').includes(',') ? 'multiple' : 'single'),
                 correct: q.correct || 'a',
+                translations: q.translations || {
+                    hi: { q: '', options: { a: '', b: '', c: '', d: '' } },
+                    mr: { q: '', options: { a: '', b: '', c: '', d: '' } }
+                }
             })));
         } else {
-            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
+            setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
         }
         showToast(`Editing Quiz: ${qz.title}`);
         quizFormRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -319,7 +352,8 @@ export default function ClassroomAdmin({ adminData }) {
     const handleCancelEdit = () => {
         setEditingQuizId(null);
         setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
-        setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
+        setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
+        setQActiveLang({});
     };
 
     const handleDeleteQuiz = async (qz) => {
@@ -335,8 +369,257 @@ export default function ClassroomAdmin({ adminData }) {
         }
     };
 
-    const addQuestion = () => setQuestions(prev => [...prev, { q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a' }]);
+    const addQuestion = () => setQuestions(prev => [...prev, { q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
     const updateQ = (i, field, val) => setQuestions(prev => prev.map((q, idx) => idx === i ? { ...q, [field]: val } : q));
+    const updateQTranslation = (i, lang, field, val) => {
+        setQuestions(prev => prev.map((q, idx) => {
+            if (idx !== i) return q;
+            const currentTrans = q.translations || {};
+            const langObj = currentTrans[lang] || { q: '', options: { a: '', b: '', c: '', d: '' } };
+            let updatedLangObj;
+            if (field === 'q') {
+                updatedLangObj = { ...langObj, q: val };
+            } else {
+                updatedLangObj = { ...langObj, options: { ...(langObj.options || {}), [field]: val } };
+            }
+            return { ...q, translations: { ...currentTrans, [lang]: updatedLangObj } };
+        }));
+    };
+
+    // Academic & Technical Glossary for Hindi & Marathi Quiz Translations
+    const ACADEMIC_GLOSSARY = {
+        hi: {
+            'none of the above': 'उपरोक्त में से कोई नहीं',
+            'none of these': 'इनमें से कोई नहीं',
+            'all of the above': 'उपरोक्त सभी',
+            'all of these': 'इनमें से सभी',
+            'both a and b': 'A और B दोनों',
+            'both b and c': 'B और C दोनों',
+            'both a and c': 'A और C दोनों',
+            'true': 'सत्य',
+            'false': 'असत्य',
+            'yes': 'हाँ',
+            'no': 'नहीं',
+            'computer': 'कंप्यूटर',
+            'hardware': 'हार्डवेयर',
+            'software': 'सॉफ्टवेयर',
+            'operating system': 'ऑपरेटिंग सिस्टम',
+            'database': 'डेटाबेस',
+            'keyboard': 'कीबोर्ड',
+            'mouse': 'माउस',
+            'monitor': 'मॉनीटर',
+            'printer': 'प्रिंटर',
+            'network': 'नेटवर्क',
+            'memory': 'मेमोरी',
+            'storage': 'स्टोरेज',
+            'input': 'इनपुट',
+            'output': 'आउटपुट',
+            'file': 'फ़ाइल',
+            'folder': 'फ़ोल्डर',
+            'browser': 'ब्राउज़र',
+            'website': 'वेबसाइट'
+        },
+        mr: {
+            'none of the above': 'यापैकी काहीही नाही',
+            'none of these': 'यापैकी काहीही नाही',
+            'all of the above': 'वरील सर्व',
+            'all of these': 'वरील सर्व',
+            'both a and b': 'A आणि B दोन्ही',
+            'both b and c': 'B आणि C दोन्ही',
+            'both a and c': 'A आणि C दोन्ही',
+            'true': 'सत्य (बरोबर)',
+            'false': 'असत्य (चूक)',
+            'yes': 'होय',
+            'no': 'नाही',
+            'computer': 'संगणक',
+            'hardware': 'हार्डवेअर',
+            'software': 'सॉफ्टवेअर',
+            'operating system': 'ऑपरेटिंग सिस्टम',
+            'database': 'डेटाबेस',
+            'keyboard': 'कीबोर्ड',
+            'mouse': 'माउस',
+            'monitor': 'मॉनिटर',
+            'printer': 'प्रिंटर',
+            'network': 'नेटवर्क',
+            'memory': 'स्मृती (मेमरी)',
+            'storage': 'साठवणूक (स्टोरेज)',
+            'input': 'इनपुट',
+            'output': 'आउटपुट',
+            'file': 'फाईल',
+            'folder': 'फोल्डर',
+            'browser': 'ब्राउझर',
+            'website': 'वेबसाइट'
+        }
+    };
+
+    const preprocessEnglishText = (text) => {
+        if (!text || !text.trim()) return '';
+        let s = text.trim();
+        // Fix typos like "mouse in input device ?" -> "mouse is an input device ?"
+        s = s.replace(/\b([a-zA-Z0-9_-]+)\s+in\s+(an?\s+)?(input|output|storage|hardware|software)\s+device\b/gi, '$1 is a $3 device');
+        s = s.replace(/\b([a-zA-Z0-9_-]+)\s+in\s+device\b/gi, '$1 is a device');
+        s = s.replace(/\bin input device\b/gi, 'is an input device');
+        s = s.replace(/\bin output device\b/gi, 'is an output device');
+        s = s.replace(/\bwhat in\b/gi, 'what is');
+        s = s.replace(/\bwhich in\b/gi, 'which is');
+        s = s.replace(/\binpute\b/gi, 'input');
+        s = s.replace(/\boutpute\b/gi, 'output');
+        s = s.replace(/\bdevise\b/gi, 'device');
+        return s;
+    };
+
+    const postprocessTranslation = (translated, targetLang, originalEng) => {
+        if (!translated) return '';
+        let res = translated;
+
+        if (targetLang === 'mr') {
+            // Fix literal translation artifacts for Marathi
+            res = res.replace(/इनपुट डिव्हाइसमध्ये ([^?]+)\?/gi, '$1 हे इनपुट डिव्हाइस आहे का?');
+            res = res.replace(/डिव्हाइसमध्ये ([^?]+)\?/gi, '$1 हे डिव्हाइस आहे का?');
+            res = res.replace(/इन्पुट/g, 'इनपुट');
+            res = res.replace(/डिव्हाईस/g, 'डिव्हाइस');
+
+            if (originalEng.toLowerCase().includes('is ') || originalEng.toLowerCase().includes(' is')) {
+                if (res.includes('आहे') && !res.includes('आहे का')) {
+                    res = res.replace(/आहे\s*\?/g, 'आहे का?');
+                }
+            }
+        }
+
+        if (targetLang === 'hi') {
+            // Fix literal translation artifacts for Hindi
+            res = res.replace(/इनपुट डिवाइस में ([^?]+)\?/gi, 'क्या $1 एक इनपुट डिवाइस है?');
+            res = res.replace(/डिवाइस में ([^?]+)\?/gi, 'क्या $1 एक डिवाइस है?');
+            res = res.replace(/इन्पुट/g, 'इनपुट');
+
+            if (originalEng.toLowerCase().startsWith('is ') && !res.startsWith('क्या')) {
+                res = 'क्या ' + res;
+            }
+        }
+
+        return res;
+    };
+
+    const translateText = async (text, targetLang) => {
+        if (!text || !text.trim()) return '';
+        const cleanedEng = preprocessEnglishText(text);
+        const cleanLower = cleanedEng.toLowerCase();
+
+        // Check exact glossary match first
+        if (ACADEMIC_GLOSSARY[targetLang] && ACADEMIC_GLOSSARY[targetLang][cleanLower]) {
+            return ACADEMIC_GLOSSARY[targetLang][cleanLower];
+        }
+
+        try {
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(cleanedEng)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            let translated = '';
+            if (Array.isArray(data) && Array.isArray(data[0])) {
+                translated = data[0].map(item => item[0]).join('');
+            }
+            if (translated && ACADEMIC_GLOSSARY[targetLang] && ACADEMIC_GLOSSARY[targetLang][cleanLower]) {
+                return ACADEMIC_GLOSSARY[targetLang][cleanLower];
+            }
+            return postprocessTranslation(translated || cleanedEng, targetLang, cleanedEng);
+        } catch (e) {
+            console.error(`Translation error for ${targetLang}:`, e);
+            return text;
+        }
+    };
+
+    const handleAutoTranslateQuestion = async (i, targetLang = null) => {
+        const q = questions[i];
+        if (!q || (!q.q && !q.a && !q.b)) {
+            alert('Please enter English Question text and Options first');
+            return;
+        }
+        setTranslatingQ(i);
+        try {
+            const langs = targetLang ? [targetLang] : ['hi', 'mr'];
+            const newTranslations = { ...(q.translations || {}) };
+
+            for (const lang of langs) {
+                const currentLangObj = newTranslations[lang] || { q: '', options: { a: '', b: '', c: '', d: '' } };
+
+                // Translate question text
+                const translatedQ = q.q ? await translateText(q.q, lang) : currentLangObj.q;
+
+                // Translate options
+                const optKeys = ['a', 'b', 'c', 'd'];
+                const translatedOptions = { ...(currentLangObj.options || {}) };
+                for (const key of optKeys) {
+                    if (q[key] && q[key].trim()) {
+                        translatedOptions[key] = await translateText(q[key], lang);
+                    }
+                }
+
+                newTranslations[lang] = {
+                    q: translatedQ || currentLangObj.q,
+                    options: translatedOptions
+                };
+            }
+
+            setQuestions(prev => prev.map((item, idx) => idx === i ? { ...item, translations: newTranslations } : item));
+            showToast(`Question ${i + 1} Auto-Translated successfully! ✨`);
+        } catch (e) {
+            alert('Auto-translation failed: ' + e.message);
+        } finally {
+            setTranslatingQ(null);
+        }
+    };
+
+    const handleAutoTranslateAllQuestions = async (targetLang = null) => {
+        if (questions.length === 0) return;
+        const hasEnglishText = questions.some(q => q.q || q.a || q.b);
+        if (!hasEnglishText) {
+            alert('Please enter or import English questions first.');
+            return;
+        }
+
+        const langLabel = targetLang ? (targetLang === 'hi' ? 'Hindi' : 'Marathi') : 'BOTH Hindi & Marathi';
+        if (!window.confirm(`Auto-translate ALL ${questions.length} questions into ${langLabel} using Academic Glossary?`)) return;
+
+        setBulkProgress({ current: 0, total: questions.length });
+
+        const langs = targetLang ? [targetLang] : ['hi', 'mr'];
+        const updatedQuestions = [...questions];
+
+        for (let i = 0; i < updatedQuestions.length; i++) {
+            setBulkProgress({ current: i + 1, total: updatedQuestions.length });
+            const q = updatedQuestions[i];
+            if (!q.q && !q.a && !q.b) continue;
+
+            const newTranslations = { ...(q.translations || {}) };
+
+            for (const lang of langs) {
+                const currentLangObj = newTranslations[lang] || { q: '', options: { a: '', b: '', c: '', d: '' } };
+
+                const translatedQ = q.q ? await translateText(q.q, lang) : currentLangObj.q;
+
+                const optKeys = ['a', 'b', 'c', 'd'];
+                const translatedOptions = { ...(currentLangObj.options || {}) };
+                for (const key of optKeys) {
+                    if (q[key] && q[key].trim()) {
+                        translatedOptions[key] = await translateText(q[key], lang);
+                    }
+                }
+
+                newTranslations[lang] = {
+                    q: translatedQ || currentLangObj.q,
+                    options: translatedOptions
+                };
+            }
+
+            updatedQuestions[i] = { ...q, translations: newTranslations };
+            await new Promise(r => setTimeout(r, 60));
+        }
+
+        setQuestions(updatedQuestions);
+        setBulkProgress(null);
+        showToast(`Successfully translated ALL ${questions.length} questions into ${langLabel}! ✨`);
+    };
+
     const removeQ = (i) => setQuestions(prev => prev.filter((_, idx) => idx !== i));
 
     const toggleCorrectOption = (questionIndex, optKey) => {
@@ -1194,23 +1477,47 @@ export default function ClassroomAdmin({ adminData }) {
 
                             {/* Questions */}
                             <div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <label className="text-sm font-bold text-gray-700">Questions ({questions.length})</label>
-                                    <button
-                                        onClick={addQuestion}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
-                                    >
-                                        <Plus size={13} /> Add Question
-                                    </button>
+                                <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm font-bold text-gray-700">Questions ({questions.length})</label>
+                                        {bulkProgress && (
+                                            <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2.5 py-1 rounded-full animate-pulse flex items-center gap-1.5">
+                                                <div className="w-3 h-3 border-2 border-purple-700 border-t-transparent rounded-full animate-spin" />
+                                                Translating Q{bulkProgress.current} of {bulkProgress.total}...
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {questions.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAutoTranslateAllQuestions()}
+                                                disabled={!!bulkProgress}
+                                                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
+                                                title="Auto-translate all imported questions into Hindi & Marathi using Academic Glossary"
+                                            >
+                                                {bulkProgress ? '⏳ Translating All...' : '🚀 Translate ALL Questions (Hindi & Marathi)'}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={addQuestion}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition"
+                                        >
+                                            <Plus size={13} /> Add Question
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-4">
                                     {questions.map((q, i) => {
                                         const isMulti = q.type === 'multiple';
                                         const correctArr = typeof q.correct === 'string' ? q.correct.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+                                        const curLang = qActiveLang[i] || 'en';
 
                                         return (
-                                            <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative">
-                                                <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
+                                            <div key={i} className="rounded-xl border border-gray-200 p-4 bg-gray-50 relative shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center gap-2 flex-wrap">
                                                     <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
 
                                                     {/* Question Type Switcher */}
@@ -1237,26 +1544,147 @@ export default function ClassroomAdmin({ adminData }) {
                                                         </button>
                                                     )}
                                                 </div>
-                                                <input
-                                                    className="inp mb-3"
-                                                    placeholder="Question text *"
-                                                    value={q.q}
-                                                    onChange={e => updateQ(i, 'q', e.target.value)}
-                                                />
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {['a', 'b', 'c', 'd'].map(opt => (
-                                                        <div key={opt} className="flex items-center gap-2">
-                                                            <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
-                                                            <input
-                                                                className="inp flex-1"
-                                                                placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
-                                                                value={q[opt]}
-                                                                onChange={e => updateQ(i, opt, e.target.value)}
-                                                            />
-                                                        </div>
-                                                    ))}
+
+                                                {/* Multi-Language Tabs & Auto-Translate Action */}
+                                                <div className="flex justify-between items-center gap-2 flex-wrap bg-gray-200/70 p-1 rounded-xl text-xs font-bold">
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setQActiveLang(p => ({ ...p, [i]: 'en' }))}
+                                                            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${curLang === 'en' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-300'}`}
+                                                        >
+                                                            🇬🇧 English (Default)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setQActiveLang(p => ({ ...p, [i]: 'hi' }))}
+                                                            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${curLang === 'hi' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-300'}`}
+                                                        >
+                                                            🇮🇳 हिन्दी (Hindi) {q.translations?.hi?.q ? <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">✓ Saved</span> : ''}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setQActiveLang(p => ({ ...p, [i]: 'mr' }))}
+                                                            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${curLang === 'mr' ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-300'}`}
+                                                        >
+                                                            🇮🇳 मराठी (Marathi) {q.translations?.mr?.q ? <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">✓ Saved</span> : ''}
+                                                        </button>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAutoTranslateQuestion(i)}
+                                                        disabled={translatingQ === i}
+                                                        className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition shadow-sm flex items-center gap-1 ml-auto cursor-pointer"
+                                                        title="Auto-translate English text into Hindi and Marathi"
+                                                    >
+                                                        {translatingQ === i ? (
+                                                            <>
+                                                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                                <span>Translating...</span>
+                                                            </>
+                                                        ) : (
+                                                            <span>🪄 Auto-Translate Q{i + 1}</span>
+                                                        )}
+                                                    </button>
                                                 </div>
-                                                <div className="mt-3 flex items-center gap-2 flex-wrap">
+
+                                                {/* Language Tab Content */}
+                                                {curLang === 'en' && (
+                                                    <div className="space-y-3">
+                                                        <input
+                                                            className="inp bg-white"
+                                                            placeholder="Question text in English *"
+                                                            value={q.q}
+                                                            onChange={e => updateQ(i, 'q', e.target.value)}
+                                                        />
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {['a', 'b', 'c', 'd'].map(opt => (
+                                                                <div key={opt} className="flex items-center gap-2">
+                                                                    <span className="text-xs font-bold text-gray-500 w-4 uppercase">{opt}</span>
+                                                                    <input
+                                                                        className="inp flex-1 bg-white"
+                                                                        placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
+                                                                        value={q[opt]}
+                                                                        onChange={e => updateQ(i, opt, e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {curLang === 'hi' && (
+                                                    <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 space-y-3">
+                                                        <div className="flex justify-between items-center text-xs font-bold text-amber-900 flex-wrap gap-2">
+                                                            <span>🇮🇳 हिन्दी प्रश्न व विकल्प (Hindi Translation - Optional)</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAutoTranslateQuestion(i, 'hi')}
+                                                                disabled={translatingQ === i}
+                                                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] transition cursor-pointer flex items-center gap-1"
+                                                            >
+                                                                {translatingQ === i ? '⏳ Translating...' : '🪄 Auto-Translate to Hindi'}
+                                                            </button>
+                                                        </div>
+                                                        <input
+                                                            className="inp bg-white border-amber-200"
+                                                            placeholder="हिन्दी में प्रश्न दर्ज करें (e.g. कंप्यूटर क्या है?)..."
+                                                            value={q.translations?.hi?.q || ''}
+                                                            onChange={e => updateQTranslation(i, 'hi', 'q', e.target.value)}
+                                                        />
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {['a', 'b', 'c', 'd'].map(opt => (
+                                                                <div key={opt} className="flex items-center gap-2">
+                                                                    <span className="text-xs font-bold text-amber-800 w-4 uppercase">{opt}</span>
+                                                                    <input
+                                                                        className="inp flex-1 bg-white border-amber-200"
+                                                                        placeholder={`विकल्प ${opt.toUpperCase()} (Hindi)`}
+                                                                        value={q.translations?.hi?.options?.[opt] || ''}
+                                                                        onChange={e => updateQTranslation(i, 'hi', opt, e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {curLang === 'mr' && (
+                                                    <div className="p-3 bg-orange-50/70 rounded-xl border border-orange-200 space-y-3">
+                                                        <div className="flex justify-between items-center text-xs font-bold text-orange-900 flex-wrap gap-2">
+                                                            <span>🇮🇳 मराठी प्रश्न व पर्याय (Marathi Translation - Optional)</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAutoTranslateQuestion(i, 'mr')}
+                                                                disabled={translatingQ === i}
+                                                                className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-[11px] transition cursor-pointer flex items-center gap-1"
+                                                            >
+                                                                {translatingQ === i ? '⏳ Translating...' : '🪄 Auto-Translate to Marathi'}
+                                                            </button>
+                                                        </div>
+                                                        <input
+                                                            className="inp bg-white border-orange-200"
+                                                            placeholder="मराठीत प्रश्न प्रविष्ट करा (e.g. संगणक म्हणजे काय?)..."
+                                                            value={q.translations?.mr?.q || ''}
+                                                            onChange={e => updateQTranslation(i, 'mr', 'q', e.target.value)}
+                                                        />
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {['a', 'b', 'c', 'd'].map(opt => (
+                                                                <div key={opt} className="flex items-center gap-2">
+                                                                    <span className="text-xs font-bold text-orange-800 w-4 uppercase">{opt}</span>
+                                                                    <input
+                                                                        className="inp flex-1 bg-white border-orange-200"
+                                                                        placeholder={`पर्याय ${opt.toUpperCase()} (Marathi)`}
+                                                                        value={q.translations?.mr?.options?.[opt] || ''}
+                                                                        onChange={e => updateQTranslation(i, 'mr', opt, e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="pt-2 flex items-center gap-2 flex-wrap border-t border-gray-200/60">
                                                     <label className="text-xs font-bold text-gray-500">
                                                         {isMulti ? 'Select ALL Correct Answers (Checkboxes):' : 'Correct Answer:'}
                                                     </label>

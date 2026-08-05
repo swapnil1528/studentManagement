@@ -140,6 +140,24 @@ export default function StudentPortal() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [showEndExamModal, setShowEndExamModal] = useState(false);
+    const [quizLang, setQuizLang] = useState('en'); // 'en' | 'hi' | 'mr'
+    const [bilingualMode, setBilingualMode] = useState(false);
+
+    const GetQuestionText = (q, lang) => {
+        if (!q) return '';
+        if (lang !== 'en' && q.translations?.[lang]?.q) {
+            return q.translations[lang].q;
+        }
+        return q.q || '';
+    };
+
+    const GetOptionText = (q, optKey, lang) => {
+        if (!q) return '';
+        if (lang !== 'en' && q.translations?.[lang]?.options?.[optKey]) {
+            return q.translations[lang].options[optKey];
+        }
+        return q.options?.[optKey] || '';
+    };
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -252,6 +270,8 @@ export default function StudentPortal() {
         setQuizStep(0);
         setQuizAnswers({});
         setFlaggedQuestions({});
+        setQuizLang('en');
+        setBilingualMode(false);
         setQuizStartTime(Date.now());
         const limitMins = Number(qz.timeLimit) || 0;
         setSecondsLeft(limitMins > 0 ? limitMins * 60 : null);
@@ -1231,14 +1251,23 @@ export default function StudentPortal() {
                                                     </div>
 
                                                     {/* Question Text */}
-                                                    <h2 style={{ fontWeight: 800, fontSize: 18, color: isDark ? '#ede9fe' : '#1a1035', marginBottom: 24, lineHeight: 1.6 }}>
-                                                        {question?.q}
-                                                    </h2>
+                                                    <div style={{ marginBottom: 24 }}>
+                                                        <h2 style={{ fontWeight: 800, fontSize: 18, color: isDark ? '#ede9fe' : '#1a1035', margin: 0, lineHeight: 1.6 }}>
+                                                            {GetQuestionText(question, quizLang)}
+                                                        </h2>
+                                                        {bilingualMode && quizLang !== 'en' && question?.q && (
+                                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed', fontStyle: 'italic', marginTop: 6 }}>
+                                                                🇬🇧 English: {question.q}
+                                                            </div>
+                                                        )}
+                                                    </div>
 
                                                     {/* Options List */}
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
                                                         {displayOptionKeys.map(opt => {
                                                             const isSelected = isMulti ? currentAnswerArr.includes(opt) : currentAnswerStr === opt;
+                                                            const mainOptText = getOptionText(question, opt, quizLang);
+                                                            const engOptText = question?.options?.[opt];
                                                             return (
                                                                 <button
                                                                     key={opt}
@@ -1264,7 +1293,14 @@ export default function StudentPortal() {
                                                                         {isSelected ? (isMulti ? '✓' : '•') : ''}
                                                                     </span>
                                                                     <span style={{ fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase' }}>{opt}.</span>
-                                                                    <span style={{ flex: 1 }}>{question.options[opt]}</span>
+                                                                    <span style={{ flex: 1 }}>
+                                                                        {mainOptText}
+                                                                        {bilingualMode && quizLang !== 'en' && engOptText && engOptText !== mainOptText && (
+                                                                            <span style={{ opacity: 0.75, fontSize: 12, fontStyle: 'italic', marginLeft: 8, color: isDark ? '#c4b5fd' : '#6b21a8' }}>
+                                                                                ({engOptText})
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
                                                                 </button>
                                                             );
                                                         })}
