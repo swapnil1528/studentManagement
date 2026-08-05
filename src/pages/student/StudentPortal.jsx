@@ -91,7 +91,7 @@ const STUDENT_TABS = ['overview', 'attendance', 'classroom', 'quizzes', 'results
 
 export default function StudentPortal() {
     const { user, logout } = useAuth();
-    const { isDark } = useTheme();
+    const { isDark, toggleTheme } = useTheme();
 
     const getInitialTab = () => {
         const hash = (window.location.hash || '').replace('#', '').trim().toLowerCase();
@@ -150,6 +150,7 @@ export default function StudentPortal() {
         }
         return q.q || '';
     };
+    const getQuestionText = GetQuestionText;
 
     const GetOptionText = (q, optKey, lang) => {
         if (!q) return '';
@@ -158,6 +159,7 @@ export default function StudentPortal() {
         }
         return q.options?.[optKey] || '';
     };
+    const getOptionText = GetOptionText;
 
     useEffect(() => {
         const interval = setInterval(() => {
