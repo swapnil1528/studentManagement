@@ -312,14 +312,6 @@ function getStudentBasic(id) {
       franchiseInfo = matches[0];
     }
   }
-
-    if (studentBranch) {
-      franchiseInfo = matches.find(f => f.branch.toLowerCase() === String(studentBranch).toLowerCase());
-    }
-    if (!franchiseInfo && matches.length > 0) {
-      franchiseInfo = matches[0];
-    }
-  }
   
   let p = 0;
   att.forEach(r => { if(String(r[4]).toLowerCase().includes('present') || String(r[4]).toLowerCase().includes('check-in')) p++; });
