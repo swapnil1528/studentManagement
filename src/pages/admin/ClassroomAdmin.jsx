@@ -3,7 +3,7 @@
  * Tabs: Classwork (publish + edit/delete materials), Submissions (grade), Quizzes (create), Exam Marks (results)
  */
 import { useState, useEffect, useRef } from 'react';
-import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSContent, saveQuiz, getQuizzes, deleteQuiz, getQuizResults } from '../../services/api';
+import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSContent, saveQuiz, getQuizzes, deleteQuiz, getQuizResults, getCourseSessions, saveCourseSessions } from '../../services/api';
 import { setLoading } from '../../components/ui/LoadingBar';
 import { showToast } from '../../components/ui/Toast';
 import { exportCsv, exportPdf } from '../../utils/exportUtils';
@@ -82,7 +82,7 @@ function EmptyBox({ icon, text, sub }) {
     );
 }
 
-const CLASSROOM_TABS = ['classwork', 'submissions', 'quizzes', 'exammarks', 'testhistory'];
+const CLASSROOM_TABS = ['classwork', 'submissions', 'quizzes', 'articulate', 'exammarks', 'testhistory'];
 
 export default function ClassroomAdmin({ adminData }) {
     const getInitialTab = () => {
@@ -1175,6 +1175,7 @@ export default function ClassroomAdmin({ adminData }) {
         { id: 'classwork', label: '📚 Classwork', desc: 'Publish & manage materials' },
         { id: 'submissions', label: '📤 Submissions', desc: 'Grade student work' },
         { id: 'quizzes', label: '📝 Quizzes', desc: 'Create exams & quizzes' },
+        { id: 'articulate', label: '🎓 Articulate Sessions', desc: 'Build step-by-step course sessions & track ERA progress' },
         { id: 'exammarks', label: '🏆 Exam Marks', desc: 'View student results' },
         { id: 'testhistory', label: '📊 Test History', desc: 'Detailed student test reports & marksheets' },
     ];
@@ -1818,6 +1819,37 @@ export default function ClassroomAdmin({ adminData }) {
                                         ? `💾 Update Quiz (${questions.length} Questions)`
                                         : `🚀 Publish Quiz (${questions.length} Questions)`}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── ARTICULATE SESSIONS & ERA PROGRESS TAB ── */}
+            {activeTab === 'articulate' && (
+                <div className="space-y-6">
+                    <div className="card shadow-md border-t-4 border-cyan-500">
+                        <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-cyan-900">
+                                    <BookOpen size={22} className="text-cyan-600" />
+                                    Articulate LMS Course & Session Builder
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Create step-by-step sequential learning sessions, attach videos, topic quizzes, and practical assignments.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-2xl flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">🎓</span>
+                                <div>
+                                    <div className="text-xs font-bold text-cyan-800 uppercase tracking-wider">ERA Step-by-Step Learning Engine</div>
+                                    <div className="text-sm font-extrabold text-cyan-950">
+                                        Students access this interactive syllabus via "Start Learning" button in their login portal.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

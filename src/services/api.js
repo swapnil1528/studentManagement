@@ -214,3 +214,21 @@ export const submitQuizResult = (form) =>
 /** Get quiz results (optionally filtered by studentId) */
 export const getQuizResults = (studentId = '') =>
     apiCall('getQuizResults', { studentId });
+
+// ─── Articulate Step-by-Step LMS Sessions ──────────────────────
+/** Get structured course sessions for Articulate viewer */
+export const getCourseSessions = (course) =>
+    apiCall('getCourseSessions', { courseName: course });
+
+/** Admin saves structured course sessions tree */
+export const saveCourseSessions = (course, sessions) =>
+    apiCall('saveCourseSessions', { courseName: course, sessions });
+
+/** Get student step-by-step learning progress and points */
+export const getStudentLearningProgress = (studentId, course) =>
+    apiCall('getStudentLearningProgress', { studentId, courseName: course });
+
+/** Record completed learning step/topic for a student */
+export const recordTopicProgress = (studentId, course, topicId, pointsEarned = 0, sessionCount = 0) =>
+    apiCall('recordTopicProgress', { studentId, courseName: course, topicId, pointsEarned, sessionCount });
+

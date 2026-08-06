@@ -1503,3 +1503,100 @@ function setupReportTriggers() {
   ScriptApp.newTrigger('triggerMonthlyReport').timeBased().onMonthDay(1).atHour(8).inTimezone('Asia/Kolkata').create();
   Logger.log('✅ Report triggers created.');
 }
+
+// ── ARTICULATE LEARNING SYSTEM & LMS SESSION MANAGEMENT ─────────────────────
+
+function getCourseSessions(courseName) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("CourseSessions");
+  if (!sheet) {
+    sheet = ss.insertSheet("CourseSessions");
+    sheet.appendRow(["Course", "SessionsData", "LastUpdated"]);
+  }
+  const data = sheet.getDataRange().getValues().slice(1);
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).toLowerCase() === String(courseName).toLowerCase()) {
+      try {
+        return { success: true, course: data[i][0], sessions: JSON.parse(data[i][1]) };
+      } catch (e) {
+        return { success: true, course: data[i][0], sessions: [] };
+      }
+    }
+  }
+  return { success: true, course: courseName, sessions: [] };
+}
+
+function saveCourseSessions(courseName, sessions) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("CourseSessions");
+  if (!sheet) {
+    sheet = ss.insertSheet("CourseSessions");
+    sheet.appendRow(["Course", "SessionsData", "LastUpdated"]);
+  }
+  const jsonStr = typeof sessions === 'string' ? sessions : JSON.stringify(sessions || []);
+  const nowStr = Utilities.formatDate(new Date(), 'GMT+5:30', 'yyyy-MM-dd HH:mm:ss');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).toLowerCase() === String(courseName).toLowerCase()) {
+      sheet.getRange(i + 1, 2, 1, 2).setValues([[jsonStr, nowStr]]);
+      return { success: true, updated: true };
+    }
+  }
+  sheet.appendRow([courseName, jsonStr, nowStr]);
+  return { success: true, created: true };
+}
+
+function getStudentLearningProgress(studentId, courseName) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("LearningProgress");
+  if (!sheet) {
+    sheet = ss.insertSheet("LearningProgress");
+    sheet.appendRow(["StudentId", "Course", "CompletedTopicIds", "PointsEarned", "CompletedSessions", "LastActive"]);
+  }
+  const data = sheet.getDataRange().getValues().slice(1);
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(studentId) && String(data[i][1]).toLowerCase() === String(courseName).toLowerCase()) {
+      try {
+        return {
+          success: true,
+          studentId: studentId,
+          course: courseName,
+          completedTopicIds: JSON.parse(data[i][2] || "[]"),
+          pointsEarned: Number(data[i][3]) || 0,
+          completedSessions: Number(data[i][4]) || 0,
+          lastActive: data[i][5]
+        };
+      } catch (e) {
+        return { success: true, studentId: studentId, course: courseName, completedTopicIds: [], pointsEarned: 0, completedSessions: 0 };
+      }
+    }
+  }
+  return { success: true, studentId: studentId, course: courseName, completedTopicIds: [], pointsEarned: 0, completedSessions: 0 };
+}
+
+function recordTopicProgress(studentId, courseName, topicId, pointsEarned, sessionCount) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName("LearningProgress");
+  if (!sheet) {
+    sheet = ss.insertSheet("LearningProgress");
+    sheet.appendRow(["StudentId", "Course", "CompletedTopicIds", "PointsEarned", "CompletedSessions", "LastActive"]);
+  }
+  const nowStr = Utilities.formatDate(new Date(), 'GMT+5:30', 'yyyy-MM-dd HH:mm:ss');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(studentId) && String(data[i][1]).toLowerCase() === String(courseName).toLowerCase()) {
+      let topicList = [];
+      try { topicList = JSON.parse(data[i][2] || "[]"); } catch (e) { }
+      if (!topicList.includes(topicId)) topicList.push(topicId);
+      const newPoints = (Number(data[i][3]) || 0) + (Number(pointsEarned) || 0);
+      const newSessions = sessionCount !== undefined ? Number(sessionCount) : (Number(data[i][4]) || 0);
+      sheet.getRange(i + 1, 3, 1, 4).setValues([[JSON.stringify(topicList), newPoints, newSessions, nowStr]]);
+      return { success: true, completedTopicIds: topicList, pointsEarned: newPoints, completedSessions: newSessions };
+    }
+  }
+  const initialTopics = topicId ? [topicId] : [];
+  const initialPoints = Number(pointsEarned) || 0;
+  const initialSessions = sessionCount !== undefined ? Number(sessionCount) : 0;
+  sheet.appendRow([studentId, courseName, JSON.stringify(initialTopics), initialPoints, initialSessions, nowStr]);
+  return { success: true, completedTopicIds: initialTopics, pointsEarned: initialPoints, completedSessions: initialSessions };
+}
