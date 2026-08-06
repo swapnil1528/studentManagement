@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { recordTopicProgress } from '../../../services/api';
 
+function getEmbedUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+    if (ytMatch) {
+        return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    }
+    const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/\n?#]+)/);
+    if (driveMatch) {
+        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+    return url;
+}
+
 export default function ArticulatePlayerModal({ isOpen, onClose, courseName = 'MS-CIT', sessions = [], studentId, completedTopicIds = [], pointsEarned = 0, onProgressUpdate, isDark = false }) {
     const [activeSessionIdx, setActiveSessionIdx] = useState(0);
     const [activeTopicIdx, setActiveTopicIdx] = useState(0);
@@ -327,9 +340,9 @@ export default function ArticulatePlayerModal({ isOpen, onClose, courseName = 'M
                                     borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', position: 'relative'
                                 }}>
                                     {currentTopic?.url ? (
-                                        currentTopic.url.includes('youtube') || currentTopic.url.includes('embed') ? (
+                                        (currentTopic.url.includes('youtube') || currentTopic.url.includes('youtu.be') || currentTopic.url.includes('drive.google.com') || currentTopic.url.includes('embed')) ? (
                                             <iframe
-                                                src={currentTopic.url}
+                                                src={getEmbedUrl(currentTopic.url)}
                                                 title={currentTopic.title}
                                                 style={{ width: '100%', height: '100%', border: 'none' }}
                                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
