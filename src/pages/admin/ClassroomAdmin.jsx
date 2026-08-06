@@ -139,6 +139,110 @@ export default function ClassroomAdmin({ adminData }) {
     const [editingQuizId, setEditingQuizId] = useState(null);
     const quizFormRef = useRef(null);
 
+    // ── Articulate Course Builder State ──
+    const [articulateCourse, setArticulateCourse] = useState('MS-CIT');
+    const [adminSessions, setAdminSessions] = useState([
+        {
+            id: 'session-1',
+            title: 'Session #01 MS-CIT (Basic Computer, SmartPhone and Typing Skills)',
+            topics: [
+                { id: 's1-t1', title: 'MS-CIT Introduction & Basic Computer Overview', type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', duration: '04:55' },
+                { id: 's1-t2', title: 'Understanding Self-Learning & Digital Skills', type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', duration: '06:20' },
+                { id: 's1-t3', title: 'Session #01 Knowledge Check Quiz', type: 'quiz', questions: [{ q: 'Which of the following is an input device used for technical drawings?', options: { a: 'Plotter', b: 'Printer', c: 'Speaker', d: 'Monitor' }, correct: 'a' }] },
+                { id: 's1-t4', title: 'Session #01 Practical Assignment', type: 'assignment', instruction: 'Upload a Word Document summarizing today\'s session.' }
+            ]
+        }
+    ]);
+    const [savingSessions, setSavingSessions] = useState(false);
+    const [loadingSessions, setLoadingSessions] = useState(false);
+
+    const fetchAdminSessions = async (courseName) => {
+        if (!courseName) return;
+        setLoadingSessions(true);
+        try {
+            const res = await getCourseSessions(courseName);
+            if (res?.success && Array.isArray(res.sessions) && res.sessions.length > 0) {
+                setAdminSessions(res.sessions);
+            }
+        } catch (e) {
+            console.error('Error fetching admin sessions:', e);
+        } finally {
+            setLoadingSessions(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'articulate') {
+            fetchAdminSessions(articulateCourse);
+        }
+    }, [activeTab, articulateCourse]);
+
+    const handleSaveAdminSessions = async () => {
+        if (!articulateCourse) {
+            alert('Please select or enter a course name');
+            return;
+        }
+        setSavingSessions(true);
+        try {
+            const res = await saveCourseSessions(articulateCourse, adminSessions);
+            if (res?.success) {
+                showToast(`Course Sessions for "${articulateCourse}" saved & published successfully! 🎉`);
+            } else {
+                alert(res?.error || 'Failed to save sessions');
+            }
+        } catch (e) {
+            alert('Error saving sessions: ' + e.message);
+        } finally {
+            setSavingSessions(false);
+        }
+    };
+
+    const handleAddSession = () => {
+        const nextNum = adminSessions.length + 1;
+        const sNum = String(nextNum).padStart(2, '0');
+        const newSession = {
+            id: `session-${Date.now()}`,
+            title: `Session #${sNum} ${articulateCourse} (New Learning Module)`,
+            topics: [
+                { id: `s${nextNum}-t1`, title: `Topic 1: Introduction`, type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', duration: '05:00' },
+                { id: `s${nextNum}-t2`, title: `Topic 2: Knowledge Check Quiz`, type: 'quiz', questions: [{ q: 'Sample Question?', options: { a: 'Option A', b: 'Option B', c: 'Option C', d: 'Option D' }, correct: 'a' }] }
+            ]
+        };
+        setAdminSessions([...adminSessions, newSession]);
+    };
+
+    const handleDeleteSession = (sIdx) => {
+        if (window.confirm(`Delete Session #${sIdx + 1}?`)) {
+            setAdminSessions(adminSessions.filter((_, idx) => idx !== sIdx));
+        }
+    };
+
+    const handleAddTopic = (sIdx) => {
+        const updated = [...adminSessions];
+        if (!updated[sIdx].topics) updated[sIdx].topics = [];
+        const nextTNum = updated[sIdx].topics.length + 1;
+        updated[sIdx].topics.push({
+            id: `s${sIdx + 1}-t${Date.now()}`,
+            title: `New Topic ${nextTNum}`,
+            type: 'video',
+            url: '',
+            duration: '05:00'
+        });
+        setAdminSessions(updated);
+    };
+
+    const handleDeleteTopic = (sIdx, tIdx) => {
+        const updated = [...adminSessions];
+        updated[sIdx].topics = updated[sIdx].topics.filter((_, idx) => idx !== tIdx);
+        setAdminSessions(updated);
+    };
+
+    const handleUpdateTopic = (sIdx, tIdx, field, val) => {
+        const updated = [...adminSessions];
+        updated[sIdx].topics[tIdx][field] = val;
+        setAdminSessions(updated);
+    };
+
     // ── Exam marks & Test history state ──────────────────────────────────────
     const [quizResults, setQuizResults] = useState([]);
     const [loadingResults, setLoadingResults] = useState(false);
@@ -1827,30 +1931,200 @@ export default function ClassroomAdmin({ adminData }) {
             {/* ── ARTICULATE SESSIONS & ERA PROGRESS TAB ── */}
             {activeTab === 'articulate' && (
                 <div className="space-y-6">
+                    {/* Header Card */}
                     <div className="card shadow-md border-t-4 border-cyan-500">
                         <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2 text-cyan-900">
                                     <BookOpen size={22} className="text-cyan-600" />
-                                    Articulate LMS Course & Session Builder
+                                    Articulate LMS Course & Session Content Builder
                                 </h2>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Create step-by-step sequential learning sessions, attach videos, topic quizzes, and practical assignments.
+                                    Create step-by-step sequential learning sessions, attach video lessons, topic quizzes, and practical assignments.
                                 </p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleSaveAdminSessions}
+                                    disabled={savingSessions}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-extrabold text-sm shadow-md transition flex items-center gap-2"
+                                >
+                                    {savingSessions ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        '💾 Save & Publish Course Syllabus'
+                                    )}
+                                </button>
                             </div>
                         </div>
 
-                        <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <span className="text-2xl">🎓</span>
-                                <div>
-                                    <div className="text-xs font-bold text-cyan-800 uppercase tracking-wider">ERA Step-by-Step Learning Engine</div>
-                                    <div className="text-sm font-extrabold text-cyan-950">
-                                        Students access this interactive syllabus via "Start Learning" button in their login portal.
-                                    </div>
-                                </div>
+                        {/* Course Selector */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-cyan-50/50 p-4 rounded-2xl border border-cyan-100 mb-4">
+                            <div>
+                                <label className="text-xs font-bold text-cyan-800 uppercase tracking-wider mb-1 block">
+                                    Target Course *
+                                </label>
+                                <select
+                                    className="inp bg-white"
+                                    value={articulateCourse}
+                                    onChange={(e) => setArticulateCourse(e.target.value)}
+                                >
+                                    <option value="MS-CIT">MS-CIT</option>
+                                    <option value="KLiC Tally">KLiC Tally</option>
+                                    <option value="Web Development">Web Development</option>
+                                    <option value="Python Programming">Python Programming</option>
+                                    {(dropdowns.courses || []).filter(c => !['MS-CIT', 'KLiC Tally', 'Web Development', 'Python Programming'].includes(c)).map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-end">
+                                <button
+                                    onClick={() => fetchAdminSessions(articulateCourse)}
+                                    disabled={loadingSessions}
+                                    className="px-4 py-2 bg-white text-cyan-700 border border-cyan-300 hover:bg-cyan-50 rounded-xl font-bold text-xs transition"
+                                >
+                                    {loadingSessions ? 'Loading...' : '📥 Reload Sessions from Cloud'}
+                                </button>
                             </div>
                         </div>
+
+                        {/* Action Bar */}
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-extrabold text-gray-800 text-base flex items-center gap-2">
+                                📋 Sequential Session Tree ({adminSessions.length} Sessions)
+                            </h3>
+                            <button
+                                onClick={handleAddSession}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow"
+                            >
+                                <Plus size={15} /> Add New Session
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sessions Accordion List */}
+                    <div className="space-y-4">
+                        {adminSessions.map((session, sIdx) => (
+                            <div key={session.id || sIdx} className="card border border-gray-200 shadow-sm hover:border-cyan-300 transition">
+                                <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-100">
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <span className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-800 font-extrabold text-sm flex items-center justify-center">
+                                            {sIdx + 1}
+                                        </span>
+                                        <input
+                                            type="text"
+                                            className="inp font-bold text-sm text-gray-800 flex-1"
+                                            value={session.title}
+                                            onChange={(e) => {
+                                                const updated = [...adminSessions];
+                                                updated[sIdx].title = e.target.value;
+                                                setAdminSessions(updated);
+                                            }}
+                                            placeholder="Session Title..."
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleAddTopic(sIdx)}
+                                            className="px-3 py-1.5 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 rounded-lg font-bold text-xs border border-cyan-200 flex items-center gap-1"
+                                        >
+                                            <Plus size={13} /> Add Topic
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteSession(sIdx)}
+                                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                            title="Delete Session"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Sub-topics List */}
+                                <div className="space-y-3 pl-4 border-l-2 border-cyan-100">
+                                    {session.topics?.map((topic, tIdx) => (
+                                        <div key={topic.id || tIdx} className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                            <div className="md:col-span-3">
+                                                <input
+                                                    type="text"
+                                                    className="inp text-xs font-bold bg-white"
+                                                    value={topic.title}
+                                                    onChange={(e) => handleUpdateTopic(sIdx, tIdx, 'title', e.target.value)}
+                                                    placeholder="Topic Title..."
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <select
+                                                    className="inp text-xs bg-white font-semibold"
+                                                    value={topic.type || 'video'}
+                                                    onChange={(e) => handleUpdateTopic(sIdx, tIdx, 'type', e.target.value)}
+                                                >
+                                                    <option value="video">📹 Video Lesson</option>
+                                                    <option value="quiz">📝 Knowledge Quiz</option>
+                                                    <option value="assignment">📤 Practical Task</option>
+                                                </select>
+                                            </div>
+
+                                            {(!topic.type || topic.type === 'video') && (
+                                                <div className="md:col-span-6 grid grid-cols-3 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        className="inp text-xs col-span-2 bg-white"
+                                                        value={topic.url || ''}
+                                                        onChange={(e) => handleUpdateTopic(sIdx, tIdx, 'url', e.target.value)}
+                                                        placeholder="Video URL (YouTube/MP4)..."
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="inp text-xs bg-white"
+                                                        value={topic.duration || '05:00'}
+                                                        onChange={(e) => handleUpdateTopic(sIdx, tIdx, 'duration', e.target.value)}
+                                                        placeholder="Duration (05:00)..."
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {topic.type === 'quiz' && (
+                                                <div className="md:col-span-6">
+                                                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 block">
+                                                        📝 Topic Quiz (Awards +100 Internal Score Points to Students)
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {topic.type === 'assignment' && (
+                                                <div className="md:col-span-6">
+                                                    <input
+                                                        type="text"
+                                                        className="inp text-xs bg-white"
+                                                        value={topic.instruction || ''}
+                                                        onChange={(e) => handleUpdateTopic(sIdx, tIdx, 'instruction', e.target.value)}
+                                                        placeholder="Practical Assignment Instructions..."
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className="md:col-span-1 text-right">
+                                                <button
+                                                    onClick={() => handleDeleteTopic(sIdx, tIdx)}
+                                                    className="p-1 text-rose-500 hover:bg-rose-100 rounded-lg transition"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {(!session.topics || session.topics.length === 0) && (
+                                        <p className="text-xs text-gray-400 italic py-2">No topics added yet. Click "+ Add Topic" above.</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

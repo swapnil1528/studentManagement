@@ -149,8 +149,8 @@ export default function StudentPortal() {
     const [articulateCourse, setArticulateCourse] = useState('MS-CIT');
     const [courseSessions, setCourseSessions] = useState([]);
     const [completedTopicIds, setCompletedTopicIds] = useState([]);
-    const [pointsEarned, setPointsEarned] = useState(4589);
-    const [completedSessions, setCompletedSessions] = useState(50);
+    const [pointsEarned, setPointsEarned] = useState(0);
+    const [completedSessions, setCompletedSessions] = useState(0);
 
     const loadProgress = async () => {
         try {
@@ -158,8 +158,8 @@ export default function StudentPortal() {
             const res = await getStudentLearningProgress(sid, articulateCourse);
             if (res?.success) {
                 if (Array.isArray(res.completedTopicIds)) setCompletedTopicIds(res.completedTopicIds);
-                if (res.pointsEarned !== undefined && res.pointsEarned !== null) setPointsEarned(res.pointsEarned || 4589);
-                if (res.completedSessions !== undefined && res.completedSessions !== null) setCompletedSessions(res.completedSessions || 50);
+                if (res.pointsEarned !== undefined && res.pointsEarned !== null) setPointsEarned(Number(res.pointsEarned) || 0);
+                if (res.completedSessions !== undefined && res.completedSessions !== null) setCompletedSessions(Number(res.completedSessions) || 0);
             }
             const sRes = await getCourseSessions(articulateCourse);
             if (sRes?.success && Array.isArray(sRes.sessions)) {
@@ -799,10 +799,10 @@ export default function StudentPortal() {
                                     boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
                                 }}>
                                     <div style={{ fontSize: 16, fontWeight: 900, color: isDark ? '#f8fafc' : '#0f172a' }}>
-                                        Level: {completedSessions || 50}
+                                        Level: {completedSessions}
                                     </div>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginTop: 4, marginBottom: 16 }}>
-                                        Current Session: Session #{completedSessions || 50} {articulateCourse} (Final Exam Practice & Interactive Articulate Self-Learning)
+                                        Current Session: Session #{completedSessions > 0 ? completedSessions : 1} {articulateCourse} (Final Exam Practice & Interactive Articulate Self-Learning)
                                     </div>
 
                                     {/* Action Buttons */}
@@ -834,10 +834,10 @@ export default function StudentPortal() {
                                     <div style={{ marginTop: 20 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 800, marginBottom: 6, color: isDark ? '#f1f5f9' : '#1e293b' }}>
                                             <span>Session Completion</span>
-                                            <span style={{ color: '#0284c7' }}>{Math.min(100, Math.round(((completedSessions || 50) / 50) * 100))}%</span>
+                                            <span style={{ color: '#0284c7' }}>{Math.min(100, Math.round((completedSessions / 50) * 100))}%</span>
                                         </div>
                                         <div style={{ width: '100%', height: 10, background: isDark ? '#334155' : '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
-                                            <div style={{ width: `${Math.min(100, Math.round(((completedSessions || 50) / 50) * 100))}%`, height: '100%', background: 'linear-gradient(90deg, #0284c7, #10b981)', borderRadius: 5, transition: 'width 0.5s' }} />
+                                            <div style={{ width: `${Math.min(100, Math.round((completedSessions / 50) * 100))}%`, height: '100%', background: 'linear-gradient(90deg, #0284c7, #10b981)', borderRadius: 5, transition: 'width 0.5s' }} />
                                         </div>
                                     </div>
                                 </div>
@@ -863,7 +863,7 @@ export default function StudentPortal() {
                                                 Internal Score (Points)
                                             </div>
                                             <div style={{ fontSize: 36, fontWeight: 900, margin: '8px 0 0' }}>
-                                                {pointsEarned || 4589} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 5000</span>
+                                                {pointsEarned} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 5000</span>
                                             </div>
                                         </div>
 
@@ -876,7 +876,7 @@ export default function StudentPortal() {
                                                 Internal Marks (MSBTE)
                                             </div>
                                             <div style={{ fontSize: 36, fontWeight: 900, margin: '8px 0 0' }}>
-                                                {((pointsEarned || 4589) / 100).toFixed(2)} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 50</span>
+                                                {(pointsEarned / 100).toFixed(2)} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 50</span>
                                             </div>
                                         </div>
 
@@ -889,7 +889,7 @@ export default function StudentPortal() {
                                                 Completed Session Count
                                             </div>
                                             <div style={{ fontSize: 36, fontWeight: 900, margin: '8px 0 0' }}>
-                                                {completedSessions || 50} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 50</span>
+                                                {completedSessions} <span style={{ fontSize: 18, opacity: 0.8, fontWeight: 700 }}>/ 50</span>
                                             </div>
                                         </div>
                                     </div>
