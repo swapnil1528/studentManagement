@@ -82,6 +82,12 @@ function doPost(e) {
     else if(act==='submitQuiz') res = submitQuizResult(d.form);
     else if(act==='getQuizResults') res = getQuizResults(d.studentId);
 
+    // --- ARTICULATE STEP-BY-STEP LMS SESSIONS ---
+    else if(act==='getCourseSessions') res = getCourseSessions(d.courseName);
+    else if(act==='saveCourseSessions') res = saveCourseSessions(d.courseName, d.sessions);
+    else if(act==='getStudentLearningProgress') res = getStudentLearningProgress(d.studentId, d.courseName);
+    else if(act==='recordTopicProgress') res = recordTopicProgress(d.studentId, d.courseName, d.topicId, d.pointsEarned, d.sessionCount);
+
     // --- SETTINGS ---
     else if(act==='getSettings') res = getSettings();
     else if(act==='saveSetting') res = saveSetting(d.key, d.value);
