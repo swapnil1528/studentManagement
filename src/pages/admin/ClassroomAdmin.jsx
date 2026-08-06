@@ -468,12 +468,108 @@ export default function ClassroomAdmin({ adminData }) {
         return s;
     };
 
+    // Device Name Transliteration Map (preserves technical names phonetically in Devanagari)
+    const DEVICE_TRANSLITERATION = {
+        mr: {
+            'plotter': 'प्लॉटर',
+            'plotters': 'प्लॉटर',
+            'flatbed scanner': 'फ्लॅटबेड स्कॅनर',
+            'flatbed scanners': 'फ्लॅटबेड स्कॅनर',
+            'scanner': 'स्कॅनर',
+            'scanners': 'स्कॅनर',
+            'barcode reader': 'बारकोड रीडर',
+            'barcode readers': 'बारकोड रीडर',
+            'joystick': 'जॉयस्टिक',
+            'joysticks': 'जॉयस्टिक',
+            'trackball': 'ट्रॅकबॉल',
+            'trackballs': 'ट्रॅकबॉल',
+            'stylus': 'स्टायलस',
+            'touchscreen': 'टचस्क्रीन',
+            'touch screen': 'टचस्क्रीन',
+            'projector': 'प्रोजेक्टर',
+            'projectors': 'प्रोजेक्टर',
+            'microprocessor': 'मायक्रोप्रोसेसर',
+            'microprocessors': 'मायक्रोप्रोसेसर',
+            'motherboard': 'मदरबोर्ड',
+            'router': 'राऊटर',
+            'modem': 'मोडेम',
+            'webcam': 'वेबकॅम',
+            'web camera': 'वेब कॅमेरा',
+            'microphone': 'मायक्रोफोन',
+            'speaker': 'स्पीकर',
+            'speakers': 'स्पीकर',
+            'headphones': 'हेडफोन',
+            'pen drive': 'पेनड्राईव्ह',
+            'pendrive': 'पेनड्राईव्ह',
+            'flash drive': 'फ्लॅश ड्राईव्ह',
+            'hard disk': 'हार्ड डिस्क',
+            'solid state drive': 'सॉलिड स्टेट ड्राईव्ह',
+            'ssd': 'एसएसडी (SSD)',
+            'cpu': 'सीपीयू (CPU)',
+            'ram': 'रॅम (RAM)',
+            'rom': 'रॉम (ROM)',
+            'usb': 'युएसबी (USB)',
+        },
+        hi: {
+            'plotter': 'प्लॉटर',
+            'plotters': 'प्लॉटर',
+            'flatbed scanner': 'फ्लैटबेड स्कैनर',
+            'flatbed scanners': 'फ्लैटबेड स्कैनर',
+            'scanner': 'स्कैनर',
+            'scanners': 'स्कैनर',
+            'barcode reader': 'बारकोड रीडर',
+            'barcode readers': 'बारकोड रीडर',
+            'joystick': 'जॉयस्टिक',
+            'joysticks': 'जॉयस्टिक',
+            'trackball': 'ट्रैकबॉल',
+            'trackballs': 'ट्रैकबॉल',
+            'stylus': 'स्टायलस',
+            'touchscreen': 'टचस्क्रीन',
+            'touch screen': 'टचस्क्रीन',
+            'projector': 'प्रोजेक्टर',
+            'projectors': 'प्रोजेक्टर',
+            'microprocessor': 'माइक्रोप्रोसेसर',
+            'microprocessors': 'माइक्रोप्रोसेसर',
+            'motherboard': 'मदरबोर्ड',
+            'router': 'राउटर',
+            'modem': 'मोडेम',
+            'webcam': 'वेबकैम',
+            'web camera': 'वेब कैमरा',
+            'microphone': 'माइक्रोफोन',
+            'speaker': 'स्पीकर',
+            'speakers': 'स्पीकर',
+            'headphones': 'हेडफोन',
+            'pen drive': 'पेनड्राइव',
+            'pendrive': 'पेनड्राइव',
+            'flash drive': 'फ्लैश ड्राइव',
+            'hard disk': 'हार्ड डिस्क',
+            'solid state drive': 'सॉलिड स्टेट ड्राइव',
+            'ssd': 'एसएसडी (SSD)',
+            'cpu': 'सीपीयू (CPU)',
+            'ram': 'रैम (RAM)',
+            'rom': 'रोम (ROM)',
+            'usb': 'यूएसबी (USB)',
+        }
+    };
+
     const postprocessTranslation = (translated, targetLang, originalEng) => {
         if (!translated) return '';
         let res = translated;
 
+        // Phonetic Device Transliteration Replacement
+        if (DEVICE_TRANSLITERATION[targetLang]) {
+            Object.entries(DEVICE_TRANSLITERATION[targetLang]).forEach(([engTerm, devanagari]) => {
+                const regexEng = new RegExp(`\\b${engTerm}\\b`, 'gi');
+                res = res.replace(regexEng, devanagari);
+            });
+        }
+
         if (targetLang === 'mr') {
-            // Fix literal translation artifacts for Marathi
+            // Fix literal translation artifacts & mistransliterations for Marathi
+            res = res.replace(/प्लोतर/gi, 'प्लॉटर');
+            res = res.replace(/प्लॉटर्स/gi, 'प्लॉटर');
+            res = res.replace(/फ्लदबेद/gi, 'फ्लॅटबेड');
+            res = res.replace(/स्कानर/gi, 'स्कॅनर');
             res = res.replace(/इनपुट डिव्हाइसमध्ये ([^?]+)\?/gi, '$1 हे इनपुट डिव्हाइस आहे का?');
             res = res.replace(/डिव्हाइसमध्ये ([^?]+)\?/gi, '$1 हे डिव्हाइस आहे का?');
             res = res.replace(/इन्पुट/g, 'इनपुट');
@@ -487,7 +583,10 @@ export default function ClassroomAdmin({ adminData }) {
         }
 
         if (targetLang === 'hi') {
-            // Fix literal translation artifacts for Hindi
+            // Fix literal translation artifacts & mistransliterations for Hindi
+            res = res.replace(/प्लोतर/gi, 'प्लॉटर');
+            res = res.replace(/प्लॉटर्स/gi, 'प्लॉटर');
+            res = res.replace(/स्कानर/gi, 'स्कैनर');
             res = res.replace(/इनपुट डिवाइस में ([^?]+)\?/gi, 'क्या $1 एक इनपुट डिवाइस है?');
             res = res.replace(/डिवाइस में ([^?]+)\?/gi, 'क्या $1 एक डिवाइस है?');
             res = res.replace(/इन्पुट/g, 'इनपुट');
