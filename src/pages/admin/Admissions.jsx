@@ -32,6 +32,7 @@ const getAdmDisc = r => 0; // Discount column was removed from sheet structure
 const getAdmStatus = r => r[11] || 'Active';
 const getAdmPhoto = r => r[12] || '';
 const getAdmDate = r => r[9] || '';
+const getAdmDueDate = r => r[14] || '';
 
 export default function Admissions({ adminData, user, onReload }) {
     const userBranch = user?.branch || '';
@@ -46,6 +47,7 @@ export default function Admissions({ adminData, user, onReload }) {
         ...(showBranchCol ? [{ key: 'branch', label: 'Branch' }] : []),
         { key: 'course', label: 'Course' },
         { key: 'batch', label: 'Batch' },
+        { key: 'dueDate', label: 'Due Date' },
         { key: 'status', label: 'Status' },
         { key: 'action', label: 'Actions' },
     ];
@@ -86,7 +88,7 @@ export default function Admissions({ adminData, user, onReload }) {
     const [showEditModal, setShowEditModal] = useState(false);
     const [editSaving, setEditSaving] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [editForm, setEditForm] = useState({ name: '', course: '', batch: '', fees: '', discount: 0, status: 'Active' });
+    const [editForm, setEditForm] = useState({ name: '', course: '', batch: '', fees: '', discount: 0, status: 'Active', dueDate: '' });
 
     // Delete state
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -101,6 +103,7 @@ export default function Admissions({ adminData, user, onReload }) {
             fees: getAdmFees(r),
             discount: getAdmDisc(r),
             status: getAdmStatus(r),
+            dueDate: getAdmDueDate(r),
         });
         setShowEditModal(true);
     };

@@ -12,6 +12,7 @@ import Inquiries from '../../pages/admin/Inquiries';
 import Registrations from '../../pages/admin/Registrations';
 import Admissions from '../../pages/admin/Admissions';
 import FeeCollection from '../../pages/admin/FeeCollection';
+import FeesPending from '../../pages/admin/FeesPending';
 import Receipts from '../../pages/admin/Receipts';
 import Attendance from '../../pages/admin/Attendance';
 import Notices from '../../pages/admin/Notices';
@@ -28,6 +29,7 @@ const PAGE_MAP = {
     'registrations': Registrations,
     'admissions': Admissions,
     'fees': FeeCollection,
+    'fees-pending': FeesPending,
     'receipts': Receipts,
     'hr': HRManagement,
     'exams': ExamResults,
@@ -43,6 +45,7 @@ export const TAB_TO_SLUG = {
     reg: 'registrations',
     adm: 'admissions',
     fee: 'fees',
+    feepending: 'fees-pending',
     rec: 'receipts',
     hr: 'hr',
     exam: 'exams',

@@ -90,7 +90,7 @@ export default function Registrations({ adminData, user, onReload }) {
     const [showAdmitModal, setShowAdmitModal] = useState(false);
     const [admitSaving, setAdmitSaving] = useState(false);
     const [admitForm, setAdmitForm] = useState({
-        admStudId: '', name: '', admCourse: '', admFees: '', discount: 0, finalFees: '', admBatchTime: ''
+        admStudId: '', name: '', admCourse: '', admFees: '', discount: 0, finalFees: '', admBatchTime: '', admDueDate: ''
     });
 
     // ── Edit modal ──
@@ -123,7 +123,8 @@ export default function Registrations({ adminData, user, onReload }) {
         setAdmitForm({
             admStudId: studentId, name: studentName,
             admCourse: '', admFees: '', discount: 0, finalFees: '',
-            admBatchTime: batchData.length > 0 ? batchData[0] : '08-10 AM'
+            admBatchTime: batchData.length > 0 ? batchData[0] : '08-10 AM',
+            admDueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
         });
         setShowAdmitModal(true);
     };

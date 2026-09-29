@@ -44,7 +44,7 @@ function setCachedData(data, branch) {
 
 export default function AdminPage() {
     const { user } = useAuth();
-    const branch = user?.branch || 'All';
+    const branch = (user?.role === 'admin' || !user?.branch) ? 'All' : user.branch;
     const cached = getCachedData(branch);
 
     // Always start with data — cached or empty defaults (NO loading spinner)

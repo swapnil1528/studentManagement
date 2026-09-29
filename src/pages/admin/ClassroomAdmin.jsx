@@ -7,7 +7,8 @@ import { apiCall, saveLMSContent, getLMSMaterials, updateLMSContent, deleteLMSCo
 import { setLoading } from '../../components/ui/LoadingBar';
 import { showToast } from '../../components/ui/Toast';
 import { exportCsv, exportPdf } from '../../utils/exportUtils';
-import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play, Download, FileSpreadsheet, Printer, Clock } from 'lucide-react';
+import { BookOpen, CheckCircle, FileText, Upload, Edit2, Trash2, Plus, X, ChevronDown, ChevronUp, BarChart2, Play, Download, FileSpreadsheet, Printer, Clock, Globe, Sparkles } from 'lucide-react';
+import { SUPPORTED_LANGUAGES, autoTranslateText } from '../../utils/quizI18n';
 
 // ─── Helper: get YouTube embed URL ───────────────────────────────────────────
 function getYouTubeEmbed(url) {
@@ -407,6 +408,7 @@ export default function ClassroomAdmin({ adminData }) {
                     translations: cleanTranslations,
                 };
             }),
+
             totalMarks,
         });
         setSavingQuiz(false);
@@ -416,6 +418,7 @@ export default function ClassroomAdmin({ adminData }) {
             setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
             setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
             setQActiveLang({});
+
             loadPublishedQuizzes();
         } else {
             alert(result?.error || 'Failed to save quiz');
@@ -448,6 +451,7 @@ export default function ClassroomAdmin({ adminData }) {
             })));
         } else {
             setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
+
         }
         showToast(`Editing Quiz: ${qz.title}`);
         quizFormRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -458,6 +462,7 @@ export default function ClassroomAdmin({ adminData }) {
         setQuizForm({ course: '', title: '', dueDate: '', timeLimit: '15', shuffleQuestions: true, shuffleOptions: true });
         setQuestions([{ q: '', a: '', b: '', c: '', d: '', type: 'single', correct: 'a', translations: { hi: { q: '', options: { a: '', b: '', c: '', d: '' } }, mr: { q: '', options: { a: '', b: '', c: '', d: '' } } } }]);
         setQActiveLang({});
+
     };
 
     const handleDeleteQuiz = async (qz) => {
@@ -822,6 +827,7 @@ export default function ClassroomAdmin({ adminData }) {
         setBulkProgress(null);
         showToast(`Successfully translated ALL ${questions.length} questions into ${langLabel}! ✨`);
     };
+
 
     const removeQ = (i) => setQuestions(prev => prev.filter((_, idx) => idx !== i));
 
@@ -1724,6 +1730,7 @@ export default function ClassroomAdmin({ adminData }) {
                                                 <div className="flex justify-between items-center gap-2 flex-wrap">
                                                     <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">Q{i + 1}</span>
 
+
                                                     {/* Question Type Switcher */}
                                                     <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-lg text-xs font-bold">
                                                         <button
@@ -1791,6 +1798,7 @@ export default function ClassroomAdmin({ adminData }) {
                                                             <span>🪄 Auto-Translate Q{i + 1}</span>
                                                         )}
                                                     </button>
+
                                                 </div>
 
                                                 {/* Language Tab Content */}

@@ -59,6 +59,7 @@ function doPost(e) {
     else if(act==='registerFace') res = registerFaceData(d.id, d.descriptor);
     else if(act==='getStudent') res = getStudentPortalData(d.id);
     else if(act==='getStudentBasic') res = getStudentBasic(d.id);
+    else if(act==='getStudentFees') res = getStudentFees(d.id);
     else if(act==='getStudentExtra') res = getStudentExtra(d.id, d.cs);
     else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device, d);
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
@@ -273,6 +274,102 @@ function fetchAllAdminData(b) {
 // ============================================
 // STUDENT PORTAL
 // ============================================
+
+// ============================================
+// STUDENT FEES & ENROLLMENTS HELPER
+// ============================================
+function getStudentFeesData(id, ad, studentBranch) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
+  const allFeeRows = safeGet("FEE MANAGEMENT").filter(r => String(r[2]).trim().toLowerCase() === String(id).trim().toLowerCase());
+  const feePayments = allFeeRows.map(r => {
+    let d = r[1];
+    let dStr = (d instanceof Date) ? Utilities.formatDate(d, "GMT+5:30", "dd-MM-yyyy") : String(r[1] || '');
+    let dueD = r[10] || '';
+    if (dueD instanceof Date) {
+      dueD = Utilities.formatDate(dueD, "GMT+5:30", "dd-MM-yyyy");
+    }
+    return {
+      recNo: String(r[0] || ''),
+      date: dStr,
+      course: String(r[4] || ''),
+      amount: Number(r[5]) || 0,
+      balance: Number(r[6]) || 0,
+      mode: String(r[7] || 'Cash'),
+      collector: String(r[8] || ''),
+      dueDate: String(dueD || '')
+    };
+  }).reverse();
+
+  const enrollments = ad.map(r => {
+    const course = String(r[7] || '');
+    const courseFees = feePayments.filter(f => !f.course || f.course.toLowerCase() === course.toLowerCase());
+    const paidForCourse = courseFees.reduce((s, f) => s + f.amount, 0);
+    const totalFee = Number(r[10]) || 0;
+    const pendingDue = Math.max(0, totalFee - paidForCourse);
+    let admDateStr = r[9];
+    if (admDateStr instanceof Date) {
+      admDateStr = Utilities.formatDate(admDateStr, "GMT+5:30", "dd-MM-yyyy");
+    }
+    let dueDateStr = r[14] || '';
+    if (dueDateStr instanceof Date) {
+      dueDateStr = Utilities.formatDate(dueDateStr, "GMT+5:30", "dd-MM-yyyy");
+    }
+    if (!dueDateStr) {
+      let baseD = admDateStr ? parseSheetDate(admDateStr) : new Date();
+      if (!baseD) baseD = new Date();
+      let d = new Date(baseD);
+      d.setDate(d.getDate() + 30);
+      dueDateStr = Utilities.formatDate(d, "GMT+5:30", "dd-MM-yyyy");
+    }
+    return {
+      admNo: String(r[1] || ''),
+      studId: String(r[2] || ''),
+      name: String(r[3] || ''),
+      branch: String(r[6] || studentBranch || ''),
+      course: course,
+      batch: String(r[8] || ''),
+      admissionDate: String(admDateStr || ''),
+      dueDate: String(dueDateStr || ''),
+      totalFee: totalFee,
+      paidFee: paidForCourse,
+      pendingFee: pendingDue,
+      status: String(r[11] || 'Active')
+    };
+  });
+
+  const totalCourseFees = enrollments.reduce((sum, e) => sum + e.totalFee, 0);
+  const totalPaidFees = feePayments.reduce((sum, f) => sum + f.amount, 0);
+  const totalPendingFees = Math.max(0, totalCourseFees - totalPaidFees);
+  const collectionRate = totalCourseFees > 0 ? Math.min(100, Math.round((totalPaidFees / totalCourseFees) * 100)) : (totalPaidFees > 0 ? 100 : 0);
+
+  const latestFeeWithDueDate = feePayments.find(f => f.dueDate);
+  const pendingEnrollments = enrollments.filter(e => e.pendingFee > 0 && e.dueDate);
+  const nextDueDate = (latestFeeWithDueDate && totalPendingFees > 0)
+    ? latestFeeWithDueDate.dueDate
+    : (pendingEnrollments.length > 0 ? pendingEnrollments[0].dueDate : (enrollments[0]?.dueDate || ''));
+
+  const feeSummary = {
+    totalFee: totalCourseFees,
+    totalPaid: totalPaidFees,
+    pendingAmount: totalPendingFees,
+    collectionRate: collectionRate,
+    status: totalPendingFees === 0 && totalCourseFees > 0 ? 'Paid' : (totalPaidFees > 0 ? 'Partial' : 'Unpaid'),
+    paymentsCount: feePayments.length,
+    dueDate: nextDueDate
+  };
+
+  return { enrollments: enrollments, feePayments: feePayments, feeSummary: feeSummary };
+}
+
+function getStudentFees(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
+  const ad = safeGet("Admission Data").filter(r => String(r[2]).trim().toLowerCase() === String(id).trim().toLowerCase());
+  const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
+  return { success: true, ...getStudentFeesData(id, ad, studentBranch) };
+}
+
 function getStudentBasic(id) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
@@ -792,21 +889,29 @@ function saveCourseAdmission(f) {
   const s = ss.getSheetByName("Registration Data").getDataRange().getValues().find(r => r[2] == f.admStudId);
   if (!s) return { error: "Student not found in Registration Data" };
   // Registration Data cols: [0]=ID,[1]=InqId,[2]=StudID,[3]=Date,[4]=Status,[5]=Name,[6]=Mobile,[7]=Village,[8]=Branch,[9]=Course,[10]=Aadhar,[11]=Photo,[12]=DOB,[13]=MotherName
-  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name"]);
+  const as = ensureSheet("Admission Data", ["ID", "AdmNo", "StudID", "Name", "Mobile", "DOB", "Branch", "Course", "Batch", "Date", "Fees", "Status", "Photo", "Mother Name", "Due Date"]);
   const year = new Date().getFullYear();
   const prefix = 'DCC/ADM/' + year + '/';
   const admNo = getNextSequenceId(as, 1, prefix); // AdmNo is in col index 1
-  as.appendRow([as.getLastRow(), admNo, f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || ""]);
+  let defDue = new Date(); defDue.setDate(defDue.getDate() + 30);
+  let dueStr = f.admDueDate || f.dueDate || Utilities.formatDate(defDue, "GMT+5:30", "dd-MM-yyyy");
+  as.appendRow([as.getLastRow(), admNo, f.admStudId, s[5], s[6], s[12], s[8], f.admCourse, f.admBatchTime, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.admFees, "Active", s[11], s[13] || "", dueStr]);
   return { success: true };
 }
 
 function saveFeeCollection(f) {
-  const feeSheet = ensureSheet("FEE MANAGEMENT", ["RecNo", "Date", "StudID", "Name", "Course", "Amount", "Balance", "Mode", "Collector", "Rem"]);
+  const feeSheet = ensureSheet("FEE MANAGEMENT", ["RecNo", "Date", "StudID", "Name", "Course", "Amount", "Balance", "Mode", "Collector", "Rem", "Next Due Date"]);
   const yr = new Date().getFullYear();
   const prefix = 'DCC/REC/' + yr + '/';
-  const recNo = getNextSequenceId(feeSheet, 0, prefix); // RecNo is in col index 0
-  feeSheet.appendRow([recNo, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.studId, f.name, f.course, f.amount, 0, f.mode, f.collector, ""]);
-  return { success: true };
+  const recNo = getNextSequenceId(feeSheet, 0, prefix);
+  let defDue = new Date(); defDue.setDate(defDue.getDate() + 30);
+  let dueStr = f.dueDate || f.nextDueDate || Utilities.formatDate(defDue, "GMT+5:30", "dd-MM-yyyy");
+  if (dueStr && dueStr.includes('-') && dueStr.split('-')[0].length === 4) {
+    const parts = dueStr.split('-');
+    dueStr = parts[2] + '-' + parts[1] + '-' + parts[0];
+  }
+  feeSheet.appendRow([recNo, Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy"), f.studId, f.name, f.course, f.amount, 0, f.mode, f.collector, f.rem || f.remarks || "", dueStr]);
+  return { success: true, receiptNo: recNo };
 }
 
 function saveAttendance(r) {

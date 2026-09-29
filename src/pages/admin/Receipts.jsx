@@ -4,11 +4,7 @@ import DataTable from '../../components/ui/DataTable';
 import ReceiptTemplate from '../../components/ui/ReceiptTemplate';
 
 export default function Receipts({ adminData }) {
-    // Drop first row if it's headers, but getAdminData usually skips headers for 'FEE MANAGEMENT'
-    // Let's assume r is the actual data rows.
     const fees = adminData?.fees || [];
-
-    // Reverse fees to show newest first, assuming appended at bottom
     const reversedFees = [...fees].reverse();
 
     const [printTx, setPrintTx] = useState(null);
@@ -20,19 +16,16 @@ export default function Receipts({ adminData }) {
         onAfterPrint: () => setPrintTx(null)
     });
 
-    // Helper to find franchise data based on the student's branch
     const getFranchiseData = (studId) => {
         if (!adminData?.franchises || adminData.franchises.length === 0) return null;
         const adm = (adminData.admissions || []).find(a => String(a[2] || a[3]) === String(studId));
-        const branch = adm ? (adm[6] || adm[5]) : ''; // r[6] Branch
+        const branch = adm ? (adm[6] || adm[5]) : '';
         const match = adminData.franchises.find(f => String(f.branch).toLowerCase() === String(branch).toLowerCase());
-        return match || adminData.franchises[0]; // fallback to first franchise
+        return match || adminData.franchises[0];
     };
 
-    // Trigger print when printTx state is fully set and rendered
     useMemo(() => {
         if (printTx) {
-            // small timeout to allow react-to-print to see the updated ref
             setTimeout(() => {
                 handlePrint();
             }, 100);
@@ -46,6 +39,7 @@ export default function Receipts({ adminData }) {
         { key: 'course', label: 'Course' },
         { key: 'mode', label: 'Mode' },
         { key: 'amount', label: 'Amount' },
+        { key: 'dueDate', label: 'Next Due Date' },
         { key: 'action', label: 'Action' },
     ];
 
@@ -59,17 +53,16 @@ export default function Receipts({ adminData }) {
                 columns={COLUMNS}
                 data={reversedFees}
                 renderRow={(r, i) => {
-                    // Fee Sheet Columns guess (based on old Receipts.jsx & typical setup):
-                    // r[0]: Date
-                    // r[1]: Receipt No / ID? (Wait, old code had r[0]=Rec No, r[1]=Date. Let's use robust fallback)
-                    const dateStr = String(r[0]).includes('-') || String(r[0]).includes('/') ? r[0] : (r[1] || '');
-                    const recNo = String(r[0]).includes('-') ? r[1] : r[0];
-                    const studId = r[2];
-                    const name = r[3];
-                    const course = r[4];
-                    const amount = r[5];
-                    const mode = r[6] || 'Cash';
-                    const collector = r[7] || '';
+                    const recNo = String(r[0] || '').includes('REC') || String(r[0] || '').includes('/') ? r[0] : (r[1] || r[0]);
+                    const dateStr = String(r[1] || '').includes('-') || String(r[1] || '').includes('/') ? r[1] : (r[0] || '');
+                    const studId = r[2] || '';
+                    const name = r[3] || '';
+                    const course = r[4] || '';
+                    const amount = r[5] || 0;
+                    const mode = r[7] || r[6] || 'Cash';
+                    const collector = r[8] || '';
+                    const remark = r[9] || '';
+                    const dueDateStr = r[10] || '';
 
                     return (
                         <tr key={i} className="t-row hover:bg-gray-50">
@@ -82,6 +75,15 @@ export default function Receipts({ adminData }) {
                             <td><span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full font-medium">{course || '--'}</span></td>
                             <td className="text-sm">{mode}</td>
                             <td className="font-bold text-green-700 text-base">₹{amount}</td>
+                            <td className="text-xs font-semibold">
+                                {dueDateStr ? (
+                                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-mono">
+                                        📅 {dueDateStr}
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-400">N/A</span>
+                                )}
+                            </td>
                             <td>
                                 <button
                                     onClick={() => setPrintTx({
@@ -98,7 +100,6 @@ export default function Receipts({ adminData }) {
                 }}
             />
 
-            {/* Hidden template for printing */}
             <div style={{ display: 'none' }}>
                 {printTx && (
                     <ReceiptTemplate

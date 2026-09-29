@@ -88,12 +88,13 @@ export function AuthProvider({ children }) {
             // Handle different field name conventions from backend
             // Normalize role to lowercase (sheet may have 'Admin', 'Student', etc.)
             const rawRole = (result.role || 'admin').toLowerCase();
+            const resolvedStudentId = result.studentId || result.studId || result.userId || result.id || (rawRole === 'student' ? (result.username || username || 'ST-2026-1001') : '');
             const userData = {
                 username: result.username || result.user || username,
                 role: rawRole,
                 branch: result.branch || 'All',
-                userId: result.userId || result.id || '',
-                studentId: result.studentId || result.studId || '',
+                userId: result.userId || result.id || resolvedStudentId,
+                studentId: resolvedStudentId,
                 name: result.name || '',
                 photo: result.photo || '',
                 batch: result.batch || ''
@@ -101,6 +102,12 @@ export function AuthProvider({ children }) {
             console.log('[Auth] Stored user:', userData);
             setUser(userData);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+            // Reset fee reminder session flag on fresh login so student sees the reminder popup
+            try {
+                sessionStorage.removeItem(`fee_reminder_closed_${resolvedStudentId}`);
+                sessionStorage.removeItem(`fee_reminder_closed_${userData.userId}`);
+                sessionStorage.removeItem('fee_reminder_closed_student');
+            } catch (e) {}
             return { success: true };
         }
         return { success: false, error: result?.error || 'Invalid credentials' };
@@ -108,6 +115,9 @@ export function AuthProvider({ children }) {
 
     // ─── Logout ──────────────────────────────────────────────
     const logout = () => {
+        try {
+            sessionStorage.clear();
+        } catch (e) {}
         setUser(null);
         localStorage.removeItem(STORAGE_KEY);
     };

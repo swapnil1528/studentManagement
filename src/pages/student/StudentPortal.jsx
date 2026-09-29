@@ -1,4 +1,4 @@
-/**
+﻿/**
  * StudentPortal — Gen Z redesign.
  * Tabs: Overview, Attendance, Assignments, Logs, Notices, LMS, Results, Schedule, Grades
  */
@@ -6,15 +6,19 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { apiCall, uploadAssignment, getAssignments, getQuizzes, submitQuizResult, getQuizResults, getCourseSessions, getStudentLearningProgress } from '../../services/api';
+import { apiCall, uploadAssignment, getAssignments, getQuizzes, submitQuizResult, getQuizResults, getCourseSessions, getStudentLearningProgress, getStudentFees, getStudentPortalData } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SUPPORTED_LANGUAGES, t, getLocalizedQuestionText, getLocalizedOptionText, getLocalizedExplanationText } from '../../utils/quizI18n';
 import DashboardWidget from './components/DashboardWidget';
 import AnimatedSkeleton from './components/AnimatedSkeleton';
 import ScheduleTab from './components/ScheduleTab';
 import GradesTab from './components/GradesTab';
+import FeesTab from './components/FeesTab';
+import DueFeeReminderModal from './components/DueFeeReminderModal';
+import AdminNoticeModal from './components/AdminNoticeModal';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
 import CameraCapture from '../../components/CameraCapture';
@@ -27,6 +31,7 @@ const isMobileDevice = () =>
 const TABS = [
     { id: 'overview', label: 'Home', emoji: '🏠' },
     { id: 'attendance', label: 'Attend', emoji: '📍' },
+    { id: 'fees', label: 'Fees & Courses', emoji: '💳' },
     { id: 'classroom', label: 'Classroom', emoji: '📚' },
     { id: 'quizzes', label: 'Quizzes', emoji: '📝' },
     { id: 'results', label: 'Results', emoji: '🏆' },
@@ -88,7 +93,7 @@ const getFileIcon = (mimeType, fileName) => {
     return '📄';
 };
 
-const STUDENT_TABS = ['overview', 'attendance', 'classroom', 'quizzes', 'results', 'schedule', 'grades', 'notices', 'logs'];
+const STUDENT_TABS = ['overview', 'attendance', 'fees', 'classroom', 'quizzes', 'results', 'schedule', 'grades', 'notices', 'logs'];
 
 export default function StudentPortal() {
     const { user, logout } = useAuth();
@@ -474,9 +479,11 @@ export default function StudentPortal() {
     const cameraRequired = settings?.success ? settings.studentCameraCheckIn : false;
     const mobileCheckDone = settings !== undefined;
 
+    const studentIdentifier = user?.studentId || user?.userId || user?.username || 'ST-2026-1001';
+
     const { data: resultBasic, isLoading: loading } = useQuery({
-        queryKey: ['studentBasic', user?.studentId || user?.userId],
-        queryFn: () => apiCall('getStudentBasic', { id: user?.studentId || user?.userId }),
+        queryKey: ['studentBasic', studentIdentifier],
+        queryFn: () => getStudentPortalData(studentIdentifier),
         enabled: !!user,
     });
 
@@ -500,7 +507,52 @@ export default function StudentPortal() {
     });
     const quizList = quizzesData?.success ? quizzesData.quizzes : [];
 
+    const { data: feesData, isLoading: feesLoading, refetch: refetchFees } = useQuery({
+        queryKey: ['studentFees', user?.studentId || user?.userId],
+        queryFn: () => getStudentFees(user?.studentId || user?.userId),
+        enabled: !!user,
+    });
+
     const data = { ...resultBasic, ...resultExtra };
+    const rawEnrollments = feesData?.enrollments || data?.enrollments || [];
+    const feePayments = feesData?.feePayments || data?.feePayments || [];
+
+    const rawTotalFee = Number(feesData?.feeSummary?.totalFee) || rawEnrollments.reduce((s, e) => s + (Number(e.totalFee) || 0), 0);
+    const rawTotalPaid = Math.max(
+        Number(feesData?.feeSummary?.totalPaid) || 0,
+        feePayments.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0)
+    );
+    const calculatedPending = Math.max(0, rawTotalFee - rawTotalPaid);
+
+    // Resolve active due date from feesData summary, feePayments, or raw enrollments
+    const resolvedDueDate = feesData?.feeSummary?.dueDate ||
+        feePayments.find(p => p.dueDate)?.dueDate ||
+        (rawEnrollments.find(e => (Number(e.pendingFee) || Number(e.pendingAmount) || 0) > 0)?.dueDate) || '';
+
+    const feeSummary = {
+        ...(feesData?.feeSummary || {}),
+        totalFee: rawTotalFee,
+        totalPaid: rawTotalPaid,
+        pendingAmount: calculatedPending,
+        collectionRate: rawTotalFee > 0 ? Math.min(100, Math.round((rawTotalPaid / rawTotalFee) * 100)) : 100,
+        dueDate: resolvedDueDate,
+        lastPaymentDate: feesData?.feeSummary?.lastPaymentDate || feePayments[0]?.date || '',
+    };
+
+    const enrollments = rawEnrollments.map(e => {
+        const itemTotal = Number(e.totalFee) || 0;
+        let itemPaid = Number(e.paidAmount) || 0;
+        if (rawEnrollments.length === 1 && rawTotalPaid > 0) {
+            itemPaid = rawTotalPaid;
+        }
+        const itemPending = Math.max(0, itemTotal - itemPaid);
+        return {
+            ...e,
+            paidAmount: itemPaid,
+            pendingAmount: itemPending,
+            feeStatus: itemPending === 0 ? 'Cleared' : (itemPaid > 0 ? 'Partial' : 'Pending'),
+        };
+    });
     const assignmentList = assignmentsData?.success ? assignmentsData.assignments : [];
     const asnTopics = assignmentsData?.success && assignmentsData.topics ? assignmentsData.topics : [];
     const asnCourses = assignmentsData?.success && assignmentsData.courses ? assignmentsData.courses : [];
@@ -513,11 +565,108 @@ export default function StudentPortal() {
 
     if (loading && !data && !user?.name) return <AnimatedSkeleton />;
 
-    const profile = data?.profile || {
-        name: user?.name || 'Student',
-        id: user?.studentId || user?.userId,
-        photo: user?.photo || '',
-        batch: user?.batch || 'Student',
+    const profile = {
+        name: data?.profile?.name || feesData?.studentName || user?.name || 'Student',
+        id: data?.profile?.id || feesData?.studentId || studentIdentifier,
+        photo: data?.profile?.photo || feesData?.photo || user?.photo || '',
+        batch: data?.profile?.batch || feesData?.batch || user?.batch || 'Student',
+    };
+
+    // ─── Priority 1 Admin Notice Modal & Priority 2 Fee Reminder ───
+    const [showNoticeModal, setShowNoticeModal] = useState(false);
+    const [currentNotice, setCurrentNotice] = useState(null);
+    const [noticeDismissed, setNoticeDismissed] = useState(false);
+
+    const [showFeeReminderModal, setShowFeeReminderModal] = useState(false);
+    const [feeReminderDismissed, setFeeReminderDismissed] = useState(false);
+
+    const parseDateString = (str) => {
+        if (!str) return null;
+        const s = String(str).trim();
+        const parts = s.split(/[-/.]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            if (parts[2].length === 4 || parts[2].length === 2) {
+                const year = parts[2].length === 2 ? 2000 + Number(parts[2]) : Number(parts[2]);
+                return new Date(year, Number(parts[1]) - 1, Number(parts[0]));
+            }
+        }
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    };
+
+    // Priority 1: Check Admin Notice Popup
+    useEffect(() => {
+        if (!user || noticeDismissed) return;
+        const studentId = user?.studentId || user?.userId || 'student';
+        const activeNotices = data?.notices || [];
+        if (activeNotices.length > 0) {
+            const topNotice = activeNotices[0];
+            const nKey = `notice_closed_${studentId}_${topNotice.title}_${topNotice.date}`;
+            if (sessionStorage.getItem(nKey) !== 'true') {
+                setCurrentNotice(topNotice);
+                setShowNoticeModal(true);
+            }
+        }
+    }, [data?.notices, user, noticeDismissed]);
+
+    const handleCloseNotice = () => {
+        setShowNoticeModal(false);
+        setNoticeDismissed(true);
+        if (currentNotice) {
+            const studentId = user?.studentId || user?.userId || 'student';
+            try {
+                sessionStorage.setItem(`notice_closed_${studentId}_${currentNotice.title}_${currentNotice.date}`, 'true');
+            } catch (e) {}
+        }
+    };
+
+    // Priority 2: Check Fee Reminder Popup: Starts 5 days before Due Date, continuously until fees received
+    useEffect(() => {
+        if (!user || feeReminderDismissed || showNoticeModal) return;
+        const studentId = user?.studentId || user?.userId || 'student';
+        const dueDateStr = feeSummary?.dueDate || '';
+        const sessionKey = `fee_reminder_closed_${studentId}_${dueDateStr || 'nodate'}`;
+        const isClosedInSession = sessionStorage.getItem(sessionKey) === 'true';
+
+        const pending = Number(feeSummary?.pendingAmount) || 0;
+        // Rule: NO POPUP IF FEES COMPLETE / CLOSED IN CURRENT SESSION
+        if (pending <= 0 || isClosedInSession) {
+            return;
+        }
+
+        // Rule: Only show popup starting 5 days BEFORE due date, and continuously until payment received
+        if (dueDateStr && dueDateStr !== 'nodate') {
+            const parsedDue = parseDateString(dueDateStr);
+            if (parsedDue) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                parsedDue.setHours(0, 0, 0, 0);
+                const diffDays = Math.round((parsedDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                // diffDays > 5  => More than 5 days remain before due date (e.g. 15 or 16 days away) -> DO NOT SHOW
+                // diffDays <= 5 => 5 or fewer days remain, or due today, or overdue -> SHOW POPUP
+                if (diffDays <= 5) {
+                    setShowFeeReminderModal(true);
+                }
+            }
+        }
+    }, [feeSummary, user, feeReminderDismissed, showNoticeModal]);
+
+    const handleCloseFeeReminder = () => {
+        setShowFeeReminderModal(false);
+        setFeeReminderDismissed(true);
+        const studentId = user?.studentId || user?.userId || 'student';
+        try {
+            const closeDueDateStr = feeSummary?.dueDate || (enrollments.find(e => e.pendingFee > 0)?.dueDate) || "nodate";
+            sessionStorage.setItem(`fee_reminder_closed_${studentId}_${closeDueDateStr}`, 'true');
+        } catch (e) {
+            console.warn('[FeeReminder] sessionStorage error:', e);
+        }
+    };
+
+    const handleNavigateToFeesFromReminder = () => {
+        handleCloseFeeReminder();
+        setActiveTab('fees');
     };
     const att = data?.attendance || {};
     const topics = asnTopics.length > 0 ? asnTopics : (data?.topics || []);
@@ -659,6 +808,24 @@ export default function StudentPortal() {
                             cameraRequired={cameraRequired}
                             notices={data?.notices || []}
                             isDark={isDark}
+                        
+                            feeSummary={feeSummary}
+                            enrollments={enrollments}
+                            onNavigateTab={setActiveTab}
+                            onOpenFeeReminder={() => setShowFeeReminderModal(true)}
+                        />
+                    )}
+
+                    {/* ── Fees & Courses ── */}
+                    {activeTab === 'fees' && (
+                        <FeesTab
+                            enrollments={enrollments}
+                            feePayments={feePayments}
+                            feeSummary={feeSummary}
+                            franchise={data?.franchise || null}
+                            profile={profile}
+                            isDark={isDark}
+                            onOpenFeeReminder={() => setShowFeeReminderModal(true)}
                         />
                     )}
 
@@ -1059,7 +1226,7 @@ export default function StudentPortal() {
                                                     <div key={idx} style={{ padding: 16, borderRadius: 16, background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', border: `1px solid ${isCorrect ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}` }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                                                             <div style={{ fontWeight: 800, fontSize: 14, color: isDark ? '#ede9fe' : '#1e293b' }}>
-                                                                Q{idx + 1}. {q.q}
+                                                                Q{idx + 1}. {getLocalizedQuestionText(q, quizLang)}
                                                             </div>
                                                             <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 12, background: isCorrect ? '#d1fae5' : '#fee2e2', color: isCorrect ? '#065f46' : '#991b1b', whiteSpace: 'nowrap' }}>
                                                                 {isCorrect ? '✓ Correct (+1)' : '✕ Incorrect'}
@@ -1087,7 +1254,7 @@ export default function StudentPortal() {
                                                                 return (
                                                                     <div key={opt} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${border}`, background: bg, color, fontSize: 12, fontWeight: (isChosen || isRightOpt) ? 800 : 500 }}>
                                                                         <span style={{ textTransform: 'uppercase', marginRight: 6 }}>{opt}.</span>
-                                                                        {q.options[opt]}
+                                                                        {getLocalizedOptionText(q, opt, quizLang)}
                                                                         {isRightOpt && <span style={{ marginLeft: 6 }}>✓ Correct</span>}
                                                                         {isChosen && !isRightOpt && <span style={{ marginLeft: 6 }}>✕ Your Choice</span>}
                                                                     </div>
@@ -1233,8 +1400,33 @@ export default function StudentPortal() {
                                                 </div>
                                             </div>
 
-                                            {/* TOP RIGHT: Clock - Timer, Language Selection, Theme Toggle & Fullscreen Toggle */}
+{/* TOP RIGHT: Clock - Timer, Language Selection, Theme Toggle & Fullscreen Toggle */}
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                                {/* Multi-Language Switcher */}
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: 6,
+                                                    padding: '4px 10px', borderRadius: 12,
+                                                    background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(124,58,237,0.08)',
+                                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(124,58,237,0.2)'}`,
+                                                }}>
+                                                    <span style={{ fontSize: 13 }}>🌐</span>
+                                                    <select
+                                                        value={quizLang}
+                                                        onChange={e => setQuizLang(e.target.value)}
+                                                        style={{
+                                                            background: 'transparent', border: 'none',
+                                                            color: isDark ? '#ede9fe' : '#1a1035',
+                                                            fontSize: 13, fontWeight: 800, cursor: 'pointer', outline: 'none'
+                                                        }}
+                                                    >
+                                                        {SUPPORTED_LANGUAGES.map(l => (
+                                                            <option key={l.code} value={l.code} style={{ background: isDark ? '#1a1035' : '#fff', color: isDark ? '#fff' : '#000' }}>
+                                                                {l.flag} {l.nativeName}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
                                                 {/* Live Wall Clock */}
                                                 <div style={{
                                                     display: 'flex', alignItems: 'center', gap: 6,
@@ -1454,7 +1646,7 @@ export default function StudentPortal() {
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
                                                         <div>
                                                             <span style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', background: 'rgba(124,58,237,0.1)', padding: '4px 12px', borderRadius: 20 }}>
-                                                                Question {quizStep + 1} of {activeQuiz.questions.length}
+                                                                {t('question', quizLang)} {quizStep + 1} {t('of', quizLang)} {activeQuiz.questions.length}
                                                             </span>
                                                             {isMulti && (
                                                                 <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, background: 'rgba(6,182,212,0.12)', color: '#0891b2', padding: '4px 10px', borderRadius: 20 }}>
@@ -1471,7 +1663,7 @@ export default function StudentPortal() {
                                                                 display: 'flex', alignItems: 'center', gap: 6
                                                             }}
                                                         >
-                                                            {isFlagged ? '🚩 Flagged' : '🏳️ Flag Question'}
+                                                            {isFlagged ? `🚩 ${t('flagged', quizLang)}` : `🏳️ ${t('flagForReview', quizLang)}`}
                                                         </button>
                                                     </div>
 
@@ -1486,6 +1678,7 @@ export default function StudentPortal() {
                                                             </div>
                                                         )}
                                                     </div>
+
 
                                                     {/* Options List */}
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
@@ -1526,6 +1719,7 @@ export default function StudentPortal() {
                                                                             </span>
                                                                         )}
                                                                     </span>
+
                                                                 </button>
                                                             );
                                                         })}
@@ -1543,7 +1737,7 @@ export default function StudentPortal() {
                                                                 fontWeight: 700, fontSize: 13, cursor: quizStep === 0 ? 'not-allowed' : 'pointer'
                                                             }}
                                                         >
-                                                            ← Previous
+                                                            ← {t('previous', quizLang)}
                                                         </button>
 
                                                         {quizAnswers[quizStep] && (
@@ -1555,7 +1749,7 @@ export default function StudentPortal() {
                                                                     fontWeight: 700, fontSize: 12, cursor: 'pointer'
                                                                 }}
                                                             >
-                                                                Clear Selection
+                                                                {t('clearAnswer', quizLang)}
                                                             </button>
                                                         )}
 
@@ -1571,7 +1765,7 @@ export default function StudentPortal() {
                                                                     boxShadow: '0 4px 14px rgba(124,58,237,0.3)'
                                                                 }}
                                                             >
-                                                                Next Question →
+                                                                {t('next', quizLang)} →
                                                             </button>
                                                         ) : (
                                                             <button
@@ -1583,7 +1777,7 @@ export default function StudentPortal() {
                                                                     boxShadow: '0 4px 14px rgba(16,185,129,0.3)'
                                                                 }}
                                                             >
-                                                                Finish & Submit Exam ✅
+                                                                {t('submitQuiz', quizLang)} ✅
                                                             </button>
                                                         )}
                                                     </div>
@@ -2115,6 +2309,25 @@ export default function StudentPortal() {
                     setPointsEarned(newPoints);
                     loadProgress();
                 }}
+            />
+
+            {/* ── Due Fee Reminder Popup Modal with 15s Timeline ── */}
+            <AdminNoticeModal
+                isOpen={showNoticeModal}
+                notice={currentNotice}
+                onClose={handleCloseNotice}
+                isDark={isDark}
+            />
+
+            <DueFeeReminderModal
+                isOpen={showFeeReminderModal}
+                onClose={handleCloseFeeReminder}
+                onNavigateToFees={handleNavigateToFeesFromReminder}
+                feeSummary={feeSummary}
+                enrollments={enrollments}
+                profile={profile}
+                isDark={isDark}
+
             />
 
             <style>{`

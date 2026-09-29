@@ -18,6 +18,7 @@ const NAV_ITEMS = [
     { id: 'reg', icon: 'fas fa-id-card', label: 'Registrations' },
     { id: 'adm', icon: 'fas fa-user-graduate', label: 'Admissions' },
     { id: 'fee', icon: 'fas fa-wallet', label: 'Fee Collection' },
+    { id: 'feepending', icon: 'fas fa-hourglass-half', label: 'Fees Pending' },
     { id: 'rec', icon: 'fas fa-receipt', label: 'Receipts' },
     { id: 'hr', icon: 'fas fa-users-cog', label: 'HR & Payroll' },
     { id: 'divider' },
