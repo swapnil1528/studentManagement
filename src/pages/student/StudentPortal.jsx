@@ -18,6 +18,7 @@ import ScheduleTab from './components/ScheduleTab';
 import GradesTab from './components/GradesTab';
 import FeesTab from './components/FeesTab';
 import DueFeeReminderModal from './components/DueFeeReminderModal';
+import StudentChatTab from './components/StudentChatTab';
 import AdminNoticeModal from './components/AdminNoticeModal';
 import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
@@ -30,6 +31,7 @@ const isMobileDevice = () =>
 
 const TABS = [
     { id: 'overview', label: 'Home', emoji: '🏠' },
+    { id: 'chat', label: 'Chat', emoji: '💬' },
     { id: 'attendance', label: 'Attend', emoji: '📍' },
     { id: 'fees', label: 'Fees & Courses', emoji: '💳' },
     { id: 'classroom', label: 'Classroom', emoji: '📚' },
@@ -797,6 +799,14 @@ export default function StudentPortal() {
                     transition={{ duration: 0.2 }}
                 >
                     {/* ── Overview ── */}
+                    {activeTab === 'chat' && (
+                        <StudentChatTab
+                            user={user}
+                            profile={profile}
+                            isDark={isDark}
+                        />
+                    )}
+
                     {activeTab === 'overview' && (
                         <DashboardWidget
                             att={att}

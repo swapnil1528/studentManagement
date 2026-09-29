@@ -417,3 +417,108 @@ export const getStudentLearningProgress = (studentId, course) =>
 export const recordTopicProgress = (studentId, course, topicId, pointsEarned = 0, sessionCount = 0) =>
     apiCall('recordTopicProgress', { studentId, courseName: course, topicId, pointsEarned, sessionCount });
 
+
+// ─── Chat & Community Sessions (WhatsApp-Style) ─────────────────────────────
+
+/** Get all accessible chat conversations, groups, and student directory */
+export const getChatConversations = async (userId, userRole, userName, branch) => {
+    try {
+        const res = await apiCall('getChatConversations', { userId, userRole, userName, branch });
+        if (res && res.success) {
+            try {
+                localStorage.setItem(`erp_chat_convs_${userId}`, JSON.stringify(res));
+            } catch (e) {}
+            return res;
+        }
+    } catch (e) {
+        console.warn('[getChatConversations] failed, checking cache:', e);
+    }
+    try {
+        const cached = localStorage.getItem(`erp_chat_convs_${userId}`);
+        if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return { success: false, conversations: [], studentDirectory: [], availableCourses: [], availableBatches: [] };
+};
+
+/** Get messages for a specific conversation with optimistic cache fallback */
+export const getChatMessages = async (conversationId, userId, limit = 200) => {
+    try {
+        const res = await apiCall('getChatMessages', { conversationId, userId, limit });
+        if (res && res.success) {
+            try {
+                localStorage.setItem(`erp_chat_msgs_${conversationId}`, JSON.stringify(res.messages || []));
+            } catch (e) {}
+            return res;
+        }
+    } catch (e) {
+        console.warn('[getChatMessages] failed, checking cache:', e);
+    }
+    try {
+        const cached = localStorage.getItem(`erp_chat_msgs_${conversationId}`);
+        if (cached) return { success: true, messages: JSON.parse(cached) };
+    } catch (e) {}
+    return { success: true, messages: [] };
+};
+
+/** Send a new chat message (text, media, note, etc.) */
+export const sendChatMessage = async (messageData) => {
+    return apiCall('sendChatMessage', { message: messageData });
+};
+
+/** Delete message (delete for me or delete for everyone) */
+export const deleteChatMessage = async (messageId, userId, deleteForEveryone = false) => {
+    return apiCall('deleteChatMessage', { messageId, userId, deleteForEveryone });
+};
+
+/** Star / bookmark or unstar a message */
+export const starChatMessage = async (messageId, userId, isStarred = true) => {
+    return apiCall('starChatMessage', { messageId, userId, isStarred });
+};
+
+/** Create a new custom or batch/course group */
+export const createChatGroup = async (groupData) => {
+    return apiCall('createChatGroup', { group: groupData });
+};
+
+/** Upload media (Photo, Video, PDF, Document, Note) to Google Drive */
+export const uploadChatMedia = async (file, senderId = 'user') => {
+    return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error('No file provided'));
+        const reader = new FileReader();
+        reader.onload = async () => {
+            try {
+                const base64Data = reader.result;
+                const res = await apiCall('uploadChatMedia', {
+                    fileData: base64Data,
+                    fileName: file.name,
+                    mimeType: file.type || 'application/octet-stream',
+                    senderId: senderId
+                });
+                if (res && res.success) {
+                    resolve(res);
+                } else {
+                    // Fallback to local data URL if drive upload fails so user can still share media
+                    resolve({
+                        success: true,
+                        url: base64Data,
+                        directUrl: base64Data,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type
+                    });
+                }
+            } catch (err) {
+                console.error('[uploadChatMedia] error:', err);
+                resolve({
+                    success: true,
+                    url: reader.result,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type
+                });
+            }
+        };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+    });
+};

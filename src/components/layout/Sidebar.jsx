@@ -24,6 +24,7 @@ const NAV_ITEMS = [
     { id: 'divider' },
     { id: 'exam', icon: 'fas fa-poll-h', label: 'Exam Results' },
     { id: 'classroom', icon: 'fas fa-chalkboard-teacher', label: 'Classroom' },
+    { id: 'chat', icon: 'fas fa-comments', label: 'Student Chat' },
 ];
 
 export default function Sidebar({ activeTab }) {

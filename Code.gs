@@ -94,6 +94,15 @@ function doPost(e) {
     else if(act==='saveSetting') res = saveSetting(d.key, d.value);
     else if(act==='checkMobileAllowed') res = checkMobileAllowed();
 
+    // --- CHAT & COMMUNITY SESSIONS (WHATSAPP-STYLE) ---
+    else if(act==='getChatConversations') res = getChatConversations(d.userId, d.userRole, d.userName, d.branch);
+    else if(act==='getChatMessages') res = getChatMessages(d.conversationId, d.userId, d.limit);
+    else if(act==='sendChatMessage') res = sendChatMessage(d.message);
+    else if(act==='deleteChatMessage') res = deleteChatMessage(d.messageId, d.userId, d.deleteForEveryone);
+    else if(act==='starChatMessage') res = starChatMessage(d.messageId, d.userId, d.isStarred);
+    else if(act==='createChatGroup') res = createChatGroup(d.group);
+    else if(act==='uploadChatMedia') res = uploadChatMedia(d.fileData, d.fileName, d.mimeType, d.senderId);
+
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
   } catch(e) {
     return ContentService.createTextOutput(JSON.stringify({error: "Server Error: "+e.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -1702,4 +1711,525 @@ function recordTopicProgress(studentId, courseName, topicId, pointsEarned, sessi
   const initialSessions = sessionCount !== undefined ? Number(sessionCount) : 0;
   sheet.appendRow([studentId, courseName, JSON.stringify(initialTopics), initialPoints, initialSessions, nowStr]);
   return { success: true, completedTopicIds: initialTopics, pointsEarned: initialPoints, completedSessions: initialSessions };
+}
+
+
+// ============================================
+// CHAT & COMMUNITY SESSIONS (WHATSAPP-STYLE)
+// ============================================
+
+function ensureChatSheets() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  ensureSheet("Chat Messages", [
+    "MsgID", "Timestamp", "ConvID", "Type", "SenderID", "SenderName", 
+    "SenderRole", "RecipientID", "Text", "MediaURL", "MediaType", 
+    "FileName", "FileSize", "DeletedFor", "DeletedEveryone", "StarredBy"
+  ]);
+  ensureSheet("Chat Groups", [
+    "GroupID", "CreatedDate", "Name", "Type", "Course", "Batch", 
+    "CreatedBy", "Description", "Avatar", "Members"
+  ]);
+}
+
+function getChatConversations(userId, userRole, userName, branch) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const safeGet = function(n) { return ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : []; };
+    
+    const admissions = safeGet("Admission Data");
+    const activeAdmissions = admissions.filter(function(r) { return String(r[11] || '').toLowerCase() !== 'dropped'; });
+    const allGroups = safeGet("Chat Groups");
+    const allMessages = safeGet("Chat Messages");
+
+    // 1. Collect all distinct courses and batches
+    const courseMap = {};
+    const batchMap = {};
+    activeAdmissions.forEach(function(r) {
+      const c = String(r[7] || '').trim();
+      const b = String(r[8] || '').trim();
+      const sId = String(r[2] || '').trim();
+      const sName = String(r[3] || '').trim();
+      if (c) {
+        if (!courseMap[c]) courseMap[c] = [];
+        if (!courseMap[c].some(function(x) { return x.id === sId; })) courseMap[c].push({ id: sId, name: sName });
+      }
+      if (c && b) {
+        const key = c + "___" + b;
+        if (!batchMap[key]) batchMap[key] = { course: c, batch: b, students: [] };
+        if (!batchMap[key].students.some(function(x) { return x.id === sId; })) batchMap[key].students.push({ id: sId, name: sName });
+      }
+    });
+
+    // 2. Determine student courses & batches if user is student
+    let userCourses = [];
+    let userBatches = [];
+    if (userRole === 'student') {
+      const myAdms = activeAdmissions.filter(function(r) { return String(r[2] || '').trim().toLowerCase() === String(userId || '').trim().toLowerCase(); });
+      userCourses = [...new Set(myAdms.map(function(r) { return String(r[7] || '').trim(); }).filter(Boolean))];
+      userBatches = [...new Set(myAdms.map(function(r) { return String(r[7] || '').trim() + "___" + String(r[8] || '').trim(); }).filter(Boolean))];
+    }
+
+    const conversations = [];
+
+    // A. General Community & Announcements Channel (Always present)
+    conversations.push({
+      id: 'community_announcements',
+      name: '🎓 DCC Student Community & Announcements',
+      type: 'community',
+      subtitle: 'Official Institute Channel',
+      avatar: '📢',
+      membersCount: activeAdmissions.length,
+      isGroup: true,
+      canPost: userRole !== 'student' // only teachers/admin can post broadcast announcements
+    });
+
+    // B. Direct Chat with Faculty / Admin (for Students)
+    if (userRole === 'student') {
+      conversations.push({
+        id: 'direct_' + userId + '_faculty',
+        name: '👨‍🏫 Institute Faculty & Support',
+        type: 'direct',
+        subtitle: 'Teacher & Admin Helpdesk',
+        avatar: '👨‍🏫',
+        recipientId: 'faculty',
+        recipientName: 'Faculty & Admin',
+        isGroup: false,
+        canPost: true
+      });
+    }
+
+    // C. Course-wise Groups
+    Object.keys(courseMap).forEach(function(course) {
+      const isMember = userRole !== 'student' || userCourses.includes(course);
+      if (isMember) {
+        conversations.push({
+          id: 'course_' + course.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase(),
+          name: course + ' Course Group',
+          type: 'course',
+          course: course,
+          subtitle: course + ' • All Batches',
+          avatar: '📚',
+          membersCount: courseMap[course].length,
+          members: courseMap[course],
+          isGroup: true,
+          canPost: true
+        });
+      }
+    });
+
+    // D. Batch Timing-wise Groups
+    Object.keys(batchMap).forEach(function(key) {
+      const bObj = batchMap[key];
+      const isMember = userRole !== 'student' || userBatches.includes(key);
+      if (isMember) {
+        conversations.push({
+          id: 'batch_' + key.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase(),
+          name: bObj.course + ' (' + bObj.batch + ')',
+          type: 'batch',
+          course: bObj.course,
+          batch: bObj.batch,
+          subtitle: 'Timing: ' + bObj.batch,
+          avatar: '⏰',
+          membersCount: bObj.students.length,
+          members: bObj.students,
+          isGroup: true,
+          canPost: true
+        });
+      }
+    });
+
+    // E. Custom Groups from "Chat Groups" sheet
+    allGroups.forEach(function(g) {
+      const gId = String(g[0] || '');
+      const gName = String(g[2] || '');
+      const gType = String(g[3] || 'group');
+      const gCourse = String(g[4] || '');
+      const gBatch = String(g[5] || '');
+      const gDesc = String(g[7] || '');
+      const gAvatar = String(g[8] || '👥');
+      let gMembers = [];
+      try { gMembers = JSON.parse(g[9] || '[]'); } catch(e) { gMembers = String(g[9] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean); }
+
+      const isMember = userRole !== 'student' || gMembers.includes(userId);
+      if (isMember && gId) {
+        conversations.push({
+          id: gId,
+          name: gName,
+          type: gType,
+          course: gCourse,
+          batch: gBatch,
+          subtitle: gDesc || (gCourse ? gCourse + ' Group' : 'Custom Group'),
+          avatar: gAvatar,
+          membersCount: gMembers.length,
+          members: gMembers,
+          isGroup: true,
+          canPost: true
+        });
+      }
+    });
+
+    // F. Direct chats for Teacher / Admin with students
+    if (userRole !== 'student') {
+      const directConvsFound = {};
+      allMessages.forEach(function(m) {
+        const cId = String(m[2] || '');
+        if (cId.indexOf('direct_') === 0) {
+          const sId = String(m[4] || '');
+          const sRole = String(m[6] || '');
+          const rId = String(m[7] || '');
+          const targetStudId = sRole === 'student' ? sId : rId;
+          if (targetStudId && targetStudId !== 'faculty' && targetStudId !== 'admin') {
+            directConvsFound[targetStudId] = cId;
+          }
+        }
+      });
+
+      const studentDir = activeAdmissions.map(function(r) {
+        return {
+          id: String(r[2] || '').trim(),
+          name: String(r[3] || '').trim(),
+          course: String(r[7] || '').trim(),
+          batch: String(r[8] || '').trim(),
+          mobile: String(r[4] || '').trim(),
+          branch: String(r[6] || '').trim()
+        };
+      });
+
+      Object.keys(directConvsFound).forEach(function(sId) {
+        const stud = studentDir.find(function(s) { return s.id.toLowerCase() === sId.toLowerCase(); });
+        const sName = stud ? stud.name : sId;
+        const convId = directConvsFound[sId];
+        if (!conversations.some(function(c) { return c.id === convId; })) {
+          conversations.push({
+            id: convId,
+            name: sName,
+            type: 'direct',
+            subtitle: (stud && stud.course ? stud.course + ' • ' : '') + 'Student (' + sId + ')',
+            avatar: '👤',
+            studentId: sId,
+            studentName: sName,
+            isGroup: false,
+            canPost: true
+          });
+        }
+      });
+    }
+
+    // Attach last message preview and time
+    conversations.forEach(function(c) {
+      const convMsgs = allMessages.filter(function(m) { return String(m[2] || '') === c.id && String(m[14] || '') !== 'TRUE'; });
+      if (convMsgs.length > 0) {
+        const lastM = convMsgs[convMsgs.length - 1];
+        c.lastMessage = {
+          id: String(lastM[0] || ''),
+          time: String(lastM[1] || ''),
+          senderName: String(lastM[5] || ''),
+          text: String(lastM[8] || ''),
+          mediaType: String(lastM[10] || 'none'),
+          fileName: String(lastM[11] || '')
+        };
+        c.lastMessageTime = String(lastM[1] || '');
+      } else {
+        c.lastMessage = null;
+        c.lastMessageTime = '';
+      }
+    });
+
+    // Sort by recent activity
+    conversations.sort(function(a, b) {
+      if (!a.lastMessageTime && !b.lastMessageTime) return 0;
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return b.lastMessageTime.localeCompare(a.lastMessageTime);
+    });
+
+    const studentDirectory = (userRole !== 'student') ? activeAdmissions.map(function(r) {
+      return {
+        id: String(r[2] || '').trim(),
+        name: String(r[3] || '').trim(),
+        course: String(r[7] || '').trim(),
+        batch: String(r[8] || '').trim(),
+        branch: String(r[6] || '').trim()
+      };
+    }) : [];
+
+    return {
+      success: true,
+      conversations: conversations,
+      studentDirectory: studentDirectory,
+      availableCourses: Object.keys(courseMap),
+      availableBatches: Object.values(batchMap).map(function(b) { return { course: b.course, batch: b.batch }; })
+    };
+  } catch (err) {
+    console.error("getChatConversations error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function getChatMessages(conversationId, userId, limit) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const mSheet = ss.getSheetByName("Chat Messages");
+    if (!mSheet || mSheet.getLastRow() < 2) return { success: true, messages: [] };
+
+    const data = mSheet.getDataRange().getValues().slice(1);
+    const uId = String(userId || '').trim().toLowerCase();
+
+    const messages = [];
+    data.forEach(function(r) {
+      const convId = String(r[2] || '');
+      if (convId !== conversationId) return;
+
+      const deletedEveryone = String(r[14] || '').toUpperCase() === 'TRUE';
+      const deletedForList = String(r[13] || '').split(',').map(function(s) { return s.trim().toLowerCase(); });
+      
+      if (deletedForList.includes(uId)) return;
+
+      const starredList = String(r[15] || '').split(',').map(function(s) { return s.trim().toLowerCase(); });
+      const isStarred = starredList.includes(uId);
+
+      messages.push({
+        id: String(r[0] || ''),
+        timestamp: String(r[1] || ''),
+        conversationId: convId,
+        type: String(r[3] || 'direct'),
+        senderId: String(r[4] || ''),
+        senderName: String(r[5] || ''),
+        senderRole: String(r[6] || 'student'),
+        recipientId: String(r[7] || ''),
+        text: deletedEveryone ? '' : String(r[8] || ''),
+        mediaUrl: deletedEveryone ? '' : String(r[9] || ''),
+        mediaType: deletedEveryone ? 'none' : String(r[10] || 'none'),
+        fileName: deletedEveryone ? '' : String(r[11] || ''),
+        fileSize: deletedEveryone ? '' : String(r[12] || ''),
+        deletedEveryone: deletedEveryone,
+        isStarred: isStarred
+      });
+    });
+
+    const maxMsgs = limit || 200;
+    const trimmed = messages.slice(-maxMsgs);
+    return { success: true, messages: trimmed };
+  } catch (err) {
+    console.error("getChatMessages error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function sendChatMessage(msg) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const mSheet = ss.getSheetByName("Chat Messages");
+
+    const msgId = "MSG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+    const timestamp = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+
+    const convId = String(msg.conversationId || '');
+    const type = String(msg.type || 'direct');
+    const senderId = String(msg.senderId || '');
+    const senderName = String(msg.senderName || 'Anonymous');
+    const senderRole = String(msg.senderRole || 'student');
+    const recipientId = String(msg.recipientId || '');
+    const text = String(msg.text || '');
+    const mediaUrl = String(msg.mediaUrl || '');
+    const mediaType = String(msg.mediaType || 'none');
+    const fileName = String(msg.fileName || '');
+    const fileSize = String(msg.fileSize || '');
+
+    mSheet.appendRow([
+      msgId,
+      timestamp,
+      convId,
+      type,
+      senderId,
+      senderName,
+      senderRole,
+      recipientId,
+      text,
+      mediaUrl,
+      mediaType,
+      fileName,
+      fileSize,
+      "",       // DeletedFor
+      "FALSE",  // DeletedEveryone
+      ""        // StarredBy
+    ]);
+
+    return {
+      success: true,
+      message: {
+        id: msgId,
+        timestamp: timestamp,
+        conversationId: convId,
+        type: type,
+        senderId: senderId,
+        senderName: senderName,
+        senderRole: senderRole,
+        recipientId: recipientId,
+        text: text,
+        mediaUrl: mediaUrl,
+        mediaType: mediaType,
+        fileName: fileName,
+        fileSize: fileSize,
+        deletedEveryone: false,
+        isStarred: false
+      }
+    };
+  } catch (err) {
+    console.error("sendChatMessage error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function deleteChatMessage(messageId, userId, deleteForEveryone) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const mSheet = ss.getSheetByName("Chat Messages");
+    if (!mSheet) return { success: false, error: "Sheet not found" };
+
+    const data = mSheet.getDataRange().getValues();
+    const uId = String(userId || '').trim().toLowerCase();
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(messageId)) {
+        if (deleteForEveryone) {
+          mSheet.getRange(i + 1, 15).setValue("TRUE");
+          return { success: true, messageId: messageId, deleteForEveryone: true };
+        } else {
+          let delFor = String(data[i][13] || '').split(',').map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+          if (!delFor.includes(uId)) delFor.push(uId);
+          mSheet.getRange(i + 1, 14).setValue(delFor.join(','));
+          return { success: true, messageId: messageId, deleteForMe: true };
+        }
+      }
+    }
+    return { success: false, error: "Message not found" };
+  } catch (err) {
+    console.error("deleteChatMessage error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function starChatMessage(messageId, userId, isStarred) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const mSheet = ss.getSheetByName("Chat Messages");
+    if (!mSheet) return { success: false, error: "Sheet not found" };
+
+    const data = mSheet.getDataRange().getValues();
+    const uId = String(userId || '').trim().toLowerCase();
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(messageId)) {
+        let stars = String(data[i][15] || '').split(',').map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+        if (isStarred) {
+          if (!stars.includes(uId)) stars.push(uId);
+        } else {
+          stars = stars.filter(function(x) { return x !== uId; });
+        }
+        mSheet.getRange(i + 1, 16).setValue(stars.join(','));
+        return { success: true, messageId: messageId, isStarred: isStarred };
+      }
+    }
+    return { success: false, error: "Message not found" };
+  } catch (err) {
+    console.error("starChatMessage error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function createChatGroup(group) {
+  try {
+    ensureChatSheets();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const gSheet = ss.getSheetByName("Chat Groups");
+
+    const gId = "GRP-" + Date.now();
+    const nowStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+    const name = String(group.name || 'New Group');
+    const type = String(group.type || 'group');
+    const course = String(group.course || '');
+    const batch = String(group.batch || '');
+    const createdBy = String(group.createdBy || 'Admin');
+    const description = String(group.description || '');
+    const avatar = String(group.avatar || '👥');
+    const members = JSON.stringify(group.members || []);
+
+    gSheet.appendRow([
+      gId, nowStr, name, type, course, batch, createdBy, description, avatar, members
+    ]);
+
+    return {
+      success: true,
+      group: {
+        id: gId,
+        createdDate: nowStr,
+        name: name,
+        type: type,
+        course: course,
+        batch: batch,
+        createdBy: createdBy,
+        description: description,
+        avatar: avatar,
+        members: group.members || []
+      }
+    };
+  } catch (err) {
+    console.error("createChatGroup error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+function uploadChatMedia(fileData, fileName, mimeType, senderId) {
+  try {
+    if (!fileData) return { success: false, error: "No file data provided" };
+    const parentFolder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    let chatFolder;
+    const folders = parentFolder.getFoldersByName("Chat Attachments");
+    if (folders.hasNext()) {
+      chatFolder = folders.next();
+    } else {
+      chatFolder = parentFolder.createFolder("Chat Attachments");
+      chatFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+
+    const cleanName = (fileName || ("file_" + Date.now())).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const cleanMime = mimeType || "application/octet-stream";
+
+    let blob;
+    const split = fileData.split('base64,');
+    if (split.length >= 2) {
+      blob = Utilities.newBlob(Utilities.base64Decode(split[1]), cleanMime, cleanName);
+    } else {
+      blob = Utilities.newBlob(Utilities.base64Decode(fileData), cleanMime, cleanName);
+    }
+
+    const file = chatFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileId = file.getId();
+    const downloadUrl = "https://drive.google.com/uc?export=download&id=" + fileId;
+    const viewUrl = "https://drive.google.com/file/d/" + fileId + "/view";
+    const directUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+
+    return {
+      success: true,
+      fileId: fileId,
+      url: cleanMime.startsWith('image/') ? directUrl : viewUrl,
+      downloadUrl: downloadUrl,
+      directUrl: directUrl,
+      viewUrl: viewUrl,
+      fileName: cleanName,
+      fileSize: file.getSize(),
+      mimeType: cleanMime
+    };
+  } catch (err) {
+    console.error("uploadChatMedia error:", err);
+    return { success: false, error: String(err) };
+  }
 }

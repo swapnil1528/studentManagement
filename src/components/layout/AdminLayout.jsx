@@ -19,6 +19,7 @@ import Notices from '../../pages/admin/Notices';
 import HRManagement from '../../pages/admin/HRManagement';
 import ExamResults from '../../pages/admin/ExamResults';
 import ClassroomAdmin from '../../pages/admin/ClassroomAdmin';
+import ChatAdmin from '../../pages/admin/ChatAdmin';
 
 // Map URL paths to components
 const PAGE_MAP = {
@@ -34,6 +35,7 @@ const PAGE_MAP = {
     'hr': HRManagement,
     'exams': ExamResults,
     'classroom': ClassroomAdmin,
+    'chat': ChatAdmin,
 };
 
 // Map old tab IDs to new URL slugs (for Sidebar compatibility)
@@ -50,6 +52,7 @@ export const TAB_TO_SLUG = {
     hr: 'hr',
     exam: 'exams',
     classroom: 'classroom',
+    chat: 'chat',
 };
 
 export const SLUG_TO_TAB = Object.fromEntries(
