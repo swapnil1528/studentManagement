@@ -5,12 +5,14 @@
  */
 
 import { useTheme } from '../../context/ThemeContext';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 
 export default function PortalLayout({
     name, id, role, photo, tabs, activeTab, onTabChange,
     hasFace, onFaceReg, onLogout, hideHeaderNav = false, children
 }) {
     const { isDark, toggleTheme } = useTheme();
+    const { isInstalled, installApp } = usePWAInstall();
 
     if (hideHeaderNav) {
         return (
@@ -90,6 +92,31 @@ export default function PortalLayout({
                     </div>
 
                     {/* Actions */}
+                    
+                        {!isInstalled && (
+                            <button
+                                onClick={installApp}
+                                className="sp-header-btn"
+                                title="Install App on Phone"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    padding: '6px 10px',
+                                    borderRadius: 10,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <i className="fas fa-mobile-alt" />
+                                <span className="hidden sm:inline">Install App</span>
+                            </button>
+                        )}
+
                     <div className="sp-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                         <button
                             onClick={toggleTheme}

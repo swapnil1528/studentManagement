@@ -20,6 +20,8 @@ import EmployeePortal from './pages/employee/EmployeePortal';
 // Global UI
 import Toast from './components/ui/Toast';
 import LoadingBar from './components/ui/LoadingBar';
+import PushupNotificationBanner from './components/ui/PushupNotificationBanner';
+import { startAdminMessageWatcher } from './services/notificationService';
 
 /**
  * ErrorBoundary — Catches rendering errors and shows a fallback UI
@@ -106,6 +108,20 @@ function RootRedirect() {
   return <Navigate to="/admin" replace />;
 }
 
+
+function GlobalNotificationWatcher() {
+  const { user, isAuthenticated } = useAuth();
+  React.useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const cleanup = startAdminMessageWatcher({
+      role: user.role,
+      studentId: user.studentId || user.userId,
+    });
+    return cleanup;
+  }, [isAuthenticated, user]);
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -113,6 +129,8 @@ export default function App() {
         {/* Global UI components */}
         <LoadingBar />
         <Toast />
+        <PushupNotificationBanner />
+        <GlobalNotificationWatcher />
 
         <Routes>
           {/* Public */}

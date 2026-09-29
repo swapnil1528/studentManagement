@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { TAB_TO_SLUG } from './AdminLayout';
 
 const NAV_ITEMS = [
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ activeTab }) {
     const { user, logout } = useAuth();
     const { isDark, toggleTheme } = useTheme();
+    const { isInstalled, installApp } = usePWAInstall();
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -110,6 +112,19 @@ export default function Sidebar({ activeTab }) {
 
                 {/* Dark Mode Toggle + Logout */}
                 <div className="p-4" style={{ borderTop: '1px solid rgba(199,210,254,0.08)' }}>
+                    {!isInstalled && (
+                        <button
+                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-all mb-2 shadow-sm"
+                            style={{
+                                background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+                                color: '#ffffff',
+                            }}
+                            onClick={installApp}
+                        >
+                            <i className="fas fa-download" /> Install Android App
+                        </button>
+                    )}
+
                     <button
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-all mb-2"
                         style={{

@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { saveNotice } from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
+import { broadcastAdminNotice } from '../../services/notificationService';
 
 export default function Notices() {
     const [saving, setSaving] = useState(false);
@@ -26,6 +27,7 @@ export default function Notices() {
         const result = await saveNotice(form);
         if (result?.success) {
             showToast('Notice Published');
+            broadcastAdminNotice({ title: form.title, msg: form.msg, audience: form.audience });
             setForm({ title: '', audience: 'All', expiry: '', msg: '' });
         }
         setSaving(false);

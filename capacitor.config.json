@@ -1,0 +1,9 @@
+{
+  "appId": "com.dcc.studentmanagement",
+  "appName": "DCC Student Portal",
+  "webDir": "dist",
+  "server": {
+    "url": "https://student-management-one-wine.vercel.app",
+    "cleartext": true
+  }
+}

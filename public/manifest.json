@@ -1,0 +1,64 @@
+{
+  "name": "DCC Student & Institute Portal",
+  "short_name": "DCC Portal",
+  "description": "Official Student, Teacher and Admin Portal for DCC Institute",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f19",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Student Portal",
+      "short_name": "Student",
+      "url": "/student",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Notices & Announcements",
+      "short_name": "Notices",
+      "url": "/student?tab=notices",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Chat & Messages",
+      "short_name": "Chat",
+      "url": "/student?tab=chat",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    "education",
+    "productivity"
+  ]
+}
