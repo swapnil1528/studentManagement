@@ -26,18 +26,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dcc.studentmanagement.data.GasApiClient
 import com.dcc.studentmanagement.theme.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (role: String, username: String, sessionJson: String) -> Unit,
-    onOpenWebPortal: () -> Unit = {},
+    onLoginSuccess: (role: String, username: String, studentId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -58,7 +53,7 @@ fun LoginScreen(
             .fillMaxSize()
             .background(DarkBg)
     ) {
-        // Vibrant Background Gradient Blobs
+        // Decorative radial gradients
         Box(
             modifier = Modifier
                 .size(360.dp)
@@ -92,34 +87,26 @@ fun LoginScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(36.dp))
 
-            // Glowing Emblem
+            // Logo & Title
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(26.dp))
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(22.dp))
                     .background(
                         Brush.linearGradient(
-                            listOf(BrandPrimary, CyanNeon, EmeraldGreen)
+                            colors = listOf(BrandPrimary, CyanNeon)
                         )
-                    )
-                    .padding(3.dp)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(23.dp))
-                        .background(DarkSurface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "DCC",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    text = "DCC",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -127,58 +114,67 @@ fun LoginScreen(
             Text(
                 text = "DCC Student Portal",
                 fontSize = 26.sp,
-                fontWeight = FontWeight.Black,
+                fontWeight = FontWeight.ExtraBold,
                 color = TextWhite,
-                letterSpacing = (-0.5).sp
+                textAlign = TextAlign.Center
             )
 
             Text(
                 text = "Unified Campus Management & WhatsApp Chat",
                 fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
                 color = TextMuted,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
             Spacer(Modifier.height(26.dp))
 
-            // Role Selector Tabs (Stitch Style Pills)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(DarkSurface)
-                    .border(1.dp, DarkBorderSubtle, RoundedCornerShape(16.dp))
-                    .padding(4.dp)
+            // Role Toggle Pill
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                border = BorderStroke(1.dp, DarkBorder)
             ) {
-                listOf(
-                    "student" to "Student Portal",
-                    "admin" to "Admin & Faculty"
-                ).forEach { pair ->
-                    val roleKey = pair.first
-                    val label = pair.second
-                    val isSelected = selectedRoleTab == roleKey
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Student Tab
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) Brush.linearGradient(
-                                    if (roleKey == "student") listOf(BrandPrimary, VioletAccent)
-                                    else listOf(EmeraldGreen, CyanNeon)
-                                ) else Brush.linearGradient(
-                                    listOf(Color.Transparent, Color.Transparent)
-                                )
-                            )
-                            .clickable { selectedRoleTab = roleKey }
-                            .padding(vertical = 11.dp),
+                            .background(if (selectedRoleTab == "student") BrandPrimary else Color.Transparent)
+                            .clickable { selectedRoleTab = "student" }
+                            .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = label,
+                            text = "Student Portal",
                             fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else TextMuted
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedRoleTab == "student") Color.White else TextMuted
+                        )
+                    }
+
+                    // Admin Tab
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selectedRoleTab == "admin") EmeraldGreen else Color.Transparent)
+                            .clickable { selectedRoleTab = "admin" }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Admin & Faculty",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedRoleTab == "admin") Color.White else TextMuted
                         )
                     }
                 }
@@ -216,7 +212,7 @@ fun LoginScreen(
                         label = {
                             Text(if (selectedRoleTab == "student") "Student ID / Username" else "Admin Username")
                         },
-                        placeholder = { Text("e.g. STU101 or admin") },
+                        placeholder = { Text("e.g. STU101 or swapnil") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
@@ -310,7 +306,7 @@ fun LoginScreen(
                         )
                     }
 
-                    // Prominent Error Banner
+                    // Error Banner
                     AnimatedVisibility(
                         visible = errorMessage != null,
                         enter = fadeIn() + expandVertically(),
@@ -347,34 +343,35 @@ fun LoginScreen(
                             errorMessage = null
 
                             scope.launch {
-                                try {
-                                    val result = performGASLogin(username.trim(), password.trim())
-                                    if (result.success) {
-                                        val role = result.role
-                                        val user = result.username
+                                val res = GasApiClient.login(username.trim(), password.trim())
+                                isLoading = false
+                                res.onSuccess { json ->
+                                    if (json.optBoolean("success", false)) {
+                                        val role = json.optString("role", "student").lowercase()
+                                        val user = json.optString("username", username.trim())
+                                        val studId = json.optString("studentId", json.optString("userId", user))
+
                                         if (saveCredentials) {
                                             prefs.edit()
                                                 .putString("saved_username", username.trim())
                                                 .putString("saved_password", password.trim())
                                                 .putString("saved_role", role)
-                                                .putString("saved_session", result.rawJson)
+                                                .putString("saved_studentid", studId)
                                                 .putBoolean("save_enabled", true)
                                                 .apply()
                                         } else {
                                             prefs.edit()
                                                 .remove("saved_password")
-                                                .remove("saved_session")
+                                                .remove("saved_studentid")
                                                 .putBoolean("save_enabled", false)
                                                 .apply()
                                         }
-                                        onLoginSuccess(role, user, result.rawJson)
+                                        onLoginSuccess(role, user, studId)
                                     } else {
-                                        errorMessage = result.error.ifBlank { "Invalid username or password. Please verify your credentials." }
+                                        errorMessage = json.optString("error", "Invalid username or password.")
                                     }
-                                } catch (e: Exception) {
-                                    errorMessage = "Network error: Unable to connect to portal server"
-                                } finally {
-                                    isLoading = false
+                                }.onFailure { err ->
+                                    errorMessage = "Login failed: " + (err.message ?: "Unable to reach server")
                                 }
                             }
                         },
@@ -396,7 +393,7 @@ fun LoginScreen(
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = "Verifying with server...",
+                                text = "Authenticating...",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = Color.White
@@ -410,128 +407,18 @@ fun LoginScreen(
                             )
                         }
                     }
-
-                    OutlinedButton(
-                        onClick = onOpenWebPortal,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = BrandLight
-                        )
-                    ) {
-                        Text(
-                            text = "🌐 Open Web Portal Directly",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                    }
                 }
             }
 
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Secured with Google Cloud Authentication",
+                text = "Direct Google Apps Script Cloud API Connection",
                 fontSize = 11.sp,
                 color = TextSubtle
             )
 
             Spacer(Modifier.height(36.dp))
-        }
-    }
-}
-
-data class GASLoginResult(
-    val success: Boolean,
-    val role: String = "student",
-    val username: String = "",
-    val error: String = "",
-    val rawJson: String = ""
-)
-
-private suspend fun performGASLogin(username: String, password: String): GASLoginResult {
-    return withContext(Dispatchers.IO) {
-        try {
-            val apiUrl = "https://script.google.com/macros/s/AKfycbzhSkApquHe8n5Z5FQzvkMrxdZxR6HURPFwE2geZQ0mWMHfhYhsd-_PtzfSe-1nfRGp9A/exec"
-            val body = JSONObject().apply {
-                put("action", "login")
-                put("u", username)
-                put("p", password)
-                put("username", username)
-                put("password", password)
-            }
-
-            val url = URL(apiUrl)
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "text/plain")
-            conn.doOutput = true
-            conn.instanceFollowRedirects = false
-            conn.connectTimeout = 15000
-            conn.readTimeout = 15000
-
-            conn.outputStream.use { os ->
-                os.write(body.toString().toByteArray())
-            }
-
-            val responseCode = conn.responseCode
-            var responseText = ""
-
-            // Handle Google Apps Script 302 Redirect cleanly with GET
-            if (responseCode == 302 || responseCode == 301) {
-                val redirectUrl = conn.getHeaderField("Location")
-                if (redirectUrl != null) {
-                    val getConn = URL(redirectUrl).openConnection() as HttpURLConnection
-                    getConn.requestMethod = "GET"
-                    getConn.instanceFollowRedirects = true
-                    getConn.connectTimeout = 15000
-                    getConn.readTimeout = 15000
-                    responseText = getConn.inputStream.bufferedReader().readText()
-                }
-            } else {
-                responseText = conn.inputStream.bufferedReader().readText()
-            }
-
-            val trimmed = responseText.trim()
-            if (trimmed.startsWith("<")) {
-                val extracted = if (trimmed.contains("require is not defined")) {
-                    "Google Apps Script Error: 'require is not defined' (line 2236 in Code.gs). Please update your Apps Script deployment or tap 'Open Web Portal Directly'."
-                } else {
-                    val match = Regex("(?i)<div[^>]*>([^<]*(?:ReferenceError|SyntaxError|Error|Exception)[^<]*)</div>").find(trimmed)
-                    match?.groupValues?.getOrNull(1)?.trim()
-                        ?: "Server configuration error: Google Apps Script returned an HTML error page."
-                }
-                return@withContext GASLoginResult(
-                    success = false,
-                    error = extracted
-                )
-            }
-
-            val json = JSONObject(responseText)
-            if (json.optBoolean("success", false)) {
-                val rawRole = json.optString("role", "student").lowercase()
-                val user = json.optString("username", username)
-                GASLoginResult(
-                    success = true,
-                    role = rawRole,
-                    username = user,
-                    rawJson = responseText
-                )
-            } else {
-                val errorMsg = json.optString("error", "Invalid username or password. Please verify your credentials.")
-                GASLoginResult(
-                    success = false,
-                    error = errorMsg
-                )
-            }
-        } catch (e: Exception) {
-            GASLoginResult(
-                success = false,
-                error = "Connection failed: " + (e.message ?: "Unable to reach server")
-            )
         }
     }
 }

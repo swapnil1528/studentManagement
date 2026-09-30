@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -20,222 +19,140 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dcc.studentmanagement.data.GasApiClient
 import com.dcc.studentmanagement.theme.*
+import kotlinx.coroutines.launch
 
-data class ColorfulCard(
+data class NativeActionCard(
     val id: String,
-    val iconTag: String,
+    val icon: String,
     val title: String,
     val subtitle: String,
     val badge: String? = null,
     val gradientColors: List<Color>,
-    val url: String
+    val onClick: () -> Unit
 )
 
 @Composable
 fun DashboardScreen(
     role: String,
     username: String,
-    onItemClick: (url: String, title: String) -> Unit,
-    onOpenChat: () -> Unit,
+    studentId: String,
+    onNavigateToAttendance: () -> Unit,
+    onNavigateToFees: () -> Unit,
+    onNavigateToChat: () -> Unit,
+    onNavigateToNotices: () -> Unit,
+    onNavigateToResults: () -> Unit,
+    onNavigateToCourses: () -> Unit,
+    onNavigateToProfile: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isAdmin = role.equals("admin", ignoreCase = true) ||
-                  role.equals("employee", ignoreCase = true) ||
-                  role.equals("teacher", ignoreCase = true)
+    val scope = rememberCoroutineScope()
+    var displayName by remember { mutableStateOf(username) }
+    var displayBranch by remember { mutableStateOf("Devichapada") }
+    var displayBatch by remember { mutableStateOf("") }
+    var attendancePerc by remember { mutableIntStateOf(0) }
+    var pendingFees by remember { mutableDoubleStateOf(0.0) }
+    var coursesCount by remember { mutableIntStateOf(0) }
 
-    val adminCards = remember {
+    LaunchedEffect(studentId) {
+        scope.launch {
+            val res = GasApiClient.getStudentData(studentId)
+            res.onSuccess { json ->
+                val prof = json.optJSONObject("profile")
+                if (prof != null) {
+                    displayName = prof.optString("name", username)
+                    displayBranch = prof.optString("branch", "Devichapada")
+                    displayBatch = prof.optString("batch", "")
+                }
+                val att = json.optJSONObject("attendance")
+                if (att != null) {
+                    attendancePerc = att.optInt("perc", 0)
+                }
+                val cArr = json.optJSONArray("courses")
+                if (cArr != null) {
+                    coursesCount = cArr.length()
+                }
+            }
+
+            val feeRes = GasApiClient.getStudentFees(studentId)
+            feeRes.onSuccess { feeJson ->
+                val summary = feeJson.optJSONObject("feeSummary")
+                if (summary != null) {
+                    pendingFees = summary.optDouble("pendingAmount", 0.0)
+                }
+            }
+        }
+    }
+
+    val actionCards = remember(coursesCount, pendingFees) {
         listOf(
-            ColorfulCard(
-                id = "admin_chat",
-                iconTag = "CHAT",
+            NativeActionCard(
+                id = "chat",
+                icon = "💬",
                 title = "WhatsApp Chat",
-                subtitle = "Groups, 1-on-1 & media",
+                subtitle = "Groups, 1-on-1 & Faculty Help",
                 badge = "ACTIVE",
                 gradientColors = listOf(Color(0xFF10B981), Color(0xFF047857)),
-                url = "/admin/chat"
+                onClick = onNavigateToChat
             ),
-            ColorfulCard(
-                id = "admin_dash",
-                iconTag = "DSH",
-                title = "Overview Dashboard",
-                subtitle = "Analytics & statistics",
-                badge = "LIVE",
-                gradientColors = listOf(BrandPrimary, Color(0xFF4338CA)),
-                url = "/admin/dashboard"
-            ),
-            ColorfulCard(
-                id = "admin_attend",
-                iconTag = "ATT",
-                title = "Attendance Tracker",
-                subtitle = "Mark & view logs",
-                badge = null,
+            NativeActionCard(
+                id = "attendance",
+                icon = "📸",
+                title = "Smart Attendance",
+                subtitle = "Camera selfie & GPS check-in",
+                badge = "$attendancePerc%",
                 gradientColors = listOf(CyanNeon, Color(0xFF0891B2)),
-                url = "/admin/attendance"
+                onClick = onNavigateToAttendance
             ),
-            ColorfulCard(
-                id = "admin_notices",
-                iconTag = "NTC",
-                title = "Notice Board",
-                subtitle = "Broadcast push alerts",
-                badge = null,
-                gradientColors = listOf(AmberGold, Color(0xFFD97706)),
-                url = "/admin/notices"
-            ),
-            ColorfulCard(
-                id = "admin_inquiries",
-                iconTag = "INQ",
-                title = "Student Inquiries",
-                subtitle = "Follow-ups & leads",
-                badge = null,
-                gradientColors = listOf(SkyBlue, Color(0xFF0284C7)),
-                url = "/admin/inquiries"
-            ),
-            ColorfulCard(
-                id = "admin_reg",
-                iconTag = "REG",
-                title = "Registrations",
-                subtitle = "New admissions queue",
-                badge = null,
-                gradientColors = listOf(PinkNeon, Color(0xFFBE185D)),
-                url = "/admin/registrations"
-            ),
-            ColorfulCard(
-                id = "admin_adm",
-                iconTag = "ADM",
-                title = "Enrolled Students",
-                subtitle = "Directory & profiles",
-                badge = null,
-                gradientColors = listOf(VioletAccent, Color(0xFF7C3AED)),
-                url = "/admin/admissions"
-            ),
-            ColorfulCard(
-                id = "admin_fees",
-                iconTag = "FEE",
-                title = "Fee Collection",
-                subtitle = "Collect dues & receipts",
-                badge = null,
+            NativeActionCard(
+                id = "fees",
+                icon = "💳",
+                title = "Fee Ledger",
+                subtitle = "Dues, payments & receipts",
+                badge = if (pendingFees > 0) "DUE" else "CLEARED",
                 gradientColors = listOf(Color(0xFF34D399), Color(0xFF059669)),
-                url = "/admin/fees"
+                onClick = onNavigateToFees
             ),
-            ColorfulCard(
-                id = "admin_pending",
-                iconTag = "DUE",
-                title = "Pending Fees",
-                subtitle = "Due date reminders",
-                badge = "ALERT",
-                gradientColors = listOf(RoseRed, Color(0xFFBE123C)),
-                url = "/admin/fees-pending"
-            ),
-            ColorfulCard(
-                id = "admin_rcpt",
-                iconTag = "RCP",
-                title = "Receipts & Accounts",
-                subtitle = "Payment transaction log",
-                badge = null,
-                gradientColors = listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)),
-                url = "/admin/receipts"
-            ),
-            ColorfulCard(
-                id = "admin_hr",
-                iconTag = "HR",
-                title = "HR & Payroll",
-                subtitle = "Staff & salary tracking",
-                badge = null,
-                gradientColors = listOf(Color(0xFF64748B), Color(0xFF334155)),
-                url = "/admin/hr"
-            ),
-            ColorfulCard(
-                id = "admin_exams",
-                iconTag = "EXM",
-                title = "Exam Marks",
-                subtitle = "Score entry & report cards",
-                badge = null,
-                gradientColors = listOf(OrangeSunset, Color(0xFFC2410C)),
-                url = "/admin/exams"
-            )
-        )
-    }
-
-    val studentCards = remember {
-        listOf(
-            ColorfulCard(
-                id = "stu_chat",
-                iconTag = "CHAT",
-                title = "WhatsApp Chat",
-                subtitle = "Teacher & batch groups",
-                badge = "ONLINE",
-                gradientColors = listOf(Color(0xFF10B981), Color(0xFF047857)),
-                url = "/student"
-            ),
-            ColorfulCard(
-                id = "stu_portal",
-                iconTag = "PORT",
-                title = "Student Portal",
-                subtitle = "Course overview & ERA LMS",
-                badge = "MY COURSE",
-                gradientColors = listOf(BrandPrimary, Color(0xFF4338CA)),
-                url = "/student"
-            ),
-            ColorfulCard(
-                id = "stu_attend",
-                iconTag = "ATT",
-                title = "My Attendance",
-                subtitle = "Check daily records & GPS",
-                badge = "92%",
-                gradientColors = listOf(CyanNeon, Color(0xFF0891B2)),
-                url = "/student"
-            ),
-            ColorfulCard(
-                id = "stu_fees",
-                iconTag = "FEE",
-                title = "Fees & Receipts",
-                subtitle = "Pay balance & vouchers",
-                badge = null,
-                gradientColors = listOf(SkyBlue, Color(0xFF0284C7)),
-                url = "/student"
-            ),
-            ColorfulCard(
-                id = "stu_notices",
-                iconTag = "NTC",
+            NativeActionCard(
+                id = "notices",
+                icon = "📢",
                 title = "Notice Board",
-                subtitle = "Important circulars",
-                badge = null,
+                subtitle = "Campus circulars & holidays",
+                badge = "NEW",
                 gradientColors = listOf(AmberGold, Color(0xFFD97706)),
-                url = "/student"
+                onClick = onNavigateToNotices
             ),
-            ColorfulCard(
-                id = "stu_notes",
-                iconTag = "DOC",
-                title = "Study Materials",
-                subtitle = "Lecture notes & PDFs",
+            NativeActionCard(
+                id = "results",
+                icon = "📊",
+                title = "Exams & Results",
+                subtitle = "Grades, marks & certificates",
                 badge = null,
                 gradientColors = listOf(VioletAccent, Color(0xFF7C3AED)),
-                url = "/student"
+                onClick = onNavigateToResults
             ),
-            ColorfulCard(
-                id = "stu_results",
-                iconTag = "EXM",
-                title = "Exam Results",
-                subtitle = "Scorecards & grades",
-                badge = null,
-                gradientColors = listOf(RoseRed, Color(0xFFBE123C)),
-                url = "/student"
+            NativeActionCard(
+                id = "courses",
+                icon = "📚",
+                title = "Enrolled Courses",
+                subtitle = "Syllabus modules & practicals",
+                badge = if (coursesCount > 0) "$coursesCount Active" else null,
+                gradientColors = listOf(BrandPrimary, Color(0xFF4338CA)),
+                onClick = onNavigateToCourses
             ),
-            ColorfulCard(
-                id = "stu_profile",
-                iconTag = "ID",
-                title = "Profile & ID Card",
-                subtitle = "Personal records",
-                badge = null,
-                gradientColors = listOf(Color(0xFF64748B), Color(0xFF334155)),
-                url = "/student"
+            NativeActionCard(
+                id = "profile",
+                icon = "🪪",
+                title = "Digital Student ID",
+                subtitle = "Campus pass & credentials",
+                badge = "VERIFIED",
+                gradientColors = listOf(PinkNeon, Color(0xFFBE185D)),
+                onClick = onNavigateToProfile
             )
         )
     }
-
-    val cards = if (isAdmin) adminCards else studentCards
 
     Box(
         modifier = modifier
@@ -246,296 +163,233 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
-            // Stitch Top App Bar with User Avatar & Chat Icon
+            // HEADER BAR
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // User Avatar Circle
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                if (isAdmin) listOf(BrandPrimary, CyanNeon)
-                                else listOf(EmeraldGreen, CyanNeon)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(BrandPrimary, CyanNeon)
+                                )
                             )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = username.take(1).uppercase(),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
-
-                Spacer(Modifier.width(14.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Hello, " + username.replaceFirstChar { it.uppercase() },
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextWhite,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp)
+                            .clickable { onNavigateToProfile() },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(if (isAdmin) BrandLight else EmeraldGreen)
-                        )
-                        Spacer(Modifier.width(6.dp))
                         Text(
-                            text = if (isAdmin) "Admin Dashboard" else "Student Portal",
+                            text = displayName.take(1).uppercase(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = displayName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = studentId + " • " + displayBranch,
                             fontSize = 12.sp,
-                            color = TextMuted,
-                            fontWeight = FontWeight.SemiBold
+                            color = TextMuted
                         )
                     }
                 }
 
-                // WhatsApp Chat Icon Action Button
-                FilledTonalButton(
-                    onClick = onOpenChat,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = EmeraldGreen,
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("Chat", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                // Logout Button
-                FilledTonalButton(
+                IconButton(
                     onClick = onLogout,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = DarkCardElevated,
-                        contentColor = TextWhite
-                    ),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(DarkCard)
                 ) {
-                    Text("Exit", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("🚪", fontSize = 18.sp)
                 }
             }
 
-            // Quick Stats Banner Strip
+            // LIVE STATS STRIP
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val quickPills = if (isAdmin) {
-                    listOf("Chat" to "/admin/chat", "Attendance" to "/admin/attendance", "Pending Fees" to "/admin/fees-pending")
-                } else {
-                    listOf("Portal" to "/student", "Chat" to "/student", "Attendance" to "/student")
+                // Attendance Box
+                Card(
+                    modifier = Modifier.weight(1f).clickable { onNavigateToAttendance() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkCard),
+                    border = BorderStroke(1.dp, DarkBorder)
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Attendance", fontSize = 11.sp, color = TextMuted)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "$attendancePerc%",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (attendancePerc >= 75) EmeraldGreen else AmberGold
+                        )
+                    }
                 }
 
-                quickPills.forEach { pair ->
-                    val label = pair.first
-                    val url = pair.second
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onItemClick(url, label) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = DarkCard),
-                        border = BorderStroke(1.dp, DarkBorderSubtle)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 10.dp, horizontal = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextWhite,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                // Dues Box
+                Card(
+                    modifier = Modifier.weight(1f).clickable { onNavigateToFees() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkCard),
+                    border = BorderStroke(1.dp, if (pendingFees > 0) Color(0xFFF43F5E).copy(alpha = 0.4f) else DarkBorder)
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Fee Dues", fontSize = 11.sp, color = TextMuted)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = if (pendingFees > 0) "₹" + pendingFees.toInt() else "CLEARED",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (pendingFees > 0) Color(0xFFF43F5E) else EmeraldGreen
+                        )
+                    }
+                }
+
+                // Batch Time Box
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkCard),
+                    border = BorderStroke(1.dp, DarkBorder)
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Batch Timing", fontSize = 11.sp, color = TextMuted)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = displayBatch.ifBlank { "Regular" }.take(9),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyanNeon
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // Section Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isAdmin) "Administrative Modules" else "Student Modules",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite
-                )
-                Text(
-                    text = cards.size.toString() + " Available",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = BrandLight
-                )
-            }
-
-            // Grid of Colorful Cards
+            // ACTION CARDS GRID
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 90.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(cards) { item ->
-                    ColorfulDashboardCard(
-                        item = item,
-                        onClick = { onItemClick(item.url, item.title) }
-                    )
-                }
-            }
-        }
-
-        // Floating WhatsApp Chat Button at Bottom-Right
-        FloatingActionButton(
-            onClick = onOpenChat,
-            containerColor = EmeraldGreen,
-            contentColor = Color.White,
-            shape = CircleShape,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-                .size(60.dp)
-        ) {
-            Text(
-                text = "💬",
-                fontSize = 24.sp
-            )
-        }
-    }
-}
-
-@Composable
-fun ColorfulDashboardCard(
-    item: ColorfulCard,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(130.dp),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard),
-        border = BorderStroke(1.dp, DarkBorder)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = item.gradientColors.map { it.copy(alpha = 0.28f) },
-                        start = Offset(0f, 0f),
-                        end = Offset(300f, 300f)
-                    )
-                )
-                .padding(14.dp)
-        ) {
-            // Top Row: Tag badge + optional Pill
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            Brush.linearGradient(item.gradientColors)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = item.iconTag.take(4),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
-
-                if (item.badge != null) {
-                    Box(
+                items(actionCards) { card ->
+                    Card(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (item.badge == "ACTIVE" || item.badge == "ONLINE") EmeraldGreen.copy(alpha = 0.25f)
-                                else RoseRed.copy(alpha = 0.2f)
-                            )
-                            .border(
-                                1.dp,
-                                if (item.badge == "ACTIVE" || item.badge == "ONLINE") EmeraldGreen.copy(alpha = 0.5f)
-                                else RoseRed.copy(alpha = 0.4f),
-                                RoundedCornerShape(6.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .fillMaxWidth()
+                            .height(148.dp)
+                            .clickable { card.onClick() },
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCard),
+                        border = BorderStroke(1.dp, DarkBorder)
                     ) {
-                        Text(
-                            text = item.badge,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (item.badge == "ACTIVE" || item.badge == "ONLINE") EmeraldLight else Color(0xFFFDA4AF)
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.linearGradient(colors = card.gradientColors)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(card.icon, fontSize = 22.sp)
+                                }
+
+                                if (card.badge != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(card.gradientColors.first().copy(alpha = 0.2f))
+                                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = card.badge,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column {
+                                Text(
+                                    text = card.title,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextWhite,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = card.subtitle,
+                                    fontSize = 11.sp,
+                                    color = TextMuted,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            // Bottom Content
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-            ) {
-                Text(
-                    text = item.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = item.subtitle,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+        // FLOATING WHATSAPP BUTTON
+        FloatingActionButton(
+            onClick = onNavigateToChat,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+                .size(60.dp),
+            shape = CircleShape,
+            containerColor = Color(0xFF25D366),
+            contentColor = Color.White,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("💬", fontSize = 24.sp)
             }
         }
     }
