@@ -12,3 +12,12 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+
+# Android Build & Temporary Files
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/.idea/
+android-app/.cxx/
+*.apk
