@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.net.http.SslError
 import android.os.Build
 import android.os.Environment
 import android.view.ViewGroup
@@ -22,7 +23,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,25 +41,35 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.dcc.studentmanagement.theme.*
 
-private const val APP_BASE_URL = "https://student-management-one-wine.vercel.app/"
+private const val WEB_ROOT = "https://student-management-one-wine.vercel.app"
 
 @Composable
 fun WebViewScreen(
-    initialUrl: String = APP_BASE_URL,
+    url: String,
+    title: String,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("dcc_credentials", Context.MODE_PRIVATE) }
+    val savedSession = remember { prefs.getString("saved_session", "") ?: "" }
+
     var isLoading by remember { mutableStateOf(true) }
     var progress by remember { mutableIntStateOf(0) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
-    var pageTitle by remember { mutableStateOf("DCC Academy") }
     var isOffline by remember { mutableStateOf(false) }
 
-    // File chooser callback holder for photo/video/doc attachments in chat & forms
+    val resolvedUrl = remember(url) {
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            url
+        } else {
+            WEB_ROOT + (if (url.startsWith("/")) url else "/" + url)
+        }
+    }
+
     var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
 
-    // Activity launcher for file picker / camera
     val fileChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -79,12 +89,9 @@ fun WebViewScreen(
         }
     }
 
-    // Request permissions for Camera and Audio
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Permissions handled
-    }
+    ) {}
 
     LaunchedEffect(Unit) {
         val permissionsToRequest = mutableListOf(
@@ -103,12 +110,11 @@ fun WebViewScreen(
         }
     }
 
-    // Hardware back press handler
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
             webViewInstance?.goBack()
         } else {
-            (context as? Activity)?.moveTaskToBack(true)
+            onBack()
         }
     }
 
@@ -117,7 +123,7 @@ fun WebViewScreen(
             .fillMaxSize()
             .background(DarkBg)
     ) {
-        // Native Stitch Top Bar
+        // Navigation Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,15 +131,8 @@ fun WebViewScreen(
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back Button
             FilledTonalButton(
-                onClick = {
-                    if (webViewInstance?.canGoBack() == true) {
-                        webViewInstance?.goBack()
-                    } else {
-                        webViewInstance?.loadUrl(APP_BASE_URL)
-                    }
-                },
+                onClick = onBack,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = DarkCardElevated,
@@ -142,45 +141,21 @@ fun WebViewScreen(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 modifier = Modifier.height(34.dp)
             ) {
-                Text(
-                    text = if (canGoBack) "< Back" else "Home",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("< Dashboard", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.width(10.dp))
 
-            // App Brand Logo & Title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            Brush.linearGradient(listOf(BrandPrimary, CyanNeon))
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("D", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White)
-                }
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextWhite,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
-                Spacer(Modifier.width(8.dp))
-
-                Text(
-                    text = pageTitle.ifBlank { "DCC Student Portal" },
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Reload Button
             FilledTonalButton(
                 onClick = {
                     isOffline = false
@@ -198,7 +173,7 @@ fun WebViewScreen(
             }
         }
 
-        // Loading Progress Bar
+        // Progress Indicator
         AnimatedVisibility(
             visible = isLoading,
             enter = fadeIn(),
@@ -214,7 +189,7 @@ fun WebViewScreen(
             )
         }
 
-        // Content Area: Offline screen or Native WebView
+        // Content Area
         Box(modifier = Modifier.fillMaxSize()) {
             if (isOffline) {
                 Column(
@@ -227,28 +202,28 @@ fun WebViewScreen(
                     Text("📡", fontSize = 48.sp)
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "Connection Error",
-                        fontSize = 20.sp,
+                        text = "Connection Notice",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextWhite
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Unable to connect to the portal. Please verify your internet connection and try again.",
+                        text = "Unable to connect to the portal. Please verify your internet connection.",
                         fontSize = 13.sp,
                         color = TextMuted,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(20.dp))
                     Button(
                         onClick = {
                             isOffline = false
-                            webViewInstance?.loadUrl(initialUrl)
+                            webViewInstance?.loadUrl(resolvedUrl)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Retry Connection", fontWeight = FontWeight.Bold)
+                        Text("Retry", fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
@@ -260,7 +235,6 @@ fun WebViewScreen(
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
 
-                            // Setup Cookies & Storage Persistence
                             CookieManager.getInstance().setAcceptCookie(true)
                             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
@@ -283,7 +257,6 @@ fun WebViewScreen(
                                 userAgentString = (userAgentString ?: "") + " DCC_Native_Android/1.0"
                             }
 
-                            // Download listener for receipts and reports
                             setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
                                 try {
                                     val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
@@ -311,38 +284,43 @@ fun WebViewScreen(
                             webViewClient = object : WebViewClient() {
                                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                     isLoading = true
+                                    // Inject saved authentication session early
+                                    if (savedSession.isNotBlank()) {
+                                        val escaped = savedSession.replace("\\", "\\\\").replace("'", "\\'")
+                                        view?.evaluateJavascript("try { localStorage.setItem('erp_session', '$escaped'); } catch(e) {}", null)
+                                    }
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     isLoading = false
                                     canGoBack = view?.canGoBack() ?: false
-                                    val title = view?.title ?: ""
-                                    if (title.isNotBlank() && !title.contains("student-management", ignoreCase = true)) {
-                                        pageTitle = title
+                                    // Reinforce authentication session injection
+                                    if (savedSession.isNotBlank()) {
+                                        val escaped = savedSession.replace("\\", "\\\\").replace("'", "\\'")
+                                        view?.evaluateJavascript("try { localStorage.setItem('erp_session', '$escaped'); } catch(e) {}", null)
                                     }
                                     CookieManager.getInstance().flush()
                                 }
 
-                                override fun onReceivedError(
-                                    view: WebView?,
-                                    request: WebResourceRequest?,
-                                    error: WebResourceError?
-                                ) {
-                                    if (request?.isForMainFrame == true) {
+                                // Prevent white/blank screens on SSL cert discrepancies
+                                override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                                    handler?.proceed()
+                                }
+
+                                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                    if (request?.isForMainFrame == true && (error?.errorCode == ERROR_HOST_LOOKUP || error?.errorCode == ERROR_CONNECT)) {
                                         isOffline = true
                                     }
                                 }
 
                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                     val reqUrl = request?.url?.toString() ?: return false
-                                    // Deep link handling for WhatsApp, phone dialer, email
                                     if (reqUrl.startsWith("tel:") || reqUrl.startsWith("mailto:") || reqUrl.startsWith("whatsapp:")) {
                                         try {
                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(reqUrl))
                                             ctx.startActivity(intent)
                                             return true
                                         } catch (_: Exception) {
-                                            Toast.makeText(ctx, "App not found for this action", Toast.LENGTH_SHORT).show()
                                             return true
                                         }
                                     }
@@ -356,13 +334,6 @@ fun WebViewScreen(
                                     if (newProgress >= 100) isLoading = false
                                 }
 
-                                override fun onReceivedTitle(view: WebView?, title: String?) {
-                                    if (!title.isNullOrBlank() && !title.contains("localhost") && !title.contains("vercel")) {
-                                        pageTitle = title
-                                    }
-                                }
-
-                                // Handle file picking for chat attachments and form uploads
                                 override fun onShowFileChooser(
                                     webView: WebView?,
                                     filePathCallbackParam: ValueCallback<Array<Uri>>?,
@@ -385,12 +356,10 @@ fun WebViewScreen(
                                     return true
                                 }
 
-                                // Grant camera / mic permission for Face Attendance and Chat
                                 override fun onPermissionRequest(request: PermissionRequest?) {
                                     request?.grant(request.resources)
                                 }
 
-                                // Grant Geolocation for attendance radius verification
                                 override fun onGeolocationPermissionsShowPrompt(
                                     origin: String?,
                                     callback: GeolocationPermissions.Callback?
@@ -399,7 +368,7 @@ fun WebViewScreen(
                                 }
                             }
 
-                            loadUrl(initialUrl)
+                            loadUrl(resolvedUrl)
                             webViewInstance = this
                         }
                     },

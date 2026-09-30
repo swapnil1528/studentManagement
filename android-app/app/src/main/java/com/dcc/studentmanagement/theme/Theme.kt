@@ -5,16 +5,16 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val StitchDarkColorScheme = darkColorScheme(
+private val ColorfulDarkColorScheme = darkColorScheme(
     primary = BrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = BrandDark,
+    primaryContainer = Color(0xFF4338CA),
     onPrimaryContainer = Color.White,
-    secondary = CyanNeon,
-    onSecondary = Color.Black,
-    secondaryContainer = Color(0xFF164E63),
+    secondary = EmeraldGreen,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF065F46),
     onSecondaryContainer = Color.White,
-    tertiary = AmberGold,
+    tertiary = CyanNeon,
     background = DarkBg,
     onBackground = TextWhite,
     surface = DarkSurface,
@@ -32,7 +32,7 @@ fun DCCStudentPortalTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = StitchDarkColorScheme,
+        colorScheme = ColorfulDarkColorScheme,
         typography = Typography,
         content = content
     )
