@@ -1294,3 +1294,301 @@ body,
 .dark label {
   color: #94a3b8;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS — Comprehensive Fix (Sep 2026)
+   Fixes: overflow, header crowding, modals, tables, touch targets
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Global Mobile Overflow Prevention ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* ── Admin Panel Mobile Fixes ── */
+@media (max-width: 768px) {
+  /* Ensure hamburger is always visible and accessible */
+  .hamburger {
+    display: flex !important;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 50;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Full-width main content with no left margin */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 56px 10px 16px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Tables: wrap in scrollable container */
+  .card table,
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .card table thead,
+  .card table tbody,
+  .card table tr {
+    display: table;
+    width: 100%;
+    table-layout: auto;
+  }
+
+  /* Force cards to not exceed viewport */
+  .card {
+    max-width: calc(100vw - 20px) !important;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  /* Stat cards grid — single column on mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Fix flex containers that overflow */
+  .flex {
+    flex-wrap: wrap;
+  }
+
+  /* Fix DataTable overflow */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+}
+
+/* ── Student Portal Header — Mobile Fix ── */
+@media (max-width: 640px) {
+  .sp-container {
+    padding: 8px 8px calc(var(--gz-nav-height) + 12px) !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  .sp-header {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    padding: 10px 10px !important;
+    gap: 8px !important;
+    border-radius: 14px !important;
+    margin-bottom: 10px !important;
+    text-align: left !important;
+    align-items: center !important;
+  }
+
+  .sp-header img {
+    width: 38px !important;
+    height: 38px !important;
+    flex-shrink: 0;
+  }
+
+  .sp-header-name {
+    font-size: 13px !important;
+    max-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .sp-header-role {
+    font-size: 8px !important;
+    padding: 1px 6px !important;
+  }
+
+  .sp-header-id {
+    font-size: 10px !important;
+  }
+
+  /* Header action buttons — compact on mobile */
+  .sp-header-actions {
+    gap: 4px !important;
+  }
+
+  .sp-header-actions button {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 12px !important;
+    padding: 0 !important;
+    min-width: unset !important;
+  }
+
+  .sp-header-btn {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    border-radius: 8px !important;
+  }
+
+  .sp-header-logout {
+    padding: 4px 8px !important;
+    font-size: 9px !important;
+  }
+
+  /* Install App button: icon only on small screens */
+  .sp-header-btn span {
+    display: none !important;
+  }
+}
+
+/* ── Bottom Navigation Bar — Mobile Fix ── */
+@media (max-width: 640px) {
+  .sp-bottom-nav {
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .sp-nav-inner {
+    gap: 0 !important;
+    justify-content: space-around !important;
+  }
+
+  .sp-nav-item {
+    padding: 4px 2px !important;
+    min-width: 36px !important;
+    flex: 0 1 auto !important;
+  }
+
+  .sp-nav-item .nav-icon {
+    font-size: 16px !important;
+  }
+
+  .sp-nav-item .nav-label {
+    font-size: 7px !important;
+    letter-spacing: 0 !important;
+    max-width: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ── Modals — Mobile Full-Screen Fix ── */
+@media (max-width: 640px) {
+  /* Generic modals */
+  [style*="position: fixed"][style*="z-index"] > div,
+  [style*="position:fixed"][style*="z-index"] > div {
+    max-width: calc(100vw - 24px) !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    margin: 12px !important;
+  }
+
+  /* Admin Notice Modal */
+  [style*="zIndex: 999999"] > div {
+    max-width: calc(100vw - 32px) !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    border-radius: 20px !important;
+  }
+
+  /* DueFeeReminderModal — prevent overflow */
+  [style*="maxWidth: '560px'"],
+  [style*="max-width: 560px"] {
+    max-width: calc(100vw - 24px) !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* ── Login Page — Mobile Fix ── */
+@media (max-width: 480px) {
+  /* Login card */
+  [style*="maxWidth: 440px"],
+  [style*="max-width: 440px"] {
+    max-width: calc(100vw - 32px) !important;
+    padding: 20px 16px !important;
+  }
+}
+
+/* ── WhatsApp Chat Component — Mobile Fix ── */
+@media (max-width: 640px) {
+  [style*="height: 600px"],
+  [style*="height: '600px'"] {
+    height: calc(100vh - 200px) !important;
+    max-height: 500px !important;
+  }
+}
+
+/* ── Admin Page Tables — Mobile Horizontal Scroll ── */
+@media (max-width: 768px) {
+  .card.p-0 {
+    overflow: hidden !important;
+  }
+
+  .card.p-0 .overflow-x-auto {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .card.p-0 table {
+    min-width: 600px;
+  }
+
+  /* Two-column flex layouts → stack vertically */
+  .flex.gap-4,
+  .flex.gap-6 {
+    flex-direction: column !important;
+  }
+
+  /* Heading + button rows */
+  .flex.items-center.justify-between {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  
+  h1.text-2xl {
+    font-size: 18px !important;
+  }
+}
+
+/* ── Fix inline style overflows on all screen sizes ── */
+@media (max-width: 480px) {
+  /* Prevent any child from exceeding viewport */
+  .sp-container > *,
+  .main-content > * {
+    max-width: 100% !important;
+    overflow-x: hidden;
+  }
+
+  /* Compact form inputs */
+  input, select, textarea {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Small screen font fixes */
+  body {
+    font-size: 14px;
+  }
+}
+
+/* ── PushupNotificationBanner — Mobile Fix ── */
+@media (max-width: 480px) {
+  [style*="maxWidth: 420"] {
+    max-width: calc(100vw - 24px) !important;
+  }
+}
+
+/* ── Dark mode mobile fixes ── */
+@media (max-width: 768px) {
+  .dark .main-content {
+    padding: 56px 10px 16px !important;
+    margin-left: 0 !important;
+  }
+}

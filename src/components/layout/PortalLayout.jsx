@@ -92,32 +92,24 @@ export default function PortalLayout({
                     </div>
 
                     {/* Actions */}
-                    
-                        {!isInstalled && (
-                            <button
-                                onClick={installApp}
-                                className="sp-header-btn"
-                                title="Install App on Phone"
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    padding: '6px 10px',
-                                    borderRadius: 10,
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <i className="fas fa-mobile-alt" />
-                                <span className="hidden sm:inline">Install App</span>
-                            </button>
-                        )}
 
                     <div className="sp-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        {!isInstalled && (
+                            <button
+                                id="install-app-header-btn"
+                                onClick={installApp}
+                                title="Install App"
+                                style={{
+                                    width: 34, height: 34, borderRadius: 10, border: 'none',
+                                    background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                    color: '#ffffff', fontSize: 14, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    transition: 'all 0.2s ease', flexShrink: 0,
+                                }}
+                            >
+                                <i className="fas fa-download" />
+                            </button>
+                        )}
                         <button
                             onClick={toggleTheme}
                             title={isDark ? 'Light Mode' : 'Dark Mode'}

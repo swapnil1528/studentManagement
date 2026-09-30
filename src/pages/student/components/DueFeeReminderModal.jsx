@@ -132,6 +132,8 @@ export default function DueFeeReminderModal({
                         position: 'relative',
                         width: '100%',
                         maxWidth: '560px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
                         background: isDark
                             ? 'linear-gradient(180deg, #1b1731 0%, #120f24 100%)'
                             : 'linear-gradient(180deg, #ffffff 0%, #faf8ff 100%)',
