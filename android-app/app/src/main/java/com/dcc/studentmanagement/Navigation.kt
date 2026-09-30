@@ -54,6 +54,9 @@ fun AppNavigation() {
                     onLoginSuccess = { role, user, sessionJson ->
                         backStack.clear()
                         backStack.add(ScreenDestination.Dashboard(role = role, username = user))
+                    },
+                    onOpenWebPortal = {
+                        backStack.add(ScreenDestination.FeatureView(url = "/login", title = "DCC Student Portal"))
                     }
                 )
             }

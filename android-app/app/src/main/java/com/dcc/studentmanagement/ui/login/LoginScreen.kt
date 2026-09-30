@@ -37,6 +37,7 @@ import java.net.URL
 @Composable
 fun LoginScreen(
     onLoginSuccess: (role: String, username: String, sessionJson: String) -> Unit,
+    onOpenWebPortal: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -409,6 +410,24 @@ fun LoginScreen(
                             )
                         }
                     }
+
+                    OutlinedButton(
+                        onClick = onOpenWebPortal,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = BrandLight
+                        )
+                    ) {
+                        Text(
+                            text = "🌐 Open Web Portal Directly",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
 
@@ -474,6 +493,21 @@ private suspend fun performGASLogin(username: String, password: String): GASLogi
                 }
             } else {
                 responseText = conn.inputStream.bufferedReader().readText()
+            }
+
+            val trimmed = responseText.trim()
+            if (trimmed.startsWith("<")) {
+                val extracted = if (trimmed.contains("require is not defined")) {
+                    "Google Apps Script Error: 'require is not defined' (line 2236 in Code.gs). Please update your Apps Script deployment or tap 'Open Web Portal Directly'."
+                } else {
+                    val match = Regex("(?i)<div[^>]*>([^<]*(?:ReferenceError|SyntaxError|Error|Exception)[^<]*)</div>").find(trimmed)
+                    match?.groupValues?.getOrNull(1)?.trim()
+                        ?: "Server configuration error: Google Apps Script returned an HTML error page."
+                }
+                return@withContext GASLoginResult(
+                    success = false,
+                    error = extracted
+                )
             }
 
             val json = JSONObject(responseText)
