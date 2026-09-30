@@ -207,4 +207,21 @@ object GasApiClient {
         }
         return executePost(payload)
     }
+
+    suspend fun saveFee(form: JSONObject): Result<JSONObject> {
+        val payload = JSONObject().apply {
+            put("action", "saveFee")
+            put("form", form)
+        }
+        return executePost(payload)
+    }
+
+    suspend fun actionLeave(id: String, status: String): Result<JSONObject> {
+        val payload = JSONObject().apply {
+            put("action", "actionLeave")
+            put("id", id)
+            put("status", status)
+        }
+        return executePost(payload)
+    }
 }

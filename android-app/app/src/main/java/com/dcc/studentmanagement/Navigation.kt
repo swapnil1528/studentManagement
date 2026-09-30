@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.dcc.studentmanagement.ui.admin.*
 import com.dcc.studentmanagement.ui.attendance.AttendanceScreen
 import com.dcc.studentmanagement.ui.chat.ChatScreen
 import com.dcc.studentmanagement.ui.courses.CoursesScreen
@@ -19,7 +20,16 @@ import com.dcc.studentmanagement.ui.results.ResultsScreen
 
 sealed class ScreenDestination {
     data object Login : ScreenDestination()
-    data class Dashboard(val role: String, val username: String, val studentId: String) : ScreenDestination()
+
+    // ADMIN PAGES
+    data class AdminDashboard(val username: String, val branch: String) : ScreenDestination()
+    data class AdminFees(val branch: String) : ScreenDestination()
+    data class AdminAttendance(val branch: String) : ScreenDestination()
+    data class AdminLeaves(val branch: String) : ScreenDestination()
+    data class AdminStudents(val branch: String) : ScreenDestination()
+
+    // STUDENT PAGES
+    data class StudentDashboard(val role: String, val username: String, val studentId: String) : ScreenDestination()
     data class Attendance(val studentId: String, val branch: String) : ScreenDestination()
     data class Fees(val studentId: String) : ScreenDestination()
     data class Chat(val userId: String, val userRole: String, val userName: String, val branch: String) : ScreenDestination()
@@ -39,8 +49,14 @@ fun AppNavigation() {
         val savedRole = prefs.getString("saved_role", null)
         val savedUser = prefs.getString("saved_username", null)
         val savedStudId = prefs.getString("saved_studentid", savedUser)
-        if (saveEnabled && !savedRole.isNullOrBlank() && !savedUser.isNullOrBlank() && !savedStudId.isNullOrBlank()) {
-            ScreenDestination.Dashboard(role = savedRole, username = savedUser, studentId = savedStudId)
+        val savedBranch = prefs.getString("saved_branch", "Devichapada") ?: "Devichapada"
+
+        if (saveEnabled && !savedRole.isNullOrBlank() && !savedUser.isNullOrBlank()) {
+            if (savedRole.equals("admin", ignoreCase = true) || savedRole.equals("employee", ignoreCase = true) || savedRole.equals("teacher", ignoreCase = true)) {
+                ScreenDestination.AdminDashboard(username = savedUser, branch = savedBranch)
+            } else {
+                ScreenDestination.StudentDashboard(role = savedRole, username = savedUser, studentId = savedStudId ?: savedUser)
+            }
         } else {
             ScreenDestination.Login
         }
@@ -51,6 +67,17 @@ fun AppNavigation() {
 
     BackHandler(enabled = backStack.size > 1) {
         backStack.removeAt(backStack.lastIndex)
+    }
+
+    fun logout() {
+        prefs.edit()
+            .remove("saved_role")
+            .remove("saved_password")
+            .remove("saved_studentid")
+            .putBoolean("save_enabled", false)
+            .apply()
+        backStack.clear()
+        backStack.add(ScreenDestination.Login)
     }
 
     AnimatedContent(
@@ -64,19 +91,89 @@ fun AppNavigation() {
         when (dest) {
             is ScreenDestination.Login -> {
                 LoginScreen(
-                    onLoginSuccess = { role, user, studentId ->
+                    onLoginSuccess = { role, user, studentId, branch ->
                         backStack.clear()
-                        backStack.add(
-                            ScreenDestination.Dashboard(
-                                role = role,
-                                username = user,
-                                studentId = studentId
-                            )
-                        )
+                        if (role.equals("admin", true) || role.equals("employee", true) || role.equals("teacher", true)) {
+                            backStack.add(ScreenDestination.AdminDashboard(username = user, branch = branch))
+                        } else {
+                            backStack.add(ScreenDestination.StudentDashboard(role = role, username = user, studentId = studentId))
+                        }
                     }
                 )
             }
-            is ScreenDestination.Dashboard -> {
+
+            // ════════════════════════════════════════════════════════════
+            // ADMIN EXECUTIVE DESTINATIONS
+            // ════════════════════════════════════════════════════════════
+            is ScreenDestination.AdminDashboard -> {
+                AdminDashboardScreen(
+                    username = dest.username,
+                    branch = dest.branch,
+                    onNavigateToAdminFees = {
+                        backStack.add(ScreenDestination.AdminFees(branch = dest.branch))
+                    },
+                    onNavigateToAdminPendingFees = {
+                        backStack.add(ScreenDestination.AdminFees(branch = dest.branch))
+                    },
+                    onNavigateToAdminAttendance = {
+                        backStack.add(ScreenDestination.AdminAttendance(branch = dest.branch))
+                    },
+                    onNavigateToAdminLeaves = {
+                        backStack.add(ScreenDestination.AdminLeaves(branch = dest.branch))
+                    },
+                    onNavigateToAdminStudents = {
+                        backStack.add(ScreenDestination.AdminStudents(branch = dest.branch))
+                    },
+                    onNavigateToNotices = {
+                        backStack.add(ScreenDestination.Notices(studentId = dest.username, role = "admin", branch = dest.branch))
+                    },
+                    onNavigateToChat = {
+                        backStack.add(ScreenDestination.Chat(userId = dest.username, userRole = "admin", userName = dest.username, branch = dest.branch))
+                    },
+                    onLogout = { logout() }
+                )
+            }
+
+            is ScreenDestination.AdminFees -> {
+                AdminFeesScreen(
+                    branch = dest.branch,
+                    onBack = {
+                        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                    }
+                )
+            }
+
+            is ScreenDestination.AdminAttendance -> {
+                AdminAttendanceScreen(
+                    branch = dest.branch,
+                    onBack = {
+                        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                    }
+                )
+            }
+
+            is ScreenDestination.AdminLeaves -> {
+                AdminLeavesScreen(
+                    branch = dest.branch,
+                    onBack = {
+                        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                    }
+                )
+            }
+
+            is ScreenDestination.AdminStudents -> {
+                AdminStudentsScreen(
+                    branch = dest.branch,
+                    onBack = {
+                        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                    }
+                )
+            }
+
+            // ════════════════════════════════════════════════════════════
+            // STUDENT DESTINATIONS
+            // ════════════════════════════════════════════════════════════
+            is ScreenDestination.StudentDashboard -> {
                 DashboardScreen(
                     role = dest.role,
                     username = dest.username,
@@ -115,18 +212,10 @@ fun AppNavigation() {
                     onNavigateToProfile = {
                         backStack.add(ScreenDestination.Profile(studentId = dest.studentId))
                     },
-                    onLogout = {
-                        prefs.edit()
-                            .remove("saved_role")
-                            .remove("saved_password")
-                            .remove("saved_studentid")
-                            .putBoolean("save_enabled", false)
-                            .apply()
-                        backStack.clear()
-                        backStack.add(ScreenDestination.Login)
-                    }
+                    onLogout = { logout() }
                 )
             }
+
             is ScreenDestination.Attendance -> {
                 AttendanceScreen(
                     studentId = dest.studentId,
@@ -136,6 +225,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Fees -> {
                 FeesScreen(
                     studentId = dest.studentId,
@@ -144,6 +234,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Chat -> {
                 ChatScreen(
                     userId = dest.userId,
@@ -155,6 +246,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Notices -> {
                 NoticesScreen(
                     studentId = dest.studentId,
@@ -165,6 +257,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Results -> {
                 ResultsScreen(
                     studentId = dest.studentId,
@@ -173,6 +266,7 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Courses -> {
                 CoursesScreen(
                     studentId = dest.studentId,
@@ -181,22 +275,14 @@ fun AppNavigation() {
                     }
                 )
             }
+
             is ScreenDestination.Profile -> {
                 ProfileScreen(
                     studentId = dest.studentId,
                     onBack = {
                         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                     },
-                    onLogout = {
-                        prefs.edit()
-                            .remove("saved_role")
-                            .remove("saved_password")
-                            .remove("saved_studentid")
-                            .putBoolean("save_enabled", false)
-                            .apply()
-                        backStack.clear()
-                        backStack.add(ScreenDestination.Login)
-                    }
+                    onLogout = { logout() }
                 )
             }
         }

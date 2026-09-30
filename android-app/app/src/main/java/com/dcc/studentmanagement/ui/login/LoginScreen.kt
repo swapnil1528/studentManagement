@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (role: String, username: String, studentId: String) -> Unit,
+    onLoginSuccess: (role: String, username: String, studentId: String, branch: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -44,7 +44,7 @@ fun LoginScreen(
     var password by remember { mutableStateOf(prefs.getString("saved_password", "") ?: "") }
     var saveCredentials by remember { mutableStateOf(prefs.getBoolean("save_enabled", true)) }
     var passwordVisible by remember { mutableStateOf(false) }
-    var selectedRoleTab by remember { mutableStateOf("student") }
+    var selectedRoleTab by remember { mutableStateOf(if (prefs.getString("saved_role", "student") == "admin") "admin" else "student") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -212,7 +212,7 @@ fun LoginScreen(
                         label = {
                             Text(if (selectedRoleTab == "student") "Student ID / Username" else "Admin Username")
                         },
-                        placeholder = { Text("e.g. STU101 or swapnil") },
+                        placeholder = { Text(if (selectedRoleTab == "student") "e.g. ST-2026-1001 or swapnil" else "e.g. admin") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
@@ -347,16 +347,20 @@ fun LoginScreen(
                                 isLoading = false
                                 res.onSuccess { json ->
                                     if (json.optBoolean("success", false)) {
-                                        val role = json.optString("role", "student").lowercase()
+                                        val rawRole = json.optString("role", selectedRoleTab).lowercase()
                                         val user = json.optString("username", username.trim())
                                         val studId = json.optString("studentId", json.optString("userId", user))
+                                        val branch = json.optString("branch", "Devichapada")
+
+                                        val finalRole = if (rawRole.contains("admin") || rawRole.contains("employee") || rawRole.contains("teacher")) "admin" else "student"
 
                                         if (saveCredentials) {
                                             prefs.edit()
                                                 .putString("saved_username", username.trim())
                                                 .putString("saved_password", password.trim())
-                                                .putString("saved_role", role)
+                                                .putString("saved_role", finalRole)
                                                 .putString("saved_studentid", studId)
+                                                .putString("saved_branch", branch)
                                                 .putBoolean("save_enabled", true)
                                                 .apply()
                                         } else {
@@ -366,7 +370,7 @@ fun LoginScreen(
                                                 .putBoolean("save_enabled", false)
                                                 .apply()
                                         }
-                                        onLoginSuccess(role, user, studId)
+                                        onLoginSuccess(finalRole, user, studId, branch)
                                     } else {
                                         errorMessage = json.optString("error", "Invalid username or password.")
                                     }
@@ -400,7 +404,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = "Sign In",
+                                text = if (selectedRoleTab == "student") "Student Sign In" else "Admin Sign In",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp,
                                 color = Color.White
@@ -413,7 +417,7 @@ fun LoginScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Direct Google Apps Script Cloud API Connection",
+                text = "Secured with Google Cloud Apps Script Database",
                 fontSize = 11.sp,
                 color = TextSubtle
             )
