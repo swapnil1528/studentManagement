@@ -110,7 +110,7 @@ export function AuthProvider({ children }) {
             } catch (e) {}
             return { success: true };
         }
-        return { success: false, error: result?.error || 'Invalid credentials' };
+        return { success: false, error: result?.error || (result === null ? 'Unable to connect to server. Please check your internet connection.' : 'Invalid username or password. Please verify your credentials.') };
     };
 
     // ─── Logout ──────────────────────────────────────────────

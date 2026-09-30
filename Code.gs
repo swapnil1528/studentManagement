@@ -28,7 +28,7 @@ function doPost(e) {
     let res = {};
 
     // --- AUTH & LOAD ---
-    if(act==='login') res = checkLogin(d.u, d.p);
+    if(act==='login') res = checkLogin(d.u || d.username, d.p || d.password);
     else if(act==='loadAdminData') res = fetchAllAdminData(d.branch);
     
     // --- SAVING DATA ---
@@ -144,7 +144,7 @@ function checkLogin(u, p) {
       };
     }
   }
-  return { success: false };
+  return { success: false, error: 'Invalid username or password' };
 }
 
 // ============================================

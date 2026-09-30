@@ -21,6 +21,20 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
+    const [rememberMe, setRememberMe] = useState(true);
+
+    // Auto-restore saved credentials if present
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('dcc_saved_login');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.username) setUsername(parsed.username);
+                if (parsed.password) setPassword(parsed.password);
+                setRememberMe(true);
+            }
+        } catch (e) {}
+    }, []);
     const [loading, setLoading] = useState(false);
     const { login, isAuthenticated, user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
@@ -243,6 +257,29 @@ export default function LoginPage() {
                         >
                             <i className={showPass ? 'fas fa-eye-slash' : 'fas fa-eye'} />
                         </button>
+                    </div>
+
+                    {/* Save Credentials Option */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        marginBottom: 16, padding: '4px 2px',
+                    }}>
+                        <label style={{
+                            display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                            fontSize: 13, fontWeight: 600, color: isDark ? '#cbd5e1' : '#475569',
+                            userSelect: 'none',
+                        }}>
+                            <input
+                                type="checkbox"
+                                checked={rememberMe}
+                                onChange={e => setRememberMe(e.target.checked)}
+                                style={{
+                                    width: 16, height: 16, accentColor: '#7c3aed',
+                                    cursor: 'pointer', borderRadius: 4,
+                                }}
+                            />
+                            Save Credentials (Stay Logged In)
+                        </label>
                     </div>
 
                     {/* Submit button */}
