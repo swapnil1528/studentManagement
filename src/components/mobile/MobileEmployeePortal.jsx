@@ -34,6 +34,17 @@ export default function MobileEmployeePortal() {
         enabled: !!user,
     });
 
+    const { data: settings } = useQuery({
+        queryKey: ['settings'],
+        queryFn: () => apiCall('getSettings', {}),
+        enabled: !!user,
+        refetchOnMount: 'always',
+    });
+
+    const employeeCameraRequired = settings?.success && settings.employeeCameraCheckIn !== undefined
+        ? (settings.employeeCameraCheckIn === true || settings.employeeCameraCheckIn === 'true')
+        : (() => { try { return localStorage.getItem('erp_employee_camera_checkin') === 'true'; } catch { return false; } })();
+
     const data = result && !result.error ? result : null;
     const profile = data?.profile || {};
     const stats = data?.stats || {};
@@ -77,52 +88,61 @@ export default function MobileEmployeePortal() {
 
     const loadData = () => {
         queryClient.invalidateQueries(['employeeData']);
+        queryClient.invalidateQueries(['settings']);
     };
 
     const initiateAttendance = (type) => {
         setAttTypePending(type);
-        setShowCamera(true);
+        if (employeeCameraRequired) {
+            setShowCamera(true);
+        } else {
+            submitEmployeeAttendance(type, '');
+        }
     };
 
-    const submitAttendanceFallback = async (photoBase64) => {
+    const submitAttendanceFallback = async (type, photoBase64) => {
         const res = await apiCall('markEmployeeAtt', {
             id: user?.userId,
-            type: attTypePending,
+            type,
             lat: null,
             lng: null,
             photo: photoBase64,
         });
         if (res?.error) alert(res.error);
         else {
-            showToast(`${attTypePending} Successful`);
+            showToast(`${type} Successful`);
             loadData();
         }
         setMarking(false);
     };
 
-    const handleAttendance = async (photoBase64) => {
+    const submitEmployeeAttendance = (type, photoBase64) => {
         setShowCamera(false);
         setMarking(true);
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const res = await apiCall('markEmployeeAtt', {
                     id: user?.userId,
-                    type: attTypePending,
+                    type,
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     photo: photoBase64,
                 });
                 if (res?.error) alert(res.error);
                 else {
-                    showToast(`${attTypePending} Successful`);
+                    showToast(`${type} Successful`);
                     loadData();
                 }
                 setMarking(false);
             },
             () => {
-                submitAttendanceFallback(photoBase64);
+                submitAttendanceFallback(type, photoBase64);
             }
         );
+    };
+
+    const handleAttendance = async (photoBase64) => {
+        submitEmployeeAttendance(attTypePending, photoBase64);
     };
 
     const handleLeaveRequest = async (e) => {
@@ -178,7 +198,7 @@ export default function MobileEmployeePortal() {
                 id: 'attendance',
                 title: 'Mark Attendance',
                 value: statusInfo.label,
-                subtitle: 'Camera selfie & GPS check-in',
+                subtitle: employeeCameraRequired ? 'Camera selfie & GPS check-in' : 'One-tap GPS check-in',
                 icon: '📍',
                 gradient: 'from-[#10B981] to-[#047857]',
                 borderColor: 'border-[#10B981]/40',
@@ -394,7 +414,11 @@ export default function MobileEmployeePortal() {
                                         disabled={marking}
                                         className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-[#10B981] to-[#059669] font-bold text-sm text-white shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
                                     >
-                                        {marking ? 'Marking Check-In...' : '📷 Check In (Camera)'}
+                                        {marking
+                                            ? 'Marking Check-In...'
+                                            : employeeCameraRequired
+                                                ? '📷 Check In (Camera)'
+                                                : '✓ Check In'}
                                     </button>
                                 )}
                                 {todayStatus === 'Check-In' && (
@@ -404,7 +428,11 @@ export default function MobileEmployeePortal() {
                                         disabled={marking}
                                         className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-[#F43F5E] to-[#E11D48] font-bold text-sm text-white shadow-lg shadow-rose-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
                                     >
-                                        {marking ? 'Marking Check-Out...' : '📷 Check Out (Camera)'}
+                                        {marking
+                                            ? 'Marking Check-Out...'
+                                            : employeeCameraRequired
+                                                ? '📷 Check Out (Camera)'
+                                                : '✓ Check Out'}
                                     </button>
                                 )}
                             </div>

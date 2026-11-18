@@ -706,9 +706,15 @@ function getEmployeePortalData(id) {
   };
 }
 
-// --- MARK EMPLOYEE ATTENDANCE (with photo) ---
+// --- MARK EMPLOYEE ATTENDANCE (with optional camera enforcement) ---
 function markEmployeeAttendance(id, type, lat, lng, photoStr) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // Backend enforcement: block check-in/out if photo missing while enforced
+  const settings = getSettings();
+  if (settings.employeeCameraCheckIn && !photoStr) {
+    return { error: "Camera check-in is enforced by Admin. Photo is required." };
+  }
   
   const attSheet = ensureSheet("Employee Attendance", ["Time", "ID", "Name", "Type", "Loc", "Dist", "Date"]);
   const timestamp = new Date();
@@ -1504,7 +1510,9 @@ function getQuizResults(studentId) {
 function getSettings() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ensureSheet("Settings", ["Key", "Value"]);
-  if (sheet.getLastRow() < 2) return { success: true, mobileCheckIn: false };
+  if (sheet.getLastRow() < 2) {
+    return { success: true, mobileCheckIn: false, studentCameraCheckIn: false, employeeCameraCheckIn: false };
+  }
   const data = sheet.getDataRange().getValues().slice(1);
   const settings = {};
   data.forEach(r => { if (r[0]) settings[r[0]] = r[1]; });
@@ -1512,7 +1520,13 @@ function getSettings() {
   // Handle both boolean true and string 'true' (Google Sheets may auto-convert)
   const isMobileOn = settings.mobileCheckIn === true || settings.mobileCheckIn === 'true';
   const isCamOn = settings.studentCameraCheckIn === true || settings.studentCameraCheckIn === 'true';
-  return { success: true, mobileCheckIn: isMobileOn, studentCameraCheckIn: isCamOn };
+  const isEmpCamOn = settings.employeeCameraCheckIn === true || settings.employeeCameraCheckIn === 'true';
+  return {
+    success: true,
+    mobileCheckIn: isMobileOn,
+    studentCameraCheckIn: isCamOn,
+    employeeCameraCheckIn: isEmpCamOn
+  };
 }
 
 // Save a setting

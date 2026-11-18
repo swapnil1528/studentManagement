@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { actionLeaveRequest, saveNotice } from '../../services/api';
+import { actionLeaveRequest, saveNotice, apiCall } from '../../services/api';
+import { showToast } from '../ui/Toast';
 
 export default function MobileAdminPortal({ adminData, branch, onReload }) {
     const { user, logout } = useAuth();
@@ -20,6 +21,51 @@ export default function MobileAdminPortal({ adminData, branch, onReload }) {
 
     // Leave action state
     const [actioningLeaveId, setActioningLeaveId] = useState(null);
+
+    // System settings state
+    const [mobileCheckIn, setMobileCheckIn] = useState(false);
+    const [studentCamera, setStudentCamera] = useState(false);
+    const [employeeCamera, setEmployeeCamera] = useState(false);
+    const [settingsLoading, setSettingsLoading] = useState(true);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            setSettingsLoading(true);
+            try {
+                const res = await apiCall('getSettings', {});
+                if (active && res?.success) {
+                    setMobileCheckIn(res.mobileCheckIn === true || res.mobileCheckIn === 'true');
+                    setStudentCamera(res.studentCameraCheckIn === true || res.studentCameraCheckIn === 'true');
+                    if (res.employeeCameraCheckIn !== undefined) {
+                        const empCamVal = res.employeeCameraCheckIn === true || res.employeeCameraCheckIn === 'true';
+                        setEmployeeCamera(empCamVal);
+                        try { localStorage.setItem('erp_employee_camera_checkin', String(empCamVal)); } catch (e) {}
+                    } else {
+                        try { setEmployeeCamera(localStorage.getItem('erp_employee_camera_checkin') === 'true'); } catch (e) {}
+                    }
+                }
+            } finally {
+                if (active) setSettingsLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, []);
+
+    const toggleSetting = async (key, currentVal, setter, label) => {
+        const nextVal = !currentVal;
+        setter(nextVal);
+        const res = await apiCall('saveSetting', { key, value: nextVal ? 'true' : 'false' });
+        if (res?.success) {
+            if (key === 'employeeCameraCheckIn') {
+                try { localStorage.setItem('erp_employee_camera_checkin', String(nextVal)); } catch (e) {}
+            }
+            showToast(`${label} ${nextVal ? 'ON' : 'OFF'}`);
+        } else {
+            setter(currentVal);
+            showToast('Failed to save setting');
+        }
+    };
 
     // Compute stats
     const stats = useMemo(() => {
@@ -339,6 +385,62 @@ export default function MobileAdminPortal({ adminData, branch, onReload }) {
                             <h4 className="text-xs font-bold text-white">WhatsApp Hub</h4>
                             <p className="text-[10px] text-[#94A3B8]">Chat with students & staff</p>
                         </div>
+                    </div>
+                </div>
+
+                {/* System Settings Card */}
+                <div className="px-4 pb-6">
+                    <div className="bg-[#131B2E] border border-[#1F293D] rounded-[22px] p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-extrabold text-white">⚙️ Attendance Settings</h4>
+                            {settingsLoading && <span className="text-[10px] text-[#64748B]">Loading...</span>}
+                        </div>
+
+                        {[
+                            {
+                                key: 'mobileCheckIn',
+                                title: 'Mobile Check-In',
+                                desc: 'Allow check-in from mobile devices',
+                                value: mobileCheckIn,
+                                setter: setMobileCheckIn,
+                            },
+                            {
+                                key: 'studentCameraCheckIn',
+                                title: 'Student Camera Enforcement',
+                                desc: 'Require live photo for student check-in',
+                                value: studentCamera,
+                                setter: setStudentCamera,
+                            },
+                            {
+                                key: 'employeeCameraCheckIn',
+                                title: 'Employee Camera Enforcement',
+                                desc: 'Require live photo for employee check-in/out',
+                                value: employeeCamera,
+                                setter: setEmployeeCamera,
+                            },
+                        ].map((item) => (
+                            <div
+                                key={item.key}
+                                className="flex items-center justify-between gap-3 bg-[#0B0F19] border border-[#1F293D] rounded-xl px-3.5 py-2.5"
+                            >
+                                <div className="min-w-0">
+                                    <div className="text-xs font-bold text-white truncate">{item.title}</div>
+                                    <div className="text-[10px] text-[#94A3B8] truncate">{item.desc}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={settingsLoading}
+                                    onClick={() => toggleSetting(item.key, item.value, item.setter, item.title)}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold shrink-0 transition-all ${
+                                        item.value
+                                            ? 'bg-[#10B981] text-white shadow-sm shadow-emerald-500/30'
+                                            : 'bg-[#1F293D] text-[#94A3B8]'
+                                    }`}
+                                >
+                                    {settingsLoading ? '...' : item.value ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

@@ -70,6 +70,17 @@ function DesktopEmployeePortal({ portalData, onReload }) {
         enabled: !!user,
     });
 
+    const { data: settings } = useQuery({
+        queryKey: ['settings'],
+        queryFn: () => apiCall('getSettings', {}),
+        enabled: !!user,
+        refetchOnMount: 'always',
+    });
+
+    const employeeCameraRequired = settings?.success && settings.employeeCameraCheckIn !== undefined
+        ? (settings.employeeCameraCheckIn === true || settings.employeeCameraCheckIn === 'true')
+        : (() => { try { return localStorage.getItem('erp_employee_camera_checkin') === 'true'; } catch { return false; } })();
+
     const data = result && !result.error ? result : null;
 
     // Leave form state
@@ -100,45 +111,53 @@ function DesktopEmployeePortal({ portalData, onReload }) {
     const [showCamera, setShowCamera] = useState(false);
     const [attTypePending, setAttTypePending] = useState(''); // 'Check-In' or 'Check-Out'
 
-    // Open camera modal instead of direct API call
+    // Open camera modal only if camera enforcement is ON; otherwise submit directly
     const initiateAttendance = (type) => {
         setAttTypePending(type);
-        setShowCamera(true);
+        if (employeeCameraRequired) {
+            setShowCamera(true);
+        } else {
+            submitEmployeeAttendance(type, '');
+        }
     };
 
-    const handleAttendance = async (photoBase64) => {
+    const submitEmployeeAttendance = (type, photoBase64) => {
         setShowCamera(false);
         setMarking(true);
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
-                const result = await apiCall('markEmployeeAtt', {
+                const res = await apiCall('markEmployeeAtt', {
                     id: user.userId,
-                    type: attTypePending,
+                    type,
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     photo: photoBase64
                 });
-                if (result?.error) alert(result.error);
-                else { showToast(`${attTypePending} Successful`); loadData(); }
+                if (res?.error) alert(res.error);
+                else { showToast(`${type} Successful`); loadData(); }
                 setMarking(false);
             },
             () => {
                 // Fallback if no location
-                submitAttendanceFallback(photoBase64);
+                submitAttendanceFallback(type, photoBase64);
             }
         );
     };
 
-    const submitAttendanceFallback = async (photoBase64) => {
-        const result = await apiCall('markEmployeeAtt', {
+    const handleAttendance = async (photoBase64) => {
+        submitEmployeeAttendance(attTypePending, photoBase64);
+    };
+
+    const submitAttendanceFallback = async (type, photoBase64) => {
+        const res = await apiCall('markEmployeeAtt', {
             id: user.userId,
-            type: attTypePending,
+            type,
             lat: null,
             lng: null,
             photo: photoBase64
         });
-        if (result?.error) alert(result.error);
-        else { showToast(`${attTypePending} Successful`); loadData(); }
+        if (res?.error) alert(res.error);
+        else { showToast(`${type} Successful`); loadData(); }
         setMarking(false);
     };
 
@@ -190,7 +209,7 @@ function DesktopEmployeePortal({ portalData, onReload }) {
                                     onClick={() => initiateAttendance('Check-In')}
                                     disabled={marking}
                                 >
-                                    <i className="fas fa-sign-in-alt mr-2" /> {marking ? 'Wait...' : 'Check In (Camera)'}
+                                    <i className="fas fa-sign-in-alt mr-2" /> {marking ? 'Wait...' : employeeCameraRequired ? 'Check In (Camera)' : 'Check In'}
                                 </button>
                             )}
                             {todayStatus === 'Check-In' && (
@@ -199,7 +218,7 @@ function DesktopEmployeePortal({ portalData, onReload }) {
                                     onClick={() => initiateAttendance('Check-Out')}
                                     disabled={marking}
                                 >
-                                    <i className="fas fa-sign-out-alt mr-2" /> {marking ? 'Wait...' : 'Check Out (Camera)'}
+                                    <i className="fas fa-sign-out-alt mr-2" /> {marking ? 'Wait...' : employeeCameraRequired ? 'Check Out (Camera)' : 'Check Out'}
                                 </button>
                             )}
                         </div>
