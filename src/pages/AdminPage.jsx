@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { fetchAdminData } from '../services/api';
 import { setLoading } from '../components/ui/LoadingBar';
 import AdminLayout from '../components/layout/AdminLayout';
+import useDeviceMode from '../components/mobile/useDeviceMode';
+import MobileAdminPortal from '../components/mobile/MobileAdminPortal';
 
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const getCacheKey = (branch) => `erp_admin_cache_${(branch || 'all').toLowerCase()}`;
@@ -43,6 +45,7 @@ function setCachedData(data, branch) {
 }
 
 export default function AdminPage() {
+    const { isMobile } = useDeviceMode();
     const { user } = useAuth();
     const branch = (user?.role === 'admin' || !user?.branch) ? 'All' : user.branch;
     const cached = getCachedData(branch);
@@ -115,7 +118,11 @@ export default function AdminPage() {
                     🔄 Refreshing...
                 </div>
             )}
-            <AdminLayout adminData={adminData || EMPTY_DATA} onReload={() => loadData(true)} />
+            {isMobile ? (
+                <MobileAdminPortal adminData={adminData || EMPTY_DATA} branch={branch} onReload={() => loadData(true)} />
+            ) : (
+                <AdminLayout adminData={adminData || EMPTY_DATA} onReload={() => loadData(true)} />
+            )}
         </>
     );
 }

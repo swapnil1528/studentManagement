@@ -351,8 +351,11 @@ fun LoginScreen(
                                         val user = json.optString("username", username.trim())
                                         val studId = json.optString("studentId", json.optString("userId", user))
                                         val branch = json.optString("branch", "Devichapada")
+                                        val name = json.optString("name", user)
+                                        val photo = json.optString("photo", "")
+                                        val batch = json.optString("batch", "")
 
-                                        val finalRole = if (rawRole.contains("admin") || rawRole.contains("employee") || rawRole.contains("teacher")) "admin" else "student"
+                                        val finalRole = if (rawRole.contains("admin") || rawRole.contains("employee") || rawRole.contains("teacher") || rawRole.contains("staff") || rawRole.contains("faculty")) "admin" else "student"
 
                                         if (saveCredentials) {
                                             prefs.edit()
@@ -361,12 +364,18 @@ fun LoginScreen(
                                                 .putString("saved_role", finalRole)
                                                 .putString("saved_studentid", studId)
                                                 .putString("saved_branch", branch)
+                                                .putString("saved_name", name)
+                                                .putString("saved_photo", photo)
+                                                .putString("saved_batch", batch)
                                                 .putBoolean("save_enabled", true)
                                                 .apply()
                                         } else {
                                             prefs.edit()
                                                 .remove("saved_password")
                                                 .remove("saved_studentid")
+                                                .remove("saved_name")
+                                                .remove("saved_photo")
+                                                .remove("saved_batch")
                                                 .putBoolean("save_enabled", false)
                                                 .apply()
                                         }

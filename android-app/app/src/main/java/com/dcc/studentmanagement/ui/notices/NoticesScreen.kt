@@ -51,7 +51,9 @@ fun NoticesScreen(
     fun refreshNotices() {
         isLoading = true
         scope.launch {
-            val res = GasApiClient.getStudentData(studentId)
+            val roleLower = role.lowercase()
+            val targetRole = if (roleLower.contains("admin") || roleLower.contains("employee") || roleLower.contains("teacher") || roleLower.contains("staff") || roleLower.contains("faculty")) "all" else "student"
+            val res = GasApiClient.getNotices(targetRole, branch)
             res.onSuccess { json ->
                 val arr = json.optJSONArray("notices") ?: JSONArray()
                 val list = mutableListOf<NoticeItem>()

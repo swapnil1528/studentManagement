@@ -29,7 +29,15 @@ sealed class ScreenDestination {
     data class AdminStudents(val branch: String) : ScreenDestination()
 
     // STUDENT PAGES
-    data class StudentDashboard(val role: String, val username: String, val studentId: String) : ScreenDestination()
+    data class StudentDashboard(
+        val role: String,
+        val username: String,
+        val studentId: String,
+        val branch: String,
+        val name: String = "",
+        val photo: String = ""
+    ) : ScreenDestination()
+
     data class Attendance(val studentId: String, val branch: String) : ScreenDestination()
     data class Fees(val studentId: String) : ScreenDestination()
     data class Chat(val userId: String, val userRole: String, val userName: String, val branch: String) : ScreenDestination()
@@ -50,12 +58,22 @@ fun AppNavigation() {
         val savedUser = prefs.getString("saved_username", null)
         val savedStudId = prefs.getString("saved_studentid", savedUser)
         val savedBranch = prefs.getString("saved_branch", "Devichapada") ?: "Devichapada"
+        val savedName = prefs.getString("saved_name", "") ?: ""
+        val savedPhoto = prefs.getString("saved_photo", "") ?: ""
 
         if (saveEnabled && !savedRole.isNullOrBlank() && !savedUser.isNullOrBlank()) {
-            if (savedRole.equals("admin", ignoreCase = true) || savedRole.equals("employee", ignoreCase = true) || savedRole.equals("teacher", ignoreCase = true)) {
+            val roleLower = savedRole.lowercase()
+            if (roleLower.contains("admin") || roleLower.contains("super") || roleLower.contains("manager") || roleLower.contains("faculty") || roleLower.contains("teacher") || roleLower.contains("staff") || roleLower.contains("employee")) {
                 ScreenDestination.AdminDashboard(username = savedUser, branch = savedBranch)
             } else {
-                ScreenDestination.StudentDashboard(role = savedRole, username = savedUser, studentId = savedStudId ?: savedUser)
+                ScreenDestination.StudentDashboard(
+                    role = savedRole,
+                    username = savedUser,
+                    studentId = savedStudId ?: savedUser,
+                    branch = savedBranch,
+                    name = savedName,
+                    photo = savedPhoto
+                )
             }
         } else {
             ScreenDestination.Login
@@ -74,6 +92,8 @@ fun AppNavigation() {
             .remove("saved_role")
             .remove("saved_password")
             .remove("saved_studentid")
+            .remove("saved_name")
+            .remove("saved_photo")
             .putBoolean("save_enabled", false)
             .apply()
         backStack.clear()
@@ -93,18 +113,30 @@ fun AppNavigation() {
                 LoginScreen(
                     onLoginSuccess = { role, user, studentId, branch ->
                         backStack.clear()
-                        if (role.equals("admin", true) || role.equals("employee", true) || role.equals("teacher", true)) {
+                        val roleLower = role.lowercase()
+                        if (roleLower.contains("admin") || roleLower.contains("super") || roleLower.contains("manager") || roleLower.contains("faculty") || roleLower.contains("teacher") || roleLower.contains("staff") || roleLower.contains("employee")) {
                             backStack.add(ScreenDestination.AdminDashboard(username = user, branch = branch))
                         } else {
-                            backStack.add(ScreenDestination.StudentDashboard(role = role, username = user, studentId = studentId))
+                            val savedName = prefs.getString("saved_name", user) ?: user
+                            val savedPhoto = prefs.getString("saved_photo", "") ?: ""
+                            backStack.add(
+                                ScreenDestination.StudentDashboard(
+                                    role = role,
+                                    username = user,
+                                    studentId = studentId,
+                                    branch = branch,
+                                    name = savedName,
+                                    photo = savedPhoto
+                                )
+                            )
                         }
                     }
                 )
             }
 
-            // ════════════════════════════════════════════════════════════
+            // ========================================================
             // ADMIN EXECUTIVE DESTINATIONS
-            // ════════════════════════════════════════════════════════════
+            // ========================================================
             is ScreenDestination.AdminDashboard -> {
                 AdminDashboardScreen(
                     username = dest.username,
@@ -170,16 +202,19 @@ fun AppNavigation() {
                 )
             }
 
-            // ════════════════════════════════════════════════════════════
+            // ========================================================
             // STUDENT DESTINATIONS
-            // ════════════════════════════════════════════════════════════
+            // ========================================================
             is ScreenDestination.StudentDashboard -> {
                 DashboardScreen(
                     role = dest.role,
                     username = dest.username,
                     studentId = dest.studentId,
+                    branch = dest.branch,
+                    initialName = dest.name,
+                    initialPhoto = dest.photo,
                     onNavigateToAttendance = {
-                        backStack.add(ScreenDestination.Attendance(studentId = dest.studentId, branch = "Devichapada"))
+                        backStack.add(ScreenDestination.Attendance(studentId = dest.studentId, branch = dest.branch))
                     },
                     onNavigateToFees = {
                         backStack.add(ScreenDestination.Fees(studentId = dest.studentId))
@@ -188,9 +223,9 @@ fun AppNavigation() {
                         backStack.add(
                             ScreenDestination.Chat(
                                 userId = dest.studentId,
-                                userRole = dest.role,
-                                userName = dest.username,
-                                branch = "Devichapada"
+                                userRole = "student",
+                                userName = dest.name.ifBlank { dest.username },
+                                branch = dest.branch
                             )
                         )
                     },
@@ -198,8 +233,8 @@ fun AppNavigation() {
                         backStack.add(
                             ScreenDestination.Notices(
                                 studentId = dest.studentId,
-                                role = dest.role,
-                                branch = "Devichapada"
+                                role = "student",
+                                branch = dest.branch
                             )
                         )
                     },

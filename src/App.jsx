@@ -86,7 +86,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
   if (allowedRoles && !roles.includes(user?.role)) {
     if (user?.role === 'student') return <Navigate to="/student" replace />;
-    if (user?.role === 'employee') return <Navigate to="/admin" replace />;
+    if (user?.role === 'employee') return <Navigate to="/employee" replace />;
     return <Navigate to="/admin" replace />;
   }
 
@@ -112,7 +112,7 @@ function RootRedirect() {
 function GlobalNotificationWatcher() {
   const { user, isAuthenticated } = useAuth();
   React.useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user || user.role === 'employee') return;
     const cleanup = startAdminMessageWatcher({
       role: user.role,
       studentId: user.studentId || user.userId,
@@ -140,7 +140,7 @@ export default function App() {
           <Route
             path="/admin/*"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'employee', 'teacher']}>
+              <ProtectedRoute allowedRoles={['admin', 'teacher']}>
                 <AdminPage />
               </ProtectedRoute>
             }

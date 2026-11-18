@@ -331,8 +331,7 @@ fun FeesScreen(
                                         fontSize = 13.sp,
                                         color = BrandLight
                                     )
-                                    Text(
-                                        text = rec.course + " • " + rec.date,
+                                    Text(text = rec.course + " • " + rec.date,
                                         fontSize = 12.sp,
                                         color = TextMuted
                                     )

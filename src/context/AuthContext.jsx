@@ -31,7 +31,11 @@ export function AuthProvider({ children }) {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) {
-                setUser(JSON.parse(stored));
+                const parsed = JSON.parse(stored);
+                if (parsed && parsed.role) {
+                    parsed.role = String(parsed.role).trim().toLowerCase();
+                }
+                setUser(parsed);
             }
         } catch (e) {
             console.error('[Auth] Failed to restore session:', e);
@@ -86,8 +90,8 @@ export function AuthProvider({ children }) {
 
         if (result && result.success) {
             // Handle different field name conventions from backend
-            // Normalize role to lowercase (sheet may have 'Admin', 'Student', etc.)
-            const rawRole = (result.role || 'admin').toLowerCase();
+            // Normalize role to lowercase (sheet may have 'Admin', 'Student', 'Employee', etc.)
+            const rawRole = String(result.role || 'admin').trim().toLowerCase();
             const resolvedStudentId = result.studentId || result.studId || result.userId || result.id || (rawRole === 'student' ? (result.username || username || 'ST-2026-1001') : '');
             const userData = {
                 username: result.username || result.user || username,
@@ -108,7 +112,7 @@ export function AuthProvider({ children }) {
                 sessionStorage.removeItem(`fee_reminder_closed_${userData.userId}`);
                 sessionStorage.removeItem('fee_reminder_closed_student');
             } catch (e) {}
-            return { success: true };
+            return { success: true, role: rawRole, branch: userData.branch, user: userData };
         }
         return { success: false, error: result?.error || (result === null ? 'Unable to connect to server. Please check your internet connection.' : 'Invalid username or password. Please verify your credentials.') };
     };

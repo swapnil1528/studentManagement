@@ -85,17 +85,30 @@ fun AdminAttendanceScreen(
                 val rawAtt = json.optJSONArray("_rawAttendance") ?: json.optJSONArray("attendance") ?: JSONArray()
                 val sList = mutableListOf<AdminStudentAttRecord>()
                 for (i in 0 until rawAtt.length()) {
-                    val r = rawAtt.optJSONArray(i)
-                    if (r != null) {
+                    val obj = rawAtt.optJSONObject(i)
+                    if (obj != null) {
                         sList.add(
                             AdminStudentAttRecord(
-                                studId = r.optString(1, ""),
-                                name = r.optString(2, "Student"),
-                                status = r.optString(4, "Present"),
-                                time = r.optString(0, ""),
-                                branch = r.optString(3, branch)
+                                studId = obj.optString("id", ""),
+                                name = obj.optString("name", "Student"),
+                                status = obj.optString("status", "Present"),
+                                time = obj.optString("date", ""),
+                                branch = obj.optString("branch", branch)
                             )
                         )
+                    } else {
+                        val r = rawAtt.optJSONArray(i)
+                        if (r != null) {
+                            sList.add(
+                                AdminStudentAttRecord(
+                                    studId = r.optString(1, ""),
+                                    name = r.optString(2, "Student"),
+                                    status = r.optString(4, "Present"),
+                                    time = r.optString(0, ""),
+                                    branch = r.optString(3, branch)
+                                )
+                            )
+                        }
                     }
                 }
                 studentAttendanceList = sList

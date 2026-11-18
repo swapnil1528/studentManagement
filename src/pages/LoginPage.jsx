@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { motion } from 'framer-motion';
+import useDeviceMode from '../components/mobile/useDeviceMode';
+import MobileLogin from '../components/mobile/MobileLogin';
 
 const QUOTES = [
     "Knowledge is your superpower ⚡",
@@ -17,6 +19,14 @@ const QUOTES = [
 ];
 
 export default function LoginPage() {
+    const { isMobile } = useDeviceMode();
+    if (isMobile) {
+        return <MobileLogin />;
+    }
+    return <DesktopLogin />;
+}
+
+function DesktopLogin() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPass, setShowPass] = useState(false);

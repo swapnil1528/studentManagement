@@ -24,6 +24,8 @@ import PortalLayout from '../../components/layout/PortalLayout';
 import AttendanceView from '../../components/AttendanceView';
 import CameraCapture from '../../components/CameraCapture';
 import ArticulatePlayerModal from './components/ArticulatePlayerModal';
+import useDeviceMode from '../../components/mobile/useDeviceMode';
+import MobileStudentPortal from '../../components/mobile/MobileStudentPortal';
 
 const isMobileDevice = () =>
     /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -98,6 +100,10 @@ const getFileIcon = (mimeType, fileName) => {
 const STUDENT_TABS = ['overview', 'attendance', 'fees', 'classroom', 'quizzes', 'results', 'schedule', 'grades', 'notices', 'logs'];
 
 export default function StudentPortal() {
+    const { isMobile: isMobileMode } = useDeviceMode();
+    if (isMobileMode) {
+        return <MobileStudentPortal />;
+    }
     const { user, logout } = useAuth();
     const { isDark, toggleTheme } = useTheme();
 

@@ -18,6 +18,47 @@ function ensureSheet(name, headers) {
   return sheet;
 }
 
+
+// ============================================
+// GAS HIGH-SPEED CACHING SERVICE
+// ============================================
+function getFromGasCache(key) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const str = cache ? cache.get(key) : null;
+    if (str) return JSON.parse(str);
+  } catch (e) {}
+  return null;
+}
+
+function putInGasCache(key, data, ttlSeconds) {
+  try {
+    const cache = CacheService.getScriptCache();
+    if (!cache) return;
+    const str = JSON.stringify(data);
+    // Google Apps Script limit per cache entry is 100KB (102,400 bytes)
+    if (str.length < 95000) {
+      cache.put(key, str, ttlSeconds || 180);
+    }
+  } catch (e) {}
+}
+
+function invalidateGasCache(prefix) {
+  try {
+    const cache = CacheService.getScriptCache();
+    if (!cache) return;
+    cache.remove("admin_data_all");
+    cache.remove("all_course_fees");
+    if (prefix) {
+      const p = String(prefix).toLowerCase().trim();
+      cache.remove("admin_data_" + p);
+      cache.remove("student_data_" + p);
+      cache.remove("student_fees_" + p);
+      cache.remove("notices_" + p);
+    }
+  } catch (e) {}
+}
+
 // ============================================
 // MAIN REQUEST HANDLER
 // ============================================
@@ -94,6 +135,9 @@ function doPost(e) {
     else if(act==='saveSetting') res = saveSetting(d.key, d.value);
     else if(act==='checkMobileAllowed') res = checkMobileAllowed();
 
+    // --- NOTICES ---
+    else if(act==='getNotices') res = { success: true, notices: getNotices(d.role || 'all') };
+
     // --- CHAT & COMMUNITY SESSIONS (WHATSAPP-STYLE) ---
     else if(act==='getChatConversations') res = getChatConversations(d.userId, d.userRole, d.userName, d.branch);
     else if(act==='getChatMessages') res = getChatMessages(d.conversationId, d.userId, d.limit);
@@ -102,6 +146,12 @@ function doPost(e) {
     else if(act==='starChatMessage') res = starChatMessage(d.messageId, d.userId, d.isStarred);
     else if(act==='createChatGroup') res = createChatGroup(d.group);
     else if(act==='uploadChatMedia') res = uploadChatMedia(d.fileData, d.fileName, d.mimeType, d.senderId);
+
+    // Invalidate server cache if a mutating action occurred
+    const mutActs = ['saveInq','updateInq','deleteInq','regStudent','saveAdm','updateReg','deleteReg','updateAdm','deleteAdm','saveFee','saveAtt','saveNotice','addEmployee','reqLeave','actionLeave','savePayroll','markStudentAtt','markEmployeeAtt'];
+    if (mutActs.includes(act)) {
+      invalidateGasCache(d.branch || (d.form && d.form.branch) || d.id || '');
+    }
 
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
   } catch(e) {
@@ -151,6 +201,11 @@ function checkLogin(u, p) {
 // ADMIN DATA LOADING
 // ============================================
 function fetchAllAdminData(b) { 
+  const branchKey = String(b || 'all').toLowerCase().trim();
+  const cacheKey = "admin_data_" + branchKey;
+  const cached = getFromGasCache(cacheKey);
+  if (cached) return cached;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const getD = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : []; 
   const check = (v, t) => String(t).toLowerCase() === "all" ? true : String(v).trim().toLowerCase() === String(t).trim().toLowerCase(); 
@@ -167,10 +222,12 @@ function fetchAllAdminData(b) {
     .map((r, i) => { r[0] = i + 2; return r; })
     .filter(r => check(r[6], b));   // r[6] = Branch
   const activeStudents = adm.filter(r => r[11] === "Active");  // r[11] = Status
+  const admStudIds = new Set(adm.map(r => String(r[2]).trim().toLowerCase()));
   
-  // Attendance Stats
+  // Attendance Stats filtered by branch students
   const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd"); 
-  const allAtt = getD("Attendance");
+  const allAttRaw = getD("Attendance");
+  const allAtt = check(b, "all") ? allAttRaw : allAttRaw.filter(r => admStudIds.has(String(r[1]).trim().toLowerCase()));
   const todayAtt = allAtt.filter(r => {
     let d = r[0];
     let dStr = (Object.prototype.toString.call(d) === '[object Date]') ? Utilities.formatDate(d, "GMT+5:30", "yyyy-MM-dd") : String(d).substring(0, 10);
@@ -252,13 +309,16 @@ function fetchAllAdminData(b) {
     }];
   }
 
-  return { 
+  const allFees = getD("FEE MANAGEMENT");
+  const fees = check(b, "all") ? allFees : allFees.filter(r => admStudIds.has(String(r[2]).trim().toLowerCase()));
+
+  const result = { 
     inquiries: inq, 
     registrations: getD("Registration Data")
       .map((r, i) => { r[0] = i + 2; return r; })
       .filter(r => check(r[8], b)),  // r[8] = Branch
     admissions: adm, 
-    fees: getD("FEE MANAGEMENT"), 
+    fees: fees, 
     franchises: franchises,
     employees: employees.map(e => ({ id: e[1], name: e[2], role: e[3], mobile: e[4], salary: e[5], branch: String(e[6] || '') })),
     leaves: leaves.map(l => ({ id: l[0], empId: l[2], name: l[3], type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), to: Utilities.formatDate(new Date(l[6]), "GMT+5:30", "dd-MMM"), reason: l[7] })),
@@ -276,8 +336,11 @@ function fetchAllAdminData(b) {
     activeStudents: activeStudents.map(r => ({ id: r[2], name: r[3], course: r[7], batch: r[8], photo: r[12] })), 
     stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) },
     _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] })),
-    empAttendance: empAtt.map(r => ({ time: r[0], empId: String(r[1]), name: r[2], status: r[3], loc: r[4], dist: r[5], date: r[6] }))
+    empAttendance: empAtt.map(r => ({ time: r[0], empId: String(r[1]), name: r[2], status: r[3], loc: r[4], dist: r[5], date: r[6] })),
+    notices: getNotices('Employee')
   };
+  putInGasCache(cacheKey, result, 180);
+  return result;
 }
 
 // ============================================
@@ -372,11 +435,17 @@ function getStudentFeesData(id, ad, studentBranch) {
 }
 
 function getStudentFees(id) {
+  const cacheKey = "student_fees_" + String(id).toLowerCase().trim();
+  const cached = getFromGasCache(cacheKey);
+  if (cached) return cached;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
   const ad = safeGet("Admission Data").filter(r => String(r[2]).trim().toLowerCase() === String(id).trim().toLowerCase());
   const studentBranch = ad[0] ? (ad[0][6] || ad[0][5] || "") : "";
-  return { success: true, ...getStudentFeesData(id, ad, studentBranch) };
+  const result = { success: true, ...getStudentFeesData(id, ad, studentBranch) };
+  putInGasCache(cacheKey, result, 120);
+  return result;
 }
 
 function getStudentBasic(id) {
@@ -444,7 +513,7 @@ function getStudentBasic(id) {
   const attLogs = att.map(r => ({ time: r[0], status: r[4], location: r[6] || "N/A", distance: r[7] || "N/A" })).reverse();
   const recentLogs = attLogs.slice(0, 6);
   
-  return { 
+  const resultData = { 
     profile: { name: ad[0] ? ad[0][3] : "Student", id: id, photo: ad[0] ? ad[0][12] : "", batch: ad[0] ? ad[0][8] : "", branch: studentBranch, hasFace: true }, 
     franchise: franchiseInfo,
     courses: cs, 
@@ -465,9 +534,15 @@ function getStudentExtra(id, cs) {
     notices: getNotices('Student'),
     topics: getTopicsList(cs)
   };
+  putInGasCache(cacheKey, resultData, 120);
+  return resultData;
 }
 
 function getStudentPortalData(id) {
+  const cacheKey = "student_data_" + String(id).toLowerCase().trim();
+  const cached = getFromGasCache(cacheKey);
+  if (cached) return cached;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const safeGet = (n) => ss.getSheetByName(n) ? ss.getSheetByName(n).getDataRange().getValues().slice(1) : [];
   

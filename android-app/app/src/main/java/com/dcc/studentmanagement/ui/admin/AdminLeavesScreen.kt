@@ -52,20 +52,36 @@ fun AdminLeavesScreen(
                 val arr = json.optJSONArray("leaves") ?: JSONArray()
                 val list = mutableListOf<AdminLeaveItem>()
                 for (i in 0 until arr.length()) {
-                    val l = arr.optJSONArray(i)
-                    if (l != null) {
+                    val obj = arr.optJSONObject(i)
+                    if (obj != null) {
                         list.add(
                             AdminLeaveItem(
-                                id = l.optString(0, ""),
-                                empId = l.optString(1, ""),
-                                name = l.optString(2, "Staff Member"),
-                                type = l.optString(4, "Leave"),
-                                fromDate = l.optString(5, ""),
-                                toDate = l.optString(6, ""),
-                                reason = l.optString(7, ""),
-                                status = l.optString(8, "Pending")
+                                id = obj.optString("id", ""),
+                                empId = obj.optString("empId", ""),
+                                name = obj.optString("name", "Staff Member"),
+                                type = obj.optString("type", "Leave"),
+                                fromDate = obj.optString("from", obj.optString("fromDate", "")),
+                                toDate = obj.optString("to", obj.optString("toDate", "")),
+                                reason = obj.optString("reason", ""),
+                                status = obj.optString("status", "Pending")
                             )
                         )
+                    } else {
+                        val l = arr.optJSONArray(i)
+                        if (l != null) {
+                            list.add(
+                                AdminLeaveItem(
+                                    id = l.optString(0, ""),
+                                    empId = l.optString(1, ""),
+                                    name = l.optString(2, "Staff Member"),
+                                    type = l.optString(4, "Leave"),
+                                    fromDate = l.optString(5, ""),
+                                    toDate = l.optString(6, ""),
+                                    reason = l.optString(7, ""),
+                                    status = l.optString(8, "Pending")
+                                )
+                            )
+                        }
                     }
                 }
                 leaves = list

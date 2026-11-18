@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dcc.studentmanagement.data.GasApiClient
 import com.dcc.studentmanagement.theme.*
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 data class NativeActionCard(
@@ -38,6 +39,9 @@ fun DashboardScreen(
     role: String,
     username: String,
     studentId: String,
+    branch: String = "Devichapada",
+    initialName: String = "",
+    initialPhoto: String = "",
     onNavigateToAttendance: () -> Unit,
     onNavigateToFees: () -> Unit,
     onNavigateToChat: () -> Unit,
@@ -49,8 +53,8 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    var displayName by remember { mutableStateOf(username) }
-    var displayBranch by remember { mutableStateOf("Devichapada") }
+    var displayName by remember { mutableStateOf(if (initialName.isNotBlank()) initialName else username) }
+    var displayBranch by remember { mutableStateOf(branch) }
     var displayBatch by remember { mutableStateOf("") }
     var attendancePerc by remember { mutableIntStateOf(0) }
     var pendingFees by remember { mutableDoubleStateOf(0.0) }
@@ -58,12 +62,15 @@ fun DashboardScreen(
 
     LaunchedEffect(studentId) {
         scope.launch {
-            val res = GasApiClient.getStudentData(studentId)
+            val studentDataDef = async { GasApiClient.getStudentData(studentId) }
+            val feesDef = async { GasApiClient.getStudentFees(studentId) }
+
+            val res = studentDataDef.await()
             res.onSuccess { json ->
                 val prof = json.optJSONObject("profile")
                 if (prof != null) {
-                    displayName = prof.optString("name", username)
-                    displayBranch = prof.optString("branch", "Devichapada")
+                    displayName = prof.optString("name", displayName)
+                    displayBranch = prof.optString("branch", displayBranch)
                     displayBatch = prof.optString("batch", "")
                 }
                 val att = json.optJSONObject("attendance")
@@ -76,7 +83,7 @@ fun DashboardScreen(
                 }
             }
 
-            val feeRes = GasApiClient.getStudentFees(studentId)
+            val feeRes = feesDef.await()
             feeRes.onSuccess { feeJson ->
                 val summary = feeJson.optJSONObject("feeSummary")
                 if (summary != null) {
@@ -99,7 +106,7 @@ fun DashboardScreen(
             ),
             NativeActionCard(
                 id = "attendance",
-                icon = "📸",
+                icon = "📍",
                 title = "Smart Attendance",
                 subtitle = "Camera selfie & GPS check-in",
                 badge = "$attendancePerc%",
@@ -144,7 +151,7 @@ fun DashboardScreen(
             ),
             NativeActionCard(
                 id = "profile",
-                icon = "🪪",
+                icon = "👤",
                 title = "Digital Student ID",
                 subtitle = "Campus pass & credentials",
                 badge = "VERIFIED",
@@ -206,7 +213,7 @@ fun DashboardScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = studentId + " • " + displayBranch,
+                            text = "$studentId • $displayBranch",
                             fontSize = 12.sp,
                             color = TextMuted
                         )

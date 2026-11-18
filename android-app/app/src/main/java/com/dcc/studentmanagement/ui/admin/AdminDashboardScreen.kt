@@ -156,7 +156,7 @@ fun AdminDashboardScreen(
                 title = "Fees Pending",
                 value = "₹" + String.format(Locale.US, "%,.0f", totalPendingFees),
                 subtitle = "Outstanding Dues",
-                icon = "⚠️",
+                icon = "⏳",
                 color1 = Color(0xFFF43F5E),
                 color2 = Color(0xFF9F1239),
                 onClick = onNavigateToAdminPendingFees
@@ -165,7 +165,7 @@ fun AdminDashboardScreen(
                 title = "Student Attendance",
                 value = "$todayPresentStudents Present",
                 subtitle = "$todayAbsentStudents Absent Today",
-                icon = "👨‍🎓",
+                icon = "👥",
                 color1 = CyanNeon,
                 color2 = Color(0xFF0891B2),
                 onClick = onNavigateToAdminAttendance
@@ -174,7 +174,7 @@ fun AdminDashboardScreen(
                 title = "Staff Attendance",
                 value = "$todayStaffPresent / $totalStaffCount",
                 subtitle = "Employees Checked-In",
-                icon = "💼",
+                icon = "👔",
                 color1 = BrandPrimary,
                 color2 = Color(0xFF4338CA),
                 onClick = onNavigateToAdminAttendance
@@ -183,7 +183,7 @@ fun AdminDashboardScreen(
                 title = "Leave Requests",
                 value = "$pendingLeavesCount Pending",
                 subtitle = "Staff Applications",
-                icon = "🏖️",
+                icon = "📝",
                 color1 = AmberGold,
                 color2 = Color(0xFFB45309),
                 onClick = onNavigateToAdminLeaves
@@ -192,7 +192,7 @@ fun AdminDashboardScreen(
                 title = "Total Enrolled",
                 value = "$totalAdmissionsCount Students",
                 subtitle = "Active Admissions",
-                icon = "👥",
+                icon = "🎓",
                 color1 = VioletAccent,
                 color2 = Color(0xFF6D28D9),
                 onClick = onNavigateToAdminStudents

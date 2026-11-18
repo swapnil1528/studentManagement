@@ -15,6 +15,8 @@ import SalarySlip from '../../components/SalarySlip';
 import CameraCapture from '../../components/CameraCapture';
 import Modal from '../../components/ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import useDeviceMode from '../../components/mobile/useDeviceMode';
+import MobileEmployeePortal from '../../components/mobile/MobileEmployeePortal';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
@@ -27,7 +29,15 @@ const TABS = [
 
 const EMP_TABS = ['attendance', 'attview', 'logs', 'notices', 'leaves', 'payslips'];
 
-export default function EmployeePortal({ portalData, onReload }) {
+export default function EmployeePortal(props) {
+    const { isMobile } = useDeviceMode();
+    if (isMobile) {
+        return <MobileEmployeePortal {...props} />;
+    }
+    return <DesktopEmployeePortal {...props} />;
+}
+
+function DesktopEmployeePortal({ portalData, onReload }) {
     const { user, logout } = useAuth();
 
     const getInitialTab = () => {
@@ -272,7 +282,7 @@ export default function EmployeePortal({ portalData, onReload }) {
                 <div>
                     <div className="card mb-4">
                         <h3 className="font-bold mb-4">Request Leave</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <select className="inp" value={leaveForm.type} onChange={(e) => setLeaveForm((p) => ({ ...p, type: e.target.value }))}>
                                 <option>Sick Leave</option>
                                 <option>Casual Leave</option>
