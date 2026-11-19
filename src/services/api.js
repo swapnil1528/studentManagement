@@ -522,3 +522,12 @@ export const uploadChatMedia = async (file, senderId = 'user') => {
         reader.readAsDataURL(file);
     });
 };
+
+// ─── Academic Tracker (Employee Login) ──────────────────────
+/** Save academic tracking record for an employee */
+export const saveAcademicTracker = (form) =>
+    apiCall('saveAcademicTracker', { form });
+
+/** Get academic tracker logs for employee */
+export const getAcademicTrackerLogs = (empId, date = '') =>
+    apiCall('getAcademicTracker', { empId, date });

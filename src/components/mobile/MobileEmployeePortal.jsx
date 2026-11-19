@@ -5,6 +5,7 @@ import { showToast } from '../ui/Toast';
 import AttendanceView from '../AttendanceView';
 import SalarySlip from '../SalarySlip';
 import CameraCapture from '../CameraCapture';
+import AcademicTrackerForm from '../employee/AcademicTrackerForm';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function MobileEmployeePortal() {
@@ -222,6 +223,16 @@ export default function MobileEmployeePortal() {
                 gradient: 'from-[#8B5CF6] to-[#6D28D9]',
                 borderColor: 'border-[#8B5CF6]/40',
                 onClick: () => setCurrentScreen('payslips'),
+            },
+            {
+                id: 'academic',
+                title: 'Academic Tracker',
+                value: stats?.todayStatus === 'Check-Out' ? 'Unlocked 🔓' : 'Locked 🔒',
+                subtitle: 'Standard, Subject, Topic & Attendance',
+                icon: '📚',
+                gradient: 'from-[#8B5CF6] to-[#7C3AED]',
+                borderColor: 'border-[#8B5CF6]/40',
+                onClick: () => setCurrentScreen('academic'),
             },
             {
                 id: 'attview',
@@ -460,6 +471,21 @@ export default function MobileEmployeePortal() {
                             )}
                         </div>
                     </div>
+                </>
+            )}
+
+            {/* SCREEN: ACADEMIC TRACKER */}
+            {currentScreen === 'academic' && (
+                <>
+                    {renderTopBar('Academic Tracker')}
+                    <AcademicTrackerForm
+                        user={user}
+                        todayStatus={stats?.todayStatus || 'None'}
+                        isMobile={true}
+                        onGoToAttendance={() => setCurrentScreen('attendance')}
+                        recentLogs={data?.academicLogs || []}
+                        onReload={loadData}
+                    />
                 </>
             )}
 

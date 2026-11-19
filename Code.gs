@@ -105,6 +105,8 @@ function doPost(e) {
     else if(act==='markStudentAtt') res = markStudentAttendance(d.id, d.type, d.lat, d.lng, d.device, d);
     else if(act==='getEmployee') res = getEmployeePortalData(d.id);
     else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng, d.photo);
+    else if(act==='saveAcademicTracker') res = saveAcademicTracker(d.form);
+    else if(act==='getAcademicTracker') res = { success: true, logs: getAcademicTrackerLogs(d.empId, d.date) };
 
     // --- ASSIGNMENTS ---
     else if(act==='uploadAssignment') res = uploadAssignment(d.form);
@@ -744,7 +746,8 @@ function getEmployeePortalData(id) {
     allLogs: allLogs,
     leaves: myLeaves.map(l => ({ type: l[4], from: Utilities.formatDate(new Date(l[5]), "GMT+5:30", "dd-MMM"), status: l[8] })),
     payroll: myPayroll.map(p => ({ id: p[0], date: p[1], days: p[4], amount: p[5], status: p[6] })),
-    notices: getNotices('Employee')
+    notices: getNotices('Employee'),
+    academicLogs: getAcademicTrackerLogs(id)
   };
 }
 
@@ -877,6 +880,116 @@ function savePayroll(f) {
   const sheet = ensureSheet("Payroll", ["ID", "Date", "Emp ID", "Name", "Days Present", "Salary Amount", "Status"]);
   sheet.appendRow(["PAY-" + Date.now(), f.date, f.empId, f.name, f.days, f.amount, "Paid"]);
   return { success: true };
+}
+
+// ============================================
+// ACADEMIC TRACKER
+// ============================================
+function saveAcademicTracker(f) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const empId = f.empId || f.employeeId;
+  if (!empId) return { error: "Employee ID is required" };
+
+  // Check-out must be completed for today before submitting academic tracking
+  const attSheet = ss.getSheetByName("Employee Attendance");
+  const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd");
+  const attData = (attSheet && attSheet.getLastRow() > 1) ? attSheet.getDataRange().getValues().slice(1) : [];
+
+  let hasCheckedOutToday = false;
+  for (let i = 0; i < attData.length; i++) {
+    const row = attData[i];
+    if (String(row[1]) === String(empId)) {
+      let rDate = row[6] || row[0];
+      let rDateStr = (rDate instanceof Date) ? Utilities.formatDate(rDate, "GMT+5:30", "yyyy-MM-dd") : String(rDate).substring(0, 10);
+      if (rDateStr === todayStr) {
+        const rType = String(row[3] || '').trim().toLowerCase();
+        if (rType.includes('out')) hasCheckedOutToday = true;
+      }
+    }
+  }
+
+  if (!hasCheckedOutToday) {
+    return { error: "Check-out must be completed before you can submit today's academic report." };
+  }
+
+  const trackerSheet = ensureSheet("AcadmicTracker", [
+    "Timestamp", "ID", "Date", "Emp ID", "Emp Name", "Branch", 
+    "Standard", "Subject", "Topic", "Batch", "Present", "Absent", 
+    "Total", "Attendance Rate", "Teaching Mode", "Homework", "Absent Students", "Remarks"
+  ]);
+
+  const timestamp = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
+  const recordId = "ACAD-" + Date.now();
+  const dateVal = f.date || todayStr;
+  const present = Number(f.present !== undefined ? f.present : (f.presentCount || 0));
+  const absent = Number(f.absent !== undefined ? f.absent : (f.absentCount || 0));
+  const total = present + absent;
+  const attRate = total > 0 ? Math.round((present / total) * 100) + "%" : "0%";
+
+  trackerSheet.appendRow([
+    timestamp,
+    recordId,
+    dateVal,
+    empId,
+    f.empName || f.employeeName || "",
+    f.branch || "",
+    f.standard || "",
+    f.subject || "",
+    f.topic || "",
+    f.batch || "",
+    present,
+    absent,
+    total,
+    attRate,
+    f.teachingMode || "Theory",
+    f.homework || "",
+    f.absentStudents || "",
+    f.remarks || ""
+  ]);
+
+  return { 
+    success: true, 
+    id: recordId, 
+    message: "Academic tracking record saved successfully to AcadmicTracker!" 
+  };
+}
+
+function getAcademicTrackerLogs(empId, dateFilter) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("AcadmicTracker");
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const rows = sheet.getDataRange().getValues().slice(1);
+  return rows
+    .filter(r => {
+      const matchEmp = !empId || String(r[3]) === String(empId);
+      if (!matchEmp) return false;
+      if (dateFilter) {
+        let rDate = r[2] instanceof Date ? Utilities.formatDate(r[2], "GMT+5:30", "yyyy-MM-dd") : String(r[2]).substring(0, 10);
+        return rDate === dateFilter;
+      }
+      return true;
+    })
+    .map(r => ({
+      timestamp: r[0],
+      id: r[1],
+      date: r[2] instanceof Date ? Utilities.formatDate(r[2], "GMT+5:30", "yyyy-MM-dd") : String(r[2]),
+      empId: r[3],
+      empName: r[4],
+      branch: r[5],
+      standard: r[6],
+      subject: r[7],
+      topic: r[8],
+      batch: r[9],
+      present: r[10],
+      absent: r[11],
+      total: r[12],
+      attRate: r[13],
+      teachingMode: r[14],
+      homework: r[15],
+      absentStudents: r[16],
+      remarks: r[17]
+    }))
+    .reverse();
 }
 
 // ============================================

@@ -17,9 +17,11 @@ import Modal from '../../components/ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import useDeviceMode from '../../components/mobile/useDeviceMode';
 import MobileEmployeePortal from '../../components/mobile/MobileEmployeePortal';
+import AcademicTrackerForm from '../../components/employee/AcademicTrackerForm';
 
 const TABS = [
     { id: 'attendance', label: 'Attendance', emoji: '📍' },
+    { id: 'academic', label: 'Academic Tracker', emoji: '📚' },
     { id: 'attview', label: 'Attendance View', emoji: '📊' },
     { id: 'logs', label: 'Logs', emoji: '📋' },
     { id: 'notices', label: 'Notices', emoji: '📢' },
@@ -27,7 +29,7 @@ const TABS = [
     { id: 'payslips', label: 'Payslips', emoji: '💰' },
 ];
 
-const EMP_TABS = ['attendance', 'attview', 'logs', 'notices', 'leaves', 'payslips'];
+const EMP_TABS = ['attendance', 'academic', 'attview', 'logs', 'notices', 'leaves', 'payslips'];
 
 export default function EmployeePortal(props) {
     const { isMobile } = useDeviceMode();
@@ -288,6 +290,18 @@ function DesktopEmployeePortal({ portalData, onReload }) {
                         onCancel={() => setShowCamera(false)}
                     />
                 </Modal>
+            )}
+
+            {/* === Academic Tracker Tab === */}
+            {activeTab === 'academic' && (
+                <AcademicTrackerForm
+                    user={user}
+                    todayStatus={stats?.todayStatus || 'None'}
+                    isMobile={false}
+                    onGoToAttendance={() => setActiveTab('attendance')}
+                    recentLogs={data?.academicLogs || []}
+                    onReload={loadData}
+                />
             )}
 
             {/* === Attendance View Tab === */}
