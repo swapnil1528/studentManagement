@@ -14,6 +14,7 @@ import { TAB_TO_SLUG } from './AdminLayout';
 const NAV_ITEMS = [
     { id: 'dash', icon: 'fas fa-home', label: 'Dashboard' },
     { id: 'att', icon: 'fas fa-calendar-check', label: 'Attendance' },
+    { id: 'academic', icon: 'fas fa-book-reader', label: 'Academic Tracker' },
     { id: 'notices', icon: 'fas fa-bullhorn', label: 'Notices' },
     { id: 'inq', icon: 'fas fa-user-plus', label: 'Inquiry' },
     { id: 'reg', icon: 'fas fa-id-card', label: 'Registrations' },

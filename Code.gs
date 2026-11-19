@@ -107,6 +107,7 @@ function doPost(e) {
     else if(act==='markEmployeeAtt') res = markEmployeeAttendance(d.id, d.type, d.lat, d.lng, d.photo);
     else if(act==='saveAcademicTracker') res = saveAcademicTracker(d.form);
     else if(act==='getAcademicTracker') res = { success: true, logs: getAcademicTrackerLogs(d.empId, d.date) };
+    else if(act==='getAllAcademicTracker') res = { success: true, logs: getAllAcademicTrackerLogs(d.branch, d.date) };
 
     // --- ASSIGNMENTS ---
     else if(act==='uploadAssignment') res = uploadAssignment(d.form);
@@ -244,6 +245,30 @@ function fetchAllAdminData(b) {
   const approvedLeaves = getD("Leave Requests").filter(r => r[8] === "Approved");
   const payroll = getD("Payroll");
   const empAtt = getD("Employee Attendance");
+  const acadRaw = getD("AcadmicTracker");
+  const academicLogs = acadRaw
+    .filter(r => check(r[5], b)) // r[5] = Branch
+    .map(r => ({
+      timestamp: r[0],
+      id: r[1],
+      date: r[2] instanceof Date ? Utilities.formatDate(r[2], "GMT+5:30", "yyyy-MM-dd") : String(r[2]),
+      empId: String(r[3] || ''),
+      empName: String(r[4] || ''),
+      branch: String(r[5] || ''),
+      standard: String(r[6] || ''),
+      subject: String(r[7] || ''),
+      topic: String(r[8] || ''),
+      batch: String(r[9] || ''),
+      present: Number(r[10] || 0),
+      absent: Number(r[11] || 0),
+      total: Number(r[12] || 0),
+      attRate: String(r[13] || ''),
+      teachingMode: String(r[14] || 'Theory'),
+      homework: String(r[15] || ''),
+      absentStudents: String(r[16] || ''),
+      remarks: String(r[17] || '')
+    }))
+    .reverse();
 
   // Dropdowns
   const getL = (n, c) => ss.getSheetByName(n) ? ss.getSheetByName(n).getRange(2, c, ss.getSheetByName(n).getLastRow() - 1 || 1).getValues().flat().filter(String) : [];
@@ -339,6 +364,7 @@ function fetchAllAdminData(b) {
     stats: { todayPresent: uniquePresent.length, todayAbsent: Math.max(0, activeStudents.length - uniquePresent.length) },
     _rawAttendance: allAtt.map(r => ({ date: r[0], id: r[1], name: r[2], course: r[3], status: r[4], batch: r[5] })),
     empAttendance: empAtt.map(r => ({ time: r[0], empId: String(r[1]), name: r[2], status: r[3], loc: r[4], dist: r[5], date: r[6] })),
+    academicLogs: academicLogs,
     notices: getNotices('Employee')
   };
   putInGasCache(cacheKey, result, 180);
@@ -988,6 +1014,44 @@ function getAcademicTrackerLogs(empId, dateFilter) {
       homework: r[15],
       absentStudents: r[16],
       remarks: r[17]
+    }))
+    .reverse();
+}
+
+function getAllAcademicTrackerLogs(branch, dateFilter) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("AcadmicTracker");
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const check = (v, t) => !t || String(t).toLowerCase() === "all" ? true : String(v).trim().toLowerCase() === String(t).trim().toLowerCase();
+  const rows = sheet.getDataRange().getValues().slice(1);
+  return rows
+    .filter(r => {
+      if (!check(r[5], branch)) return false;
+      if (dateFilter) {
+        let rDate = r[2] instanceof Date ? Utilities.formatDate(r[2], "GMT+5:30", "yyyy-MM-dd") : String(r[2]).substring(0, 10);
+        return rDate === dateFilter;
+      }
+      return true;
+    })
+    .map(r => ({
+      timestamp: r[0],
+      id: r[1],
+      date: r[2] instanceof Date ? Utilities.formatDate(r[2], "GMT+5:30", "yyyy-MM-dd") : String(r[2]),
+      empId: String(r[3] || ''),
+      empName: String(r[4] || ''),
+      branch: String(r[5] || ''),
+      standard: String(r[6] || ''),
+      subject: String(r[7] || ''),
+      topic: String(r[8] || ''),
+      batch: String(r[9] || ''),
+      present: Number(r[10] || 0),
+      absent: Number(r[11] || 0),
+      total: Number(r[12] || 0),
+      attRate: String(r[13] || ''),
+      teachingMode: String(r[14] || 'Theory'),
+      homework: String(r[15] || ''),
+      absentStudents: String(r[16] || ''),
+      remarks: String(r[17] || '')
     }))
     .reverse();
 }

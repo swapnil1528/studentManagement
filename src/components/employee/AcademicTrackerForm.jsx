@@ -629,3 +629,4 @@ function AcademicLogCard({ log, isMobile }) {
         </div>
     );
 }
+

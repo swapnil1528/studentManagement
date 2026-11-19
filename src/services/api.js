@@ -531,3 +531,7 @@ export const saveAcademicTracker = (form) =>
 /** Get academic tracker logs for employee */
 export const getAcademicTrackerLogs = (empId, date = '') =>
     apiCall('getAcademicTracker', { empId, date });
+
+/** Admin: get all academic tracker records across all faculty */
+export const getAllAcademicTrackerLogs = (branch = 'all', date = '') =>
+    apiCall('getAllAcademicTracker', { branch, date });

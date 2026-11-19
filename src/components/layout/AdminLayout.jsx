@@ -20,11 +20,13 @@ import HRManagement from '../../pages/admin/HRManagement';
 import ExamResults from '../../pages/admin/ExamResults';
 import ClassroomAdmin from '../../pages/admin/ClassroomAdmin';
 import ChatAdmin from '../../pages/admin/ChatAdmin';
+import AcademicTrackerAdmin from '../../pages/admin/AcademicTrackerAdmin';
 
 // Map URL paths to components
 const PAGE_MAP = {
     'dashboard': Dashboard,
     'attendance': Attendance,
+    'academic': AcademicTrackerAdmin,
     'notices': Notices,
     'inquiries': Inquiries,
     'registrations': Registrations,
@@ -42,6 +44,7 @@ const PAGE_MAP = {
 export const TAB_TO_SLUG = {
     dash: 'dashboard',
     att: 'attendance',
+    academic: 'academic',
     notices: 'notices',
     inq: 'inquiries',
     reg: 'registrations',

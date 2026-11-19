@@ -23,6 +23,7 @@ const EMPTY_DATA = {
     stats: { todayPresent: 0, todayAbsent: 0 },
     _rawAttendance: [],
     empAttendance: [],
+    academicLogs: [],
 };
 
 /** Read cached admin data from localStorage */
@@ -71,6 +72,7 @@ export default function AdminPage() {
             stats: result.stats || EMPTY_DATA.stats,
             _rawAttendance: result._rawAttendance || [],
             empAttendance: result.empAttendance || [],
+            academicLogs: result.academicLogs || [],
         };
     }, []);
 

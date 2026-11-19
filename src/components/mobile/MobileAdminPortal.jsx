@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { actionLeaveRequest, saveNotice, apiCall } from '../../services/api';
 import { showToast } from '../ui/Toast';
+import AcademicTrackerAdmin from '../../pages/admin/AcademicTrackerAdmin';
 
 export default function MobileAdminPortal({ adminData, branch, onReload }) {
     const { user, logout } = useAuth();
@@ -283,6 +284,16 @@ export default function MobileAdminPortal({ adminData, branch, onReload }) {
                 gradient: 'from-[#8B5CF6] to-[#6D28D9]',
                 borderColor: 'border-[#8B5CF6]/40',
                 onClick: () => setCurrentScreen('students')
+            },
+            {
+                id: 'academic',
+                title: 'Academic Tracker',
+                value: `${(adminData?.academicLogs || []).length} Logs`,
+                subtitle: 'Lectures & Syllabus Covered',
+                icon: '📚',
+                gradient: 'from-[#6366F1] to-[#4F46E5]',
+                borderColor: 'border-[#6366F1]/40',
+                onClick: () => setCurrentScreen('academic')
             }
         ];
 
@@ -846,6 +857,22 @@ export default function MobileAdminPortal({ adminData, branch, onReload }) {
                                 Open Full Chat Hub
                             </a>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SCREEN: ACADEMIC TRACKER */}
+            {currentScreen === 'academic' && (
+                <div className="flex flex-col min-h-screen bg-[#0B0F19] pb-10">
+                    <div className="sticky top-0 z-30 bg-[#131B2E] border-b border-[#1F293D] px-4 py-3 flex items-center justify-between">
+                        <button type="button" onClick={() => setCurrentScreen('dashboard')} className="text-[#818CF8] font-bold text-sm">
+                            ← Back
+                        </button>
+                        <h3 className="text-sm font-bold text-white">Academic Tracker</h3>
+                        <div className="w-10"></div>
+                    </div>
+                    <div className="p-3">
+                        <AcademicTrackerAdmin adminData={adminData} user={user} onReload={onReload} />
                     </div>
                 </div>
             )}
