@@ -99,11 +99,15 @@ const getFileIcon = (mimeType, fileName) => {
 
 const STUDENT_TABS = ['overview', 'attendance', 'fees', 'classroom', 'quizzes', 'results', 'schedule', 'grades', 'notices', 'logs'];
 
-export default function StudentPortal() {
+export default function StudentPortal(props) {
     const { isMobile: isMobileMode } = useDeviceMode();
     if (isMobileMode) {
-        return <MobileStudentPortal />;
+        return <MobileStudentPortal {...props} />;
     }
+    return <DesktopStudentPortal {...props} />;
+}
+
+function DesktopStudentPortal(props) {
     const { user, logout } = useAuth();
     const { isDark, toggleTheme } = useTheme();
 

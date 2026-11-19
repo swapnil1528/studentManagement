@@ -9,6 +9,7 @@ import {
     getChatMessages,
     sendChatMessage
 } from '../../services/api';
+import MobileFeeReminderModal from './MobileFeeReminderModal';
 
 export default function MobileStudentPortal() {
     const { user, logout } = useAuth();
@@ -40,6 +41,9 @@ export default function MobileStudentPortal() {
         dueDate: '',
         payments: []
     });
+    const [enrollments, setEnrollments] = useState([]);
+    const [showFeeReminderModal, setShowFeeReminderModal] = useState(false);
+    const [feeReminderDismissed, setFeeReminderDismissed] = useState(false);
 
     const [courses, setCourses] = useState([]);
     const [notices, setNotices] = useState([]);
@@ -81,13 +85,20 @@ export default function MobileStudentPortal() {
             if (feeRes.status === 'fulfilled' && feeRes.value) {
                 const fData = feeRes.value;
                 const summary = fData.feeSummary || {};
+                const total = Number(summary.totalAmount || summary.totalFee || 0);
+                const paid = Number(summary.paidAmount || summary.totalPaid || 0);
+                const pending = summary.pendingAmount !== undefined ? Number(summary.pendingAmount) : Math.max(0, total - paid);
+                const nextDue = summary.nextDueDate || summary.dueDate || '';
                 setFeesData({
-                    pendingAmount: summary.pendingAmount || 0,
-                    totalFee: summary.totalAmount || summary.totalFee || 0,
-                    totalPaid: summary.paidAmount || summary.totalPaid || 0,
-                    dueDate: summary.nextDueDate || '',
+                    pendingAmount: pending,
+                    totalFee: total,
+                    totalPaid: paid,
+                    dueDate: nextDue,
                     payments: fData.feePayments || []
                 });
+                if (Array.isArray(fData.enrollments)) {
+                    setEnrollments(fData.enrollments);
+                }
             }
         } catch (err) {
             console.error('Error loading mobile student data:', err);
@@ -99,6 +110,58 @@ export default function MobileStudentPortal() {
     useEffect(() => {
         loadData();
     }, [studentId]);
+
+    // Check fee reminder popup on fresh load or data update
+    useEffect(() => {
+        if (isLoading || feeReminderDismissed) return;
+        const pending = Number(feesData?.pendingAmount) || 0;
+        if (pending <= 0) return;
+
+        const studentKey = studentId || user?.studentId || user?.userId || 'student';
+        const dueDateStr = feesData?.dueDate || 'nodate';
+        const sessionKey = `fee_reminder_closed_${studentKey}_${dueDateStr}`;
+        if (sessionStorage.getItem(sessionKey) === 'true') {
+            return;
+        }
+
+        let shouldShow = true;
+        if (dueDateStr && dueDateStr !== 'nodate') {
+            const parts = String(dueDateStr).split(/[-/.]/);
+            let d = null;
+            if (parts.length === 3) {
+                if (parts[0].length === 4) d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                else d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+            } else {
+                d = new Date(dueDateStr);
+            }
+            if (d && !isNaN(d.getTime())) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                d.setHours(0, 0, 0, 0);
+                const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays > 5) shouldShow = false;
+            }
+        }
+
+        if (shouldShow) {
+            setShowFeeReminderModal(true);
+        }
+    }, [feesData, studentId, user, feeReminderDismissed, isLoading]);
+
+    const handleCloseFeeReminder = () => {
+        setShowFeeReminderModal(false);
+        setFeeReminderDismissed(true);
+        try {
+            const studentKey = studentId || user?.studentId || user?.userId || 'student';
+            const dueDateStr = feesData?.dueDate || 'nodate';
+            sessionStorage.setItem(`fee_reminder_closed_${studentKey}_${dueDateStr}`, 'true');
+        } catch (e) {}
+    };
+
+    const handleNavigateToFeesFromReminder = () => {
+        handleCloseFeeReminder();
+        setCurrentScreen('fees');
+    };
 
     // Top Navigation Bar
     const renderTopBar = (title) => (
@@ -237,7 +300,10 @@ export default function MobileStudentPortal() {
 
                     {/* Fee Dues */}
                     <div
-                        onClick={() => setCurrentScreen('fees')}
+                        onClick={() => {
+                            if (feesData.pendingAmount > 0) setShowFeeReminderModal(true);
+                            else setCurrentScreen('fees');
+                        }}
                         className={`bg-[#131B2E] border rounded-2xl p-3 cursor-pointer active:scale-95 transition-all ${
                             feesData.pendingAmount > 0 ? 'border-[#F43F5E]/40' : 'border-[#1F293D]'
                         }`}
@@ -285,6 +351,21 @@ export default function MobileStudentPortal() {
                         </div>
                     ))}
                 </div>
+
+                {/* Mobile Fee Reminder Popup Modal */}
+                <MobileFeeReminderModal
+                    isOpen={showFeeReminderModal}
+                    onClose={handleCloseFeeReminder}
+                    onNavigateToFees={handleNavigateToFeesFromReminder}
+                    feeSummary={{
+                        pendingAmount: feesData.pendingAmount,
+                        totalFee: feesData.totalFee,
+                        totalPaid: feesData.totalPaid,
+                        dueDate: feesData.dueDate,
+                    }}
+                    enrollments={enrollments}
+                    profile={{ ...profile, id: studentId }}
+                />
             </div>
         );
     }
@@ -529,6 +610,20 @@ export default function MobileStudentPortal() {
             {currentScreen === 'chat' && (
                 <MobileChatView studentId={studentId} studentName={profile.name} branch={profile.branch} onBack={() => setCurrentScreen('dashboard')} />
             )}
+            {/* Mobile Fee Reminder Popup Modal (available across sub-pages) */}
+            <MobileFeeReminderModal
+                isOpen={showFeeReminderModal}
+                onClose={handleCloseFeeReminder}
+                onNavigateToFees={handleNavigateToFeesFromReminder}
+                feeSummary={{
+                    pendingAmount: feesData.pendingAmount,
+                    totalFee: feesData.totalFee,
+                    totalPaid: feesData.totalPaid,
+                    dueDate: feesData.dueDate,
+                }}
+                enrollments={enrollments}
+                profile={{ ...profile, id: studentId }}
+            />
         </div>
     );
 }

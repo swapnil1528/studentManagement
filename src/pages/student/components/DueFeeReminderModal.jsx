@@ -131,8 +131,8 @@ export default function DueFeeReminderModal({
                     style={{
                         position: 'relative',
                         width: '100%',
-                        maxWidth: '560px',
-                        maxHeight: '90vh',
+                        maxWidth: 'min(560px, 94vw)',
+                        maxHeight: '88vh',
                         overflowY: 'auto',
                         background: isDark
                             ? 'linear-gradient(180deg, #1b1731 0%, #120f24 100%)'
@@ -144,8 +144,7 @@ export default function DueFeeReminderModal({
                         boxShadow: isDark
                             ? '0 25px 60px -15px rgba(239, 68, 68, 0.3), 0 10px 40px rgba(0,0,0,0.7)'
                             : '0 25px 60px -15px rgba(239, 68, 68, 0.2), 0 15px 35px rgba(0,0,0,0.1)',
-                        padding: '28px',
-                        overflow: 'hidden',
+                        padding: 'min(24px, 5vw)',
                         fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
                     }}
                 >
