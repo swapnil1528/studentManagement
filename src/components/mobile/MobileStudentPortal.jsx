@@ -409,7 +409,7 @@ export default function MobileStudentPortal() {
                         </div>
 
                         {/* Selfie & GPS Check-In Card */}
-                        <AttendanceActionBox studentId={studentId} onDone={loadData} />
+                        <AttendanceActionBox studentId={studentId} todayStatus={attendanceData.todayStatus} onDone={loadData} />
 
                         {/* History Logs */}
                         <div>
@@ -629,9 +629,13 @@ export default function MobileStudentPortal() {
 }
 
 // Attendance Box with Camera
-function AttendanceActionBox({ studentId, onDone }) {
+function AttendanceActionBox({ studentId, todayStatus = 'None', onDone }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [msg, setMsg] = useState('');
+
+    const canCheckIn = todayStatus === 'None' || !todayStatus;
+    const canCheckOut = todayStatus === 'Check-In';
+    const isCompleted = todayStatus === 'Check-Out';
 
     const handleMark = async (type) => {
         setIsSubmitting(true);
@@ -665,28 +669,47 @@ function AttendanceActionBox({ studentId, onDone }) {
     return (
         <div className="bg-[#131B2E] border border-[#1F293D] rounded-[22px] p-5 text-center">
             <h4 className="text-sm font-bold text-white">Daily Check-In & Check-Out</h4>
-            <p className="text-xs text-[#94A3B8] mt-1 mb-4">Tap below to stamp your attendance timestamp</p>
+            <p className="text-xs text-[#94A3B8] mt-1 mb-4">
+                {isCompleted
+                    ? "Today's attendance completed"
+                    : canCheckOut
+                        ? "You are checked in. Tap check-out when leaving."
+                        : "Tap Check-In to start your session"}
+            </p>
 
             {msg && <p className="text-xs font-bold text-[#10B981] mb-3">{msg}</p>}
 
             <div className="grid grid-cols-2 gap-3">
                 <button
                     type="button"
-                    disabled={isSubmitting}
+                    disabled={!canCheckIn || isSubmitting}
                     onClick={() => handleMark('Check-In')}
-                    className="h-12 rounded-xl bg-[#10B981] hover:bg-[#059669] font-bold text-xs text-white flex items-center justify-center space-x-1 active:scale-95 transition-all shadow-md shadow-emerald-500/20"
+                    className={`h-12 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${
+                        canCheckIn && !isSubmitting
+                            ? 'bg-[#10B981] hover:bg-[#059669] text-white active:scale-95 shadow-md shadow-emerald-500/20 cursor-pointer'
+                            : 'bg-[#1E293B] text-[#64748B] opacity-60 cursor-not-allowed'
+                    }`}
                 >
-                    <span>✓ Check In</span>
+                    <span>{todayStatus === 'Check-In' || isCompleted ? '✓ Checked In' : '✓ Check In'}</span>
                 </button>
                 <button
                     type="button"
-                    disabled={isSubmitting}
+                    disabled={!canCheckOut || isSubmitting}
                     onClick={() => handleMark('Check-Out')}
-                    className="h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] font-bold text-xs text-white flex items-center justify-center space-x-1 active:scale-95 transition-all shadow-md shadow-red-500/20"
+                    className={`h-12 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${
+                        canCheckOut && !isSubmitting
+                            ? 'bg-[#DC2626] hover:bg-[#B91C1C] text-white active:scale-95 shadow-md shadow-red-500/20 cursor-pointer'
+                            : 'bg-[#1E293B] text-[#64748B] opacity-60 cursor-not-allowed'
+                    }`}
                 >
-                    <span>⏱ Check Out</span>
+                    <span>{isCompleted ? '✓ Checked Out' : '⏱ Check Out'}</span>
                 </button>
             </div>
+            {isCompleted && (
+                <p className="text-[11px] font-bold text-[#10B981] mt-3">
+                    ✅ Attendance complete for today. Double check-in is disabled.
+                </p>
+            )}
         </div>
     );
 }

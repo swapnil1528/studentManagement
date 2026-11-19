@@ -625,6 +625,44 @@ function markStudentAttendance(id, type, lat, lng, device, d) {
   const studentRow = adData.find(r => String(r[2]) === String(id) && String(r[11]) === "Active");
   if (!studentRow) return { error: "Student not Active" };
   
+  // Enforce attendance flow:
+  // 1. Double check-in on same day is blocked.
+  // 2. Check-out is blocked if check-in has not been done today.
+  // 3. Double check-out on same day is blocked.
+  const attSheet = ss.getSheetByName("Attendance");
+  const todayStr = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd");
+  const attData = (attSheet && attSheet.getLastRow() > 1) ? attSheet.getDataRange().getValues().slice(1) : [];
+
+  let hasCheckedInToday = false;
+  let hasCheckedOutToday = false;
+
+  for (let i = 0; i < attData.length; i++) {
+    const row = attData[i];
+    if (String(row[1]) === String(id)) {
+      let rDate = row[0];
+      let rDateStr = (rDate instanceof Date) ? Utilities.formatDate(rDate, "GMT+5:30", "yyyy-MM-dd") : String(rDate).substring(0, 10);
+      if (rDateStr === todayStr) {
+        const rType = String(row[4] || '').trim().toLowerCase();
+        if (rType.includes('in') || rType.includes('present')) hasCheckedInToday = true;
+        if (rType.includes('out')) hasCheckedOutToday = true;
+      }
+    }
+  }
+
+  const reqType = String(type || '').trim().toLowerCase();
+  if (reqType.includes('in')) {
+    if (hasCheckedInToday) {
+      return { error: "Already checked in today. Double check-in is not allowed." };
+    }
+  } else if (reqType.includes('out')) {
+    if (!hasCheckedInToday) {
+      return { error: "Cannot check out: You have not checked in today." };
+    }
+    if (hasCheckedOutToday) {
+      return { error: "Already checked out today. Your attendance is completed for today." };
+    }
+  }
+
   // Save the photo if provided
   let photoUrl = "";
   if (d.photo) {
@@ -636,7 +674,6 @@ function markStudentAttendance(id, type, lat, lng, device, d) {
   }
 
   // Save attendance record
-  const attSheet = ss.getSheetByName("Attendance");
   const timestamp = Utilities.formatDate(new Date(), "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const loc = (lat && lng) ? lat + "," + lng : "N/A";
   
@@ -655,6 +692,11 @@ function markStudentAttendance(id, type, lat, lng, device, d) {
   
   attSheet.appendRow(rowData);
   
+  // Invalidate student portal cache
+  try {
+    CacheService.getScriptCache().remove("student_data_" + String(id).toLowerCase().trim());
+  } catch(e) {}
+
   return { success: true, time: timestamp, type: type, photoUrl: photoUrl };
 }
 
@@ -721,6 +763,41 @@ function markEmployeeAttendance(id, type, lat, lng, photoStr) {
   const dateStr = Utilities.formatDate(timestamp, "GMT+5:30", "yyyy-MM-dd");
   const timeStr = Utilities.formatDate(timestamp, "GMT+5:30", "yyyy-MM-dd HH:mm:ss");
   const loc = (lat && lng) ? lat + "," + lng : "N/A";
+
+  // Enforce attendance flow:
+  // 1. Double check-in on same day is blocked.
+  // 2. Check-out is blocked if check-in has not been done today.
+  // 3. Double check-out on same day is blocked.
+  const attData = attSheet.getLastRow() > 1 ? attSheet.getDataRange().getValues().slice(1) : [];
+  let hasCheckedInToday = false;
+  let hasCheckedOutToday = false;
+
+  for (let i = 0; i < attData.length; i++) {
+    const row = attData[i];
+    if (String(row[1]) === String(id)) {
+      let rDate = row[6] || row[0];
+      let rDateStr = (rDate instanceof Date) ? Utilities.formatDate(rDate, "GMT+5:30", "yyyy-MM-dd") : String(rDate).substring(0, 10);
+      if (rDateStr === dateStr) {
+        const rType = String(row[3] || '').trim().toLowerCase();
+        if (rType.includes('in')) hasCheckedInToday = true;
+        if (rType.includes('out')) hasCheckedOutToday = true;
+      }
+    }
+  }
+
+  const reqType = String(type || '').trim().toLowerCase();
+  if (reqType.includes('in')) {
+    if (hasCheckedInToday) {
+      return { error: "Already checked in today. Double check-in is not allowed." };
+    }
+  } else if (reqType.includes('out')) {
+    if (!hasCheckedInToday) {
+      return { error: "Cannot check out: You have not checked in today." };
+    }
+    if (hasCheckedOutToday) {
+      return { error: "Already checked out today. Your shift is completed." };
+    }
+  }
   
   // Get employee name
   const empSheet = ss.getSheetByName("Employee");

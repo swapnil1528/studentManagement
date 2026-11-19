@@ -1,4 +1,4 @@
-﻿/**
+/**
  * StudentPortal — Gen Z redesign.
  * Tabs: Overview, Attendance, Assignments, Logs, Notices, LMS, Results, Schedule, Grades
  */
@@ -575,8 +575,6 @@ function DesktopStudentPortal(props) {
         queryClient.invalidateQueries(['settings']);
     };
 
-    if (loading && !data && !user?.name) return <AnimatedSkeleton />;
-
     const profile = {
         name: data?.profile?.name || feesData?.studentName || user?.name || 'Student',
         id: data?.profile?.id || feesData?.studentId || studentIdentifier,
@@ -687,9 +685,9 @@ function DesktopStudentPortal(props) {
     const canMarkAttendance = !isMobile || mobileAllowed;
 
     const getAttStatus = () => {
-        if (att.todayStatus === 'Check-In') return { class: 'status-checkin', label: '✓ Checked In', showOut: true };
-        if (att.todayStatus === 'Check-Out') return { class: 'status-checkout', label: '✗ Checked Out', showOut: false };
-        return { class: 'status-none', label: '⏳ Not Marked', showOut: false };
+        if (att.todayStatus === 'Check-In') return { class: 'status-checkin', label: '✓ Checked In', showOut: true, canCheckIn: false, canCheckOut: true };
+        if (att.todayStatus === 'Check-Out') return { class: 'status-checkout', label: '✗ Checked Out', showOut: false, canCheckIn: false, canCheckOut: false };
+        return { class: 'status-none', label: '⏳ Not Marked', showOut: false, canCheckIn: true, canCheckOut: false };
     };
     const attStatus = getAttStatus();
 
@@ -785,6 +783,8 @@ function DesktopStudentPortal(props) {
             <div style={{ fontSize: 13, color: '#94a3b8' }}>{sub}</div>
         </div>
     );
+
+    if (loading && !data && !user?.name) return <AnimatedSkeleton />;
 
     return (
         <PortalLayout
@@ -889,22 +889,34 @@ function DesktopStudentPortal(props) {
                                         </p>
                                     )}
 
-                                    {attStatus.showOut ? (
-                                        <button
-                                            className="gz-checkin-btn gz-btn-out"
-                                            onClick={() => initiateAttendance('Check-Out')}
-                                            disabled={!canMarkAttendance}
-                                        >
-                                            👋 Check Out {cameraRequired ? '📷' : ''}
-                                        </button>
-                                    ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                                         <button
                                             className="gz-checkin-btn gz-btn-in"
-                                            onClick={() => initiateAttendance('Check-In')}
-                                            disabled={!canMarkAttendance || att.todayStatus === 'Check-Out'}
+                                            onClick={() => attStatus.canCheckIn && initiateAttendance('Check-In')}
+                                            disabled={!attStatus.canCheckIn || !canMarkAttendance}
+                                            style={{
+                                                opacity: attStatus.canCheckIn && canMarkAttendance ? 1 : 0.5,
+                                                cursor: attStatus.canCheckIn && canMarkAttendance ? 'pointer' : 'not-allowed'
+                                            }}
                                         >
-                                            {att.todayStatus === 'Check-Out' ? '✅ Done for Today' : `⚡ Check In ${cameraRequired ? '📷' : ''}`}
+                                            {att.todayStatus === 'Check-In' || att.todayStatus === 'Check-Out' ? '✓ Checked In' : `⚡ Check In ${cameraRequired ? '📷' : ''}`}
                                         </button>
+                                        <button
+                                            className="gz-checkin-btn gz-btn-out"
+                                            onClick={() => attStatus.canCheckOut && initiateAttendance('Check-Out')}
+                                            disabled={!attStatus.canCheckOut || !canMarkAttendance}
+                                            style={{
+                                                opacity: attStatus.canCheckOut && canMarkAttendance ? 1 : 0.5,
+                                                cursor: attStatus.canCheckOut && canMarkAttendance ? 'pointer' : 'not-allowed'
+                                            }}
+                                        >
+                                            {att.todayStatus === 'Check-Out' ? '✓ Checked Out' : `👋 Check Out ${cameraRequired ? '📷' : ''}`}
+                                        </button>
+                                    </div>
+                                    {att.todayStatus === 'Check-Out' && (
+                                        <p style={{ textAlign: 'center', fontSize: 11, color: '#10B981', marginTop: 8, fontWeight: 700 }}>
+                                            ✅ Today's attendance is complete.
+                                        </p>
                                     )}
                                 </div>
 

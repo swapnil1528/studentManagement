@@ -176,24 +176,35 @@ export default function DashboardWidget({
                         ))}
                     </div>
 
-                    {/* Check-In/Out button */}
-                    {attStatus.showOut ? (
-                        <button
-                            className="gz-checkin-btn gz-btn-out"
-                            onClick={() => initiateAttendance('Check-Out')}
-                            disabled={!canMarkAttendance}
-                        >
-                            👋 Check Out {cameraRequired ? '📷' : ''}
-                        </button>
-                    ) : (
+                    {/* Check-In/Out buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '8px 0' }}>
                         <button
                             className="gz-checkin-btn gz-btn-in"
-                            onClick={() => initiateAttendance('Check-In')}
-                            disabled={!canMarkAttendance || att?.todayStatus === 'Check-Out'}
+                            onClick={() => (attStatus?.canCheckIn ?? (att?.todayStatus === 'None' || !att?.todayStatus)) && initiateAttendance('Check-In')}
+                            disabled={!(attStatus?.canCheckIn ?? (att?.todayStatus === 'None' || !att?.todayStatus)) || !canMarkAttendance}
+                            style={{
+                                opacity: (attStatus?.canCheckIn ?? (att?.todayStatus === 'None' || !att?.todayStatus)) && canMarkAttendance ? 1 : 0.5,
+                                cursor: (attStatus?.canCheckIn ?? (att?.todayStatus === 'None' || !att?.todayStatus)) && canMarkAttendance ? 'pointer' : 'not-allowed',
+                                fontSize: 12,
+                                padding: '10px 8px'
+                            }}
                         >
-                            {att?.todayStatus === 'Check-Out' ? '✅ Done for Today' : `Tap to Check In ${cameraRequired ? '📷' : '⚡'}`}
+                            {att?.todayStatus === 'Check-In' || att?.todayStatus === 'Check-Out' ? '✓ Checked In' : `Check In ${cameraRequired ? '📷' : '⚡'}`}
                         </button>
-                    )}
+                        <button
+                            className="gz-checkin-btn gz-btn-out"
+                            onClick={() => (attStatus?.canCheckOut ?? (att?.todayStatus === 'Check-In')) && initiateAttendance('Check-Out')}
+                            disabled={!(attStatus?.canCheckOut ?? (att?.todayStatus === 'Check-In')) || !canMarkAttendance}
+                            style={{
+                                opacity: (attStatus?.canCheckOut ?? (att?.todayStatus === 'Check-In')) && canMarkAttendance ? 1 : 0.5,
+                                cursor: (attStatus?.canCheckOut ?? (att?.todayStatus === 'Check-In')) && canMarkAttendance ? 'pointer' : 'not-allowed',
+                                fontSize: 12,
+                                padding: '10px 8px'
+                            }}
+                        >
+                            {att?.todayStatus === 'Check-Out' ? '✓ Checked Out' : `Check Out ${cameraRequired ? '📷' : '👋'}`}
+                        </button>
+                    </div>
 
                     {att?.lastCheckInTime && (
                         <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', margin: 0 }}>

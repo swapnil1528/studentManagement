@@ -98,13 +98,41 @@ function DesktopEmployeePortal({ portalData, onReload }) {
     const stats = data?.stats || {};
 
     // Attendance status helpers
+    const todayStatus = stats.todayStatus || 'None';
     const getAttButtons = () => {
-        if (stats.todayStatus === 'Check-In') return { showIn: false, showOut: true, icon: 'fas fa-building text-green-500', iconClass: 'text-5xl mb-4 text-green-500', label: 'Working', lastText: `Checked in at: ${stats.lastCheckTime ? new Date(stats.lastCheckTime).toLocaleTimeString() : ''}` };
-        if (stats.todayStatus === 'Check-Out') return { showIn: true, showOut: false, icon: 'fas fa-home text-gray-400', iconClass: 'text-5xl mb-4 text-gray-400', label: 'Checked Out', lastText: 'Shift ended' };
-        return { showIn: true, showOut: false, icon: 'fas fa-clock text-gray-300', iconClass: 'text-5xl mb-4 text-gray-300', label: 'Not Marked', lastText: 'Mark your attendance' };
+        if (todayStatus === 'Check-In') {
+            return {
+                canCheckIn: false,
+                canCheckOut: true,
+                isCompleted: false,
+                icon: 'fas fa-building text-green-500',
+                iconClass: 'text-5xl mb-4 text-green-500',
+                label: 'Working (Checked In)',
+                lastText: `Checked in at: ${stats.lastCheckTime ? new Date(stats.lastCheckTime).toLocaleTimeString() : ''}`
+            };
+        }
+        if (todayStatus === 'Check-Out') {
+            return {
+                canCheckIn: false,
+                canCheckOut: false,
+                isCompleted: true,
+                icon: 'fas fa-check-circle text-blue-500',
+                iconClass: 'text-5xl mb-4 text-blue-500',
+                label: 'Shift Completed',
+                lastText: 'Attendance completed for today. Double check-in is disabled.'
+            };
+        }
+        return {
+            canCheckIn: true,
+            canCheckOut: false,
+            isCompleted: false,
+            icon: 'fas fa-clock text-gray-400',
+            iconClass: 'text-5xl mb-4 text-gray-400',
+            label: 'Not Checked In',
+            lastText: 'Mark your check-in to start your day.'
+        };
     };
     const attState = getAttButtons();
-    const todayStatus = stats.todayStatus || 'None';
     const [marking, setMarking] = useState(false);
 
     // Camera state
@@ -203,25 +231,36 @@ function DesktopEmployeePortal({ portalData, onReload }) {
                         <div className={attState.iconClass}><i className={attState.icon} /></div>
                         <p className="text-sm text-gray-400 mb-6">{attState.lastText}</p>
                         <div className="flex justify-center gap-4 mt-8">
-                            {(todayStatus === 'None' || todayStatus === 'Check-Out') && (
-                                <button
-                                    className="btn bg-green-600 px-8 py-3 text-lg"
-                                    onClick={() => initiateAttendance('Check-In')}
-                                    disabled={marking}
-                                >
-                                    <i className="fas fa-sign-in-alt mr-2" /> {marking ? 'Wait...' : employeeCameraRequired ? 'Check In (Camera)' : 'Check In'}
-                                </button>
-                            )}
-                            {todayStatus === 'Check-In' && (
-                                <button
-                                    className="btn bg-red-600 px-8 py-3 text-lg"
-                                    onClick={() => initiateAttendance('Check-Out')}
-                                    disabled={marking}
-                                >
-                                    <i className="fas fa-sign-out-alt mr-2" /> {marking ? 'Wait...' : employeeCameraRequired ? 'Check Out (Camera)' : 'Check Out'}
-                                </button>
-                            )}
+                            <button
+                                className={`btn px-8 py-3 text-lg transition-all ${attState.canCheckIn && !marking ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'}`}
+                                onClick={() => attState.canCheckIn && initiateAttendance('Check-In')}
+                                disabled={!attState.canCheckIn || marking}
+                            >
+                                <i className="fas fa-sign-in-alt mr-2" />
+                                {marking && attTypePending === 'Check-In'
+                                    ? 'Wait...'
+                                    : todayStatus === 'Check-In' || todayStatus === 'Check-Out'
+                                        ? 'Checked In ✓'
+                                        : employeeCameraRequired ? 'Check In (Camera)' : 'Check In'}
+                            </button>
+                            <button
+                                className={`btn px-8 py-3 text-lg transition-all ${attState.canCheckOut && !marking ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'}`}
+                                onClick={() => attState.canCheckOut && initiateAttendance('Check-Out')}
+                                disabled={!attState.canCheckOut || marking}
+                            >
+                                <i className="fas fa-sign-out-alt mr-2" />
+                                {marking && attTypePending === 'Check-Out'
+                                    ? 'Wait...'
+                                    : todayStatus === 'Check-Out'
+                                        ? 'Checked Out ✓'
+                                        : employeeCameraRequired ? 'Check Out (Camera)' : 'Check Out'}
+                            </button>
                         </div>
+                        {attState.isCompleted && (
+                            <p className="text-sm font-semibold text-green-600 mt-4">
+                                ✅ Shift completed for today. Double check-in is disabled.
+                            </p>
+                        )}
                     </div>
 
                     <div className="card">

@@ -332,26 +332,38 @@ fun AttendanceScreen(
                                 Spacer(Modifier.height(8.dp))
                                 Text("Submitting to server...", color = TextMuted, fontSize = 12.sp)
                             } else {
+                                val canCheckIn = todayStatus.equals("None", ignoreCase = true) || todayStatus.equals("Not Marked", ignoreCase = true)
+                                val canCheckOut = todayStatus.contains("In", ignoreCase = true)
+                                val isCompleted = todayStatus.contains("Out", ignoreCase = true)
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Button(
                                         onClick = { submitAttendance("Check-In") },
+                                        enabled = canCheckIn,
                                         modifier = Modifier.weight(1f).height(50.dp),
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = EmeraldGreen,
+                                            disabledContainerColor = DarkBorder
+                                        )
                                     ) {
-                                        Text("🟢 Check In", fontWeight = FontWeight.Bold)
+                                        Text(if (canCheckIn) "🟢 Check In" else "✓ Checked In", fontWeight = FontWeight.Bold)
                                     }
 
                                     Button(
                                         onClick = { submitAttendance("Check-Out") },
+                                        enabled = canCheckOut,
                                         modifier = Modifier.weight(1f).height(50.dp),
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFDC2626),
+                                            disabledContainerColor = DarkBorder
+                                        )
                                     ) {
-                                        Text("🔴 Check Out", fontWeight = FontWeight.Bold)
+                                        Text(if (isCompleted) "✓ Checked Out" else "🔴 Check Out", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

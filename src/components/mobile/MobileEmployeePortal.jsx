@@ -66,6 +66,9 @@ export default function MobileEmployeePortal() {
             badge: 'CHECKED IN',
             color: 'text-[#10B981]',
             badgeBg: 'bg-[#10B981]/20 text-[#10B981]',
+            canCheckIn: false,
+            canCheckOut: true,
+            isCompleted: false,
             lastText: stats.lastCheckTime
                 ? `Checked in at ${new Date(stats.lastCheckTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                 : 'Currently on shift',
@@ -76,6 +79,9 @@ export default function MobileEmployeePortal() {
                 badge: 'SHIFT ENDED',
                 color: 'text-[#F59E0B]',
                 badgeBg: 'bg-[#F59E0B]/20 text-[#F59E0B]',
+                canCheckIn: false,
+                canCheckOut: false,
+                isCompleted: true,
                 lastText: 'Today shift completed',
             }
             : {
@@ -83,6 +89,9 @@ export default function MobileEmployeePortal() {
                 badge: 'PENDING',
                 color: 'text-[#94A3B8]',
                 badgeBg: 'bg-[#94A3B8]/20 text-[#94A3B8]',
+                canCheckIn: true,
+                canCheckOut: false,
+                isCompleted: false,
                 lastText: 'Tap below to mark your attendance',
             };
 
@@ -406,36 +415,49 @@ export default function MobileEmployeePortal() {
                                 <p className="text-xs text-[#94A3B8] mt-1">{statusInfo.lastText}</p>
                             </div>
 
-                            <div className="pt-2">
-                                {(todayStatus === 'None' || todayStatus === 'Check-Out') && (
-                                    <button
-                                        type="button"
-                                        onClick={() => initiateAttendance('Check-In')}
-                                        disabled={marking}
-                                        className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-[#10B981] to-[#059669] font-bold text-sm text-white shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
-                                    >
-                                        {marking
-                                            ? 'Marking Check-In...'
-                                            : employeeCameraRequired
-                                                ? '📷 Check In (Camera)'
-                                                : '✓ Check In'}
-                                    </button>
-                                )}
-                                {todayStatus === 'Check-In' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => initiateAttendance('Check-Out')}
-                                        disabled={marking}
-                                        className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-[#F43F5E] to-[#E11D48] font-bold text-sm text-white shadow-lg shadow-rose-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
-                                    >
-                                        {marking
-                                            ? 'Marking Check-Out...'
-                                            : employeeCameraRequired
-                                                ? '📷 Check Out (Camera)'
-                                                : '✓ Check Out'}
-                                    </button>
-                                )}
+                            <div className="pt-2 grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => statusInfo.canCheckIn && initiateAttendance('Check-In')}
+                                    disabled={!statusInfo.canCheckIn || marking}
+                                    className={`h-[52px] rounded-2xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${
+                                        statusInfo.canCheckIn && !marking
+                                            ? 'bg-gradient-to-r from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/25 active:scale-[0.98] cursor-pointer'
+                                            : 'bg-[#1E293B] text-[#64748B] opacity-60 cursor-not-allowed'
+                                    }`}
+                                >
+                                    <span>
+                                        {marking && attTypePending === 'Check-In'
+                                            ? 'Checking In...'
+                                            : todayStatus === 'Check-In' || statusInfo.isCompleted
+                                                ? '✓ Checked In'
+                                                : employeeCameraRequired ? '📷 Check In' : '✓ Check In'}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => statusInfo.canCheckOut && initiateAttendance('Check-Out')}
+                                    disabled={!statusInfo.canCheckOut || marking}
+                                    className={`h-[52px] rounded-2xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${
+                                        statusInfo.canCheckOut && !marking
+                                            ? 'bg-gradient-to-r from-[#F43F5E] to-[#E11D48] text-white shadow-lg shadow-rose-500/25 active:scale-[0.98] cursor-pointer'
+                                            : 'bg-[#1E293B] text-[#64748B] opacity-60 cursor-not-allowed'
+                                    }`}
+                                >
+                                    <span>
+                                        {marking && attTypePending === 'Check-Out'
+                                            ? 'Checking Out...'
+                                            : statusInfo.isCompleted
+                                                ? '✓ Checked Out'
+                                                : employeeCameraRequired ? '📷 Check Out' : '⏱ Check Out'}
+                                    </span>
+                                </button>
                             </div>
+                            {statusInfo.isCompleted && (
+                                <p className="text-[11px] font-bold text-[#10B981] mt-2">
+                                    ✅ Shift completed for today. Double check-in is disabled.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </>
